@@ -1,0 +1,128 @@
+//! English translations
+
+use std::collections::HashMap;
+
+pub fn get_translations() -> HashMap<String, String> {
+    let mut t = HashMap::new();
+
+    // App general
+    t.insert("app.title".into(), "PowerCost Tracker".into());
+    t.insert("app.version".into(), "Version".into());
+
+    // Navigation
+    t.insert("nav.dashboard".into(), "Dashboard".into());
+    t.insert("nav.history".into(), "History".into());
+    t.insert("nav.settings".into(), "Settings".into());
+    t.insert("nav.about".into(), "About".into());
+
+    // Dashboard
+    t.insert("dashboard.current_power".into(), "Current Power".into());
+    t.insert("dashboard.session_energy".into(), "Session Energy".into());
+    t.insert("dashboard.session_cost".into(), "Session Cost".into());
+    t.insert("dashboard.hourly_estimate".into(), "Hourly Estimate".into());
+    t.insert("dashboard.daily_estimate".into(), "Daily Estimate".into());
+    t.insert("dashboard.monthly_estimate".into(), "Monthly Estimate".into());
+    t.insert("dashboard.session_duration".into(), "Session Duration".into());
+    t.insert("dashboard.power_source".into(), "Power Source".into());
+    t.insert("dashboard.estimated".into(), "Estimated".into());
+    t.insert("dashboard.measured".into(), "Measured".into());
+
+    // Units
+    t.insert("unit.watts".into(), "W".into());
+    t.insert("unit.kilowatts".into(), "kW".into());
+    t.insert("unit.watt_hours".into(), "Wh".into());
+    t.insert("unit.kilowatt_hours".into(), "kWh".into());
+    t.insert("unit.per_hour".into(), "/hour".into());
+    t.insert("unit.per_day".into(), "/day".into());
+    t.insert("unit.per_month".into(), "/month".into());
+
+    // Settings - General
+    t.insert("settings.general".into(), "General".into());
+    t.insert("settings.language".into(), "Language".into());
+    t.insert("settings.language.auto".into(), "Auto-detect".into());
+    t.insert("settings.theme".into(), "Theme".into());
+    t.insert("settings.theme.dark".into(), "Dark".into());
+    t.insert("settings.theme.light".into(), "Light".into());
+    t.insert("settings.theme.system".into(), "System".into());
+    t.insert("settings.refresh_rate".into(), "Refresh Rate".into());
+    t.insert("settings.eco_mode".into(), "Eco Mode".into());
+    t.insert("settings.eco_mode.description".into(), "Reduce refresh rate when minimized".into());
+    t.insert("settings.start_minimized".into(), "Start Minimized".into());
+    t.insert("settings.start_with_system".into(), "Start with System".into());
+
+    // Settings - Pricing
+    t.insert("settings.pricing".into(), "Pricing".into());
+    t.insert("settings.pricing.mode".into(), "Pricing Mode".into());
+    t.insert("settings.pricing.mode.simple".into(), "Simple (flat rate)".into());
+    t.insert("settings.pricing.mode.peak_offpeak".into(), "Peak/Off-peak".into());
+    t.insert("settings.pricing.mode.seasonal".into(), "Seasonal".into());
+    t.insert("settings.pricing.mode.tempo".into(), "Tempo (EDF-style)".into());
+    t.insert("settings.pricing.currency".into(), "Currency".into());
+    t.insert("settings.pricing.rate".into(), "Rate per kWh".into());
+    t.insert("settings.pricing.peak_rate".into(), "Peak Rate".into());
+    t.insert("settings.pricing.offpeak_rate".into(), "Off-peak Rate".into());
+    t.insert("settings.pricing.offpeak_start".into(), "Off-peak Start".into());
+    t.insert("settings.pricing.offpeak_end".into(), "Off-peak End".into());
+    t.insert("settings.pricing.summer_rate".into(), "Summer Rate".into());
+    t.insert("settings.pricing.winter_rate".into(), "Winter Rate".into());
+    t.insert("settings.pricing.not_configured".into(), "Pricing not configured".into());
+    t.insert("settings.pricing.configure_hint".into(), "Configure pricing to see cost estimates".into());
+
+    // Settings - Widget
+    t.insert("settings.widget".into(), "Widget".into());
+    t.insert("settings.widget.enabled".into(), "Enable Widget".into());
+    t.insert("settings.widget.show_cost".into(), "Show Cost".into());
+    t.insert("settings.widget.show_power".into(), "Show Power Only".into());
+    t.insert("settings.widget.position".into(), "Position".into());
+    t.insert("settings.widget.position.top_left".into(), "Top Left".into());
+    t.insert("settings.widget.position.top_right".into(), "Top Right".into());
+    t.insert("settings.widget.position.bottom_left".into(), "Bottom Left".into());
+    t.insert("settings.widget.position.bottom_right".into(), "Bottom Right".into());
+    t.insert("settings.widget.opacity".into(), "Opacity".into());
+
+    // Settings - Advanced
+    t.insert("settings.advanced".into(), "Advanced".into());
+    t.insert("settings.advanced.baseline".into(), "Baseline Power".into());
+    t.insert("settings.advanced.baseline.auto".into(), "Auto-detect".into());
+    t.insert("settings.advanced.baseline.manual".into(), "Manual".into());
+    t.insert("settings.advanced.baseline.description".into(), "Baseline power for surplus tracking".into());
+
+    // History
+    t.insert("history.title".into(), "Consumption History".into());
+    t.insert("history.today".into(), "Today".into());
+    t.insert("history.this_week".into(), "This Week".into());
+    t.insert("history.this_month".into(), "This Month".into());
+    t.insert("history.custom_range".into(), "Custom Range".into());
+    t.insert("history.total_consumption".into(), "Total Consumption".into());
+    t.insert("history.total_cost".into(), "Total Cost".into());
+    t.insert("history.average_power".into(), "Average Power".into());
+    t.insert("history.peak_power".into(), "Peak Power".into());
+    t.insert("history.no_data".into(), "No data available for this period".into());
+
+    // About
+    t.insert("about.title".into(), "About PowerCost Tracker".into());
+    t.insert("about.description".into(), "A lightweight desktop application for monitoring PC power consumption and calculating electricity costs in real-time.".into());
+    t.insert("about.license".into(), "License: MIT".into());
+    t.insert("about.source".into(), "Source Code".into());
+
+    // Errors and warnings
+    t.insert("error.hardware_not_detected".into(), "Power monitoring hardware not detected".into());
+    t.insert("error.using_estimation".into(), "Using power estimation mode".into());
+    t.insert("error.permission_denied".into(), "Permission denied".into());
+    t.insert("warning.estimated_values".into(), "Values are estimated and may not be accurate".into());
+
+    // Actions
+    t.insert("action.save".into(), "Save".into());
+    t.insert("action.cancel".into(), "Cancel".into());
+    t.insert("action.reset".into(), "Reset".into());
+    t.insert("action.close".into(), "Close".into());
+    t.insert("action.minimize".into(), "Minimize".into());
+    t.insert("action.quit".into(), "Quit".into());
+
+    // Time
+    t.insert("time.hours".into(), "hours".into());
+    t.insert("time.minutes".into(), "minutes".into());
+    t.insert("time.seconds".into(), "seconds".into());
+
+    t
+}

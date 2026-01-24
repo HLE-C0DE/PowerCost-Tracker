@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerCost Tracker</title>
+    <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <span class="logo-text">PowerCost</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#dashboard" class="nav-link active" data-view="dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="9"/>
+                        <rect x="14" y="3" width="7" height="5"/>
+                        <rect x="14" y="12" width="7" height="9"/>
+                        <rect x="3" y="16" width="7" height="5"/>
+                    </svg>
+                    <span data-i18n="nav.dashboard">Dashboard</span>
+                </a></li>
+                <li><a href="#history" class="nav-link" data-view="history">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                    </svg>
+                    <span data-i18n="nav.history">History</span>
+                </a></li>
+                <li><a href="#settings" class="nav-link" data-view="settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                    <span data-i18n="nav.settings">Settings</span>
+                </a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Dashboard View -->
+            <section id="dashboard" class="view active">
+                <header class="view-header">
+                    <h1 data-i18n="nav.dashboard">Dashboard</h1>
+                    <div class="status-badge" id="source-badge">
+                        <span class="status-dot"></span>
+                        <span id="power-source">--</span>
+                    </div>
+                </header>
+
+                <div class="dashboard-grid">
+                    <!-- Current Power Card -->
+                    <div class="card power-card main-card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.current_power">Current Power</span>
+                        </div>
+                        <div class="card-value">
+                            <span id="current-power">--</span>
+                            <span class="unit" data-i18n="unit.watts">W</span>
+                        </div>
+                        <div class="power-graph" id="power-graph">
+                            <canvas id="power-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Session Stats -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.session_energy">Session Energy</span>
+                        </div>
+                        <div class="card-value">
+                            <span id="session-energy">--</span>
+                            <span class="unit" data-i18n="unit.watt_hours">Wh</span>
+                        </div>
+                    </div>
+
+                    <div class="card cost-card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.session_cost">Session Cost</span>
+                        </div>
+                        <div class="card-value">
+                            <span id="currency-symbol"></span><span id="session-cost">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Estimates -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.hourly_estimate">Hourly Estimate</span>
+                        </div>
+                        <div class="card-value small">
+                            <span id="currency-hourly"></span><span id="hourly-cost">--</span>
+                            <span class="unit" data-i18n="unit.per_hour">/hour</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.daily_estimate">Daily Estimate</span>
+                        </div>
+                        <div class="card-value small">
+                            <span id="currency-daily"></span><span id="daily-cost">--</span>
+                            <span class="unit" data-i18n="unit.per_day">/day</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.monthly_estimate">Monthly Estimate</span>
+                        </div>
+                        <div class="card-value small">
+                            <span id="currency-monthly"></span><span id="monthly-cost">--</span>
+                            <span class="unit" data-i18n="unit.per_month">/month</span>
+                        </div>
+                    </div>
+
+                    <!-- Session Duration -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span data-i18n="dashboard.session_duration">Session Duration</span>
+                        </div>
+                        <div class="card-value small">
+                            <span id="session-duration">00:00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estimation Warning -->
+                <div id="estimation-warning" class="warning-banner hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span data-i18n="warning.estimated_values">Values are estimated and may not be accurate</span>
+                </div>
+            </section>
+
+            <!-- History View -->
+            <section id="history" class="view">
+                <header class="view-header">
+                    <h1 data-i18n="nav.history">History</h1>
+                    <div class="date-range-picker">
+                        <button class="range-btn active" data-range="today" data-i18n="history.today">Today</button>
+                        <button class="range-btn" data-range="week" data-i18n="history.this_week">This Week</button>
+                        <button class="range-btn" data-range="month" data-i18n="history.this_month">This Month</button>
+                    </div>
+                </header>
+
+                <div class="history-stats">
+                    <div class="stat-card">
+                        <span class="stat-label" data-i18n="history.total_consumption">Total Consumption</span>
+                        <span class="stat-value" id="history-total-wh">-- kWh</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label" data-i18n="history.total_cost">Total Cost</span>
+                        <span class="stat-value" id="history-total-cost">--</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label" data-i18n="history.average_power">Average Power</span>
+                        <span class="stat-value" id="history-avg-power">-- W</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label" data-i18n="history.peak_power">Peak Power</span>
+                        <span class="stat-value" id="history-peak-power">-- W</span>
+                    </div>
+                </div>
+
+                <div class="history-chart-container">
+                    <canvas id="history-chart"></canvas>
+                </div>
+
+                <div id="no-history-data" class="empty-state hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8"/>
+                    </svg>
+                    <p data-i18n="history.no_data">No data available for this period</p>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section id="settings" class="view">
+                <header class="view-header">
+                    <h1 data-i18n="nav.settings">Settings</h1>
+                </header>
+
+                <div class="settings-container">
+                    <!-- General Settings -->
+                    <div class="settings-section">
+                        <h2 data-i18n="settings.general">General</h2>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.language">Language</label>
+                            <select id="setting-language">
+                                <option value="auto" data-i18n="settings.language.auto">Auto-detect</option>
+                                <option value="en">English</option>
+                                <option value="fr">Francais</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.theme">Theme</label>
+                            <select id="setting-theme">
+                                <option value="dark" data-i18n="settings.theme.dark">Dark</option>
+                                <option value="light" data-i18n="settings.theme.light">Light</option>
+                                <option value="system" data-i18n="settings.theme.system">System</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.refresh_rate">Refresh Rate</label>
+                            <select id="setting-refresh-rate">
+                                <option value="1000">1s</option>
+                                <option value="2000">2s</option>
+                                <option value="5000">5s</option>
+                                <option value="10000">10s</option>
+                                <option value="30000">30s</option>
+                                <option value="60000">60s</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.eco_mode">Eco Mode</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-eco-mode">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Settings -->
+                    <div class="settings-section">
+                        <h2 data-i18n="settings.pricing">Pricing</h2>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.pricing.mode">Pricing Mode</label>
+                            <select id="setting-pricing-mode">
+                                <option value="simple" data-i18n="settings.pricing.mode.simple">Simple (flat rate)</option>
+                                <option value="peak_offpeak" data-i18n="settings.pricing.mode.peak_offpeak">Peak/Off-peak</option>
+                                <option value="seasonal" data-i18n="settings.pricing.mode.seasonal">Seasonal</option>
+                                <option value="tempo" data-i18n="settings.pricing.mode.tempo">Tempo (EDF-style)</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.pricing.currency">Currency</label>
+                            <select id="setting-currency">
+                                <option value="EUR">EUR</option>
+                                <option value="USD">$ USD</option>
+                                <option value="GBP">GBP</option>
+                                <option value="CHF">CHF</option>
+                            </select>
+                        </div>
+
+                        <!-- Simple pricing -->
+                        <div id="pricing-simple" class="pricing-mode-config">
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.rate">Rate per kWh</label>
+                                <input type="number" id="setting-rate-kwh" step="0.0001" value="0.2276">
+                            </div>
+                        </div>
+
+                        <!-- Peak/Off-peak pricing -->
+                        <div id="pricing-peak-offpeak" class="pricing-mode-config hidden">
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.peak_rate">Peak Rate</label>
+                                <input type="number" id="setting-peak-rate" step="0.0001" value="0.27">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.offpeak_rate">Off-peak Rate</label>
+                                <input type="number" id="setting-offpeak-rate" step="0.0001" value="0.20">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.offpeak_start">Off-peak Start</label>
+                                <input type="time" id="setting-offpeak-start" value="22:00">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.offpeak_end">Off-peak End</label>
+                                <input type="time" id="setting-offpeak-end" value="06:00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Widget Settings -->
+                    <div class="settings-section">
+                        <h2 data-i18n="settings.widget">Widget</h2>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.widget.enabled">Enable Widget</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-widget-enabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.widget.show_cost">Show Cost</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-widget-show-cost" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.widget.position">Position</label>
+                            <select id="setting-widget-position">
+                                <option value="top_left" data-i18n="settings.widget.position.top_left">Top Left</option>
+                                <option value="top_right" data-i18n="settings.widget.position.top_right">Top Right</option>
+                                <option value="bottom_left" data-i18n="settings.widget.position.bottom_left">Bottom Left</option>
+                                <option value="bottom_right" data-i18n="settings.widget.position.bottom_right">Bottom Right</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div class="settings-actions">
+                        <button id="save-settings" class="btn btn-primary" data-i18n="action.save">Save</button>
+                        <button id="reset-settings" class="btn btn-secondary" data-i18n="action.reset">Reset</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

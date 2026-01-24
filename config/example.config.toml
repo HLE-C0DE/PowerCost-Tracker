@@ -1,0 +1,94 @@
+# PowerCost Tracker - Example Configuration
+# Copy this file to your config directory:
+#   Linux: ~/.config/powercost-tracker/config.toml
+#   Windows: %APPDATA%/PowerCost-Tracker/config.toml
+
+[general]
+# Language setting: "auto" (detect system), "en" (English), "fr" (French)
+language = "auto"
+
+# Theme: "dark", "light", or "system"
+theme = "dark"
+
+# Refresh rate in milliseconds (1000 = 1 second)
+# Higher values reduce CPU usage but make the display less responsive
+refresh_rate_ms = 1000
+
+# Eco mode: reduces refresh rate when the app is minimized
+eco_mode = false
+
+# Start the app minimized to system tray
+start_minimized = false
+
+# Start the app automatically with the system
+start_with_system = false
+
+
+[pricing]
+# Pricing mode determines how electricity costs are calculated
+# Options: "simple", "peak_offpeak", "seasonal", "tempo"
+mode = "simple"
+
+# Currency code and symbol
+currency = "EUR"
+currency_symbol = "\u20AC"
+
+
+# Simple mode: single flat rate
+[pricing.simple]
+rate_per_kwh = 0.2276  # Price per kWh in your currency
+
+
+# Peak/Off-peak mode (Heures Pleines / Heures Creuses)
+[pricing.peak_offpeak]
+peak_rate = 0.27       # Rate during peak hours
+offpeak_rate = 0.20    # Rate during off-peak hours
+offpeak_start = "22:00" # When off-peak starts (24h format)
+offpeak_end = "06:00"   # When off-peak ends (24h format)
+
+
+# Seasonal mode: different rates for summer/winter
+[pricing.seasonal]
+summer_rate = 0.20
+winter_rate = 0.25
+# Months considered as winter (1 = January, 12 = December)
+winter_months = [11, 12, 1, 2, 3]
+
+
+# Tempo mode (EDF-style French pricing with day colors)
+[pricing.tempo]
+# Blue days (most common, cheapest)
+blue_peak = 0.16
+blue_offpeak = 0.13
+# White days (intermediate)
+white_peak = 0.19
+white_offpeak = 0.15
+# Red days (rare, most expensive - typically cold winter days)
+red_peak = 0.76
+red_offpeak = 0.16
+
+
+[widget]
+# Enable the always-on-top mini widget
+enabled = true
+
+# Show cost (true) or power consumption only (false)
+show_cost = true
+
+# Widget position: "top_left", "top_right", "bottom_left", "bottom_right"
+position = "bottom_right"
+
+# Widget opacity (0.0 to 1.0)
+opacity = 0.9
+
+
+[advanced]
+# Baseline power consumption in watts for surplus tracking
+# Set to 0 for automatic detection
+baseline_watts = 0
+
+# Enable automatic baseline detection
+baseline_auto = true
+
+# Active hardware profile name
+active_profile = "default"
