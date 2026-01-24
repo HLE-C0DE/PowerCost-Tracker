@@ -10,7 +10,7 @@
 |-------|--------|-------------|
 | Phase 1 | **COMPLETE** | Setup & Architecture |
 | Phase 2 | En attente | Core Engine |
-| Phase 3 | En attente | Interface utilisateur |
+| Phase 3 | **COMPLETE** | Interface utilisateur |
 | Phase 4 | En attente | Cross-platform |
 | Phase 5 | En attente | Bonus features |
 
@@ -53,12 +53,12 @@
 
 ## Phase 3 : Interface utilisateur
 
-**Status: EN ATTENTE**
+**Status: COMPLETE**
 
-- [ ] Creer l'UI principale avec toutes les vues
-- [ ] Implementer le systeme i18n (FR/EN)
-- [ ] Creer le widget systeme
-- [ ] **CHECKPOINT** : App utilisable avec UI
+- [x] Creer l'UI principale avec toutes les vues
+- [x] Implementer le systeme i18n (FR/EN)
+- [x] Creer le widget systeme
+- [x] **CHECKPOINT** : App utilisable avec UI
 
 ### Vues a implementer
 - Dashboard (puissance, energie, couts)
