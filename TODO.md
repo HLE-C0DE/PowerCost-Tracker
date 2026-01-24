@@ -9,7 +9,7 @@
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | **COMPLETE** | Setup & Architecture |
-| Phase 2 | En attente | Core Engine |
+| Phase 2 | **COMPLETE** | Core Engine |
 | Phase 3 | En attente | Interface utilisateur |
 | Phase 4 | En attente | Cross-platform |
 | Phase 5 | En attente | Bonus features |
@@ -36,18 +36,26 @@
 
 ## Phase 2 : Core Engine
 
-**Status: EN ATTENTE**
+**Status: COMPLETE**
 
-- [ ] Implementer la recuperation de consommation (Linux d'abord via RAPL)
-- [ ] Creer le systeme de calcul de cout
-- [ ] Implementer la persistence des donnees (SQLite)
-- [ ] **CHECKPOINT** : Demo CLI fonctionnelle
+- [x] Implementer la recuperation de consommation (Windows prioritaire + Linux RAPL)
+- [x] Creer le systeme de calcul de cout
+- [x] Implementer la persistence des donnees (SQLite)
+- [x] **CHECKPOINT** : Demo CLI fonctionnelle (`cargo run --bin powercost-demo`)
 
 ### Objectifs techniques
 - Lecture RAPL fonctionnelle sous Linux
-- Fallback estimation si pas de capteur
-- Calcul temps reel des couts selon mode tarifaire
+- WMI + GPU (NVIDIA/AMD) sous Windows
+- Fallback estimation TDP avec detection CPU automatique
+- Calcul temps reel des couts selon mode tarifaire (simple, HP/HC, saisonnier, tempo)
 - Stockage historique dans SQLite
+
+### Livrables Phase 2
+- `hardware/windows.rs` - Monitoring WMI + GPU NVIDIA/AMD
+- `hardware/estimator.rs` - Estimation TDP intelligente avec detection CPU
+- `pricing/mod.rs` - Moteur de tarification complet
+- `db/mod.rs` - Persistence SQLite avec schema complet
+- `bin/demo.rs` - Demo CLI fonctionnelle (10 tests passes)
 
 ---
 
@@ -204,6 +212,15 @@
 ---
 
 ## Changelog
+
+### 2026-01-24 - Phase 2 Complete
+- Windows: Monitoring WMI reel avec support GPU NVIDIA (nvidia-smi) et AMD (rocm-smi)
+- Windows: Lecture batterie laptop via WMI
+- Estimation TDP amelioree avec detection automatique du CPU (Intel, AMD, Apple Silicon)
+- Pricing engine complet: simple, HP/HC, saisonnier, tempo EDF
+- Persistence SQLite avec schema power_readings, daily_stats, sessions
+- Demo CLI fonctionnelle: `cargo run --bin powercost-demo`
+- 10 tests unitaires passes
 
 ### 2024-XX-XX - Phase 1 Complete
 - Setup projet Tauri v2 + Rust
