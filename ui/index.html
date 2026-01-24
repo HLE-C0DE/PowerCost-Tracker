@@ -285,6 +285,55 @@
                                 <input type="time" id="setting-offpeak-end" value="06:00">
                             </div>
                         </div>
+
+                        <!-- Seasonal pricing -->
+                        <div id="pricing-seasonal" class="pricing-mode-config hidden">
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.summer_rate">Summer Rate</label>
+                                <input type="number" id="setting-summer-rate" step="0.0001" value="0.20">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.winter_rate">Winter Rate</label>
+                                <input type="number" id="setting-winter-rate" step="0.0001" value="0.25">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.winter_months">Winter Months</label>
+                                <span class="info-text">Nov - Mar</span>
+                            </div>
+                        </div>
+
+                        <!-- Tempo pricing (EDF-style) -->
+                        <div id="pricing-tempo" class="pricing-mode-config hidden">
+                            <h4 class="pricing-subsection" data-i18n="settings.pricing.tempo.blue">Blue Days</h4>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.tempo.peak">Peak</label>
+                                <input type="number" id="setting-tempo-blue-peak" step="0.0001" value="0.16">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.tempo.offpeak">Off-peak</label>
+                                <input type="number" id="setting-tempo-blue-offpeak" step="0.0001" value="0.13">
+                            </div>
+
+                            <h4 class="pricing-subsection" data-i18n="settings.pricing.tempo.white">White Days</h4>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.tempo.peak">Peak</label>
+                                <input type="number" id="setting-tempo-white-peak" step="0.0001" value="0.19">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.tempo.offpeak">Off-peak</label>
+                                <input type="number" id="setting-tempo-white-offpeak" step="0.0001" value="0.15">
+                            </div>
+
+                            <h4 class="pricing-subsection" data-i18n="settings.pricing.tempo.red">Red Days</h4>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.tempo.peak">Peak</label>
+                                <input type="number" id="setting-tempo-red-peak" step="0.0001" value="0.76">
+                            </div>
+                            <div class="setting-row">
+                                <label data-i18n="settings.pricing.tempo.offpeak">Off-peak</label>
+                                <input type="number" id="setting-tempo-red-offpeak" step="0.0001" value="0.16">
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Widget Settings -->
@@ -293,10 +342,7 @@
 
                         <div class="setting-row">
                             <label data-i18n="settings.widget.enabled">Enable Widget</label>
-                            <label class="toggle">
-                                <input type="checkbox" id="setting-widget-enabled" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
+                            <button id="toggle-widget-btn" class="btn btn-secondary" data-i18n="settings.widget.open">Open Widget</button>
                         </div>
 
                         <div class="setting-row">
@@ -327,6 +373,9 @@
             </section>
         </main>
     </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
 
     <script type="module" src="src/main.js"></script>
 </body>

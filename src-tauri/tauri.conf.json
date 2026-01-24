@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "PowerCost Tracker",
+        "label": "main",
         "width": 900,
         "height": 600,
         "minWidth": 600,

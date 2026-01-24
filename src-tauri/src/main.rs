@@ -17,7 +17,7 @@ use crate::hardware::PowerMonitor;
 use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::Mutex;
 
 /// Application state shared across all Tauri commands
@@ -148,6 +148,64 @@ async fn get_readings(
         .map_err(|e| e.to_string())
 }
 
+/// Open the widget window
+#[tauri::command]
+async fn open_widget(app: tauri::AppHandle, state: tauri::State<'_, TauriState>) -> Result<(), String> {
+    // Check if widget is already open
+    if app.get_webview_window("widget").is_some() {
+        return Ok(());
+    }
+
+    // Get widget position from config
+    let config = state.config.lock().await;
+    let position = &config.widget.position;
+
+    // Calculate position based on config
+    let (x, y) = match position.as_str() {
+        "top_left" => (20.0, 20.0),
+        "top_right" => (1200.0, 20.0),  // Will be adjusted by screen size
+        "bottom_left" => (20.0, 700.0),
+        "bottom_right" => (1200.0, 700.0),
+        _ => (20.0, 20.0),
+    };
+
+    // Create widget window
+    let _widget = WebviewWindowBuilder::new(&app, "widget", WebviewUrl::App("widget.html".into()))
+        .title("PowerCost Widget")
+        .inner_size(180.0, 70.0)
+        .position(x, y)
+        .resizable(false)
+        .decorations(false)
+        .always_on_top(true)
+        .transparent(true)
+        .skip_taskbar(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Close the widget window
+#[tauri::command]
+async fn close_widget(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(widget) = app.get_webview_window("widget") {
+        widget.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Toggle widget visibility
+#[tauri::command]
+async fn toggle_widget(app: tauri::AppHandle, state: tauri::State<'_, TauriState>) -> Result<bool, String> {
+    if let Some(widget) = app.get_webview_window("widget") {
+        widget.close().map_err(|e| e.to_string())?;
+        Ok(false)
+    } else {
+        open_widget(app, state).await?;
+        Ok(true)
+    }
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -206,6 +264,9 @@ fn main() {
             get_translations,
             get_history,
             get_readings,
+            open_widget,
+            close_widget,
+            toggle_widget,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

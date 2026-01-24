@@ -79,6 +79,19 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.widget.position.bottom_left".into(), "Bas gauche".into());
     t.insert("settings.widget.position.bottom_right".into(), "Bas droite".into());
     t.insert("settings.widget.opacity".into(), "Opacit\u{00E9}".into());
+    t.insert("settings.widget.open".into(), "Ouvrir le widget".into());
+    t.insert("settings.widget.close".into(), "Fermer le widget".into());
+
+    // Settings - Pricing Tempo
+    t.insert("settings.pricing.tempo.blue".into(), "Jours bleus".into());
+    t.insert("settings.pricing.tempo.white".into(), "Jours blancs".into());
+    t.insert("settings.pricing.tempo.red".into(), "Jours rouges".into());
+    t.insert("settings.pricing.tempo.peak".into(), "Heures pleines".into());
+    t.insert("settings.pricing.tempo.offpeak".into(), "Heures creuses".into());
+    t.insert("settings.pricing.winter_months".into(), "Mois d'hiver".into());
+
+    // Settings - Status
+    t.insert("settings.saved".into(), "Param\u{00E8}tres enregistr\u{00E9}s avec succ\u{00E8}s".into());
 
     // Settings - Advanced
     t.insert("settings.advanced".into(), "Avanc\u{00E9}".into());
@@ -109,6 +122,7 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("error.hardware_not_detected".into(), "Mat\u{00E9}riel de mesure non d\u{00E9}tect\u{00E9}".into());
     t.insert("error.using_estimation".into(), "Utilisation du mode estimation".into());
     t.insert("error.permission_denied".into(), "Permission refus\u{00E9}e".into());
+    t.insert("error.save_failed".into(), "\u{00C9}chec de l'enregistrement".into());
     t.insert("warning.estimated_values".into(), "Les valeurs sont estim\u{00E9}es et peuvent ne pas \u{00EA}tre pr\u{00E9}cises".into());
 
     // Actions

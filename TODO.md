@@ -60,10 +60,10 @@
 - [x] Creer le widget systeme
 - [x] **CHECKPOINT** : App utilisable avec UI
 
-### Vues a implementer
-- Dashboard (puissance, energie, couts)
-- Historique (graphiques, stats)
-- Parametres (tarifs, langue, theme, widget)
+### Vues implementees
+- Dashboard (puissance, energie, couts, graphique temps reel)
+- Historique (graphiques en barres, stats journalieres)
+- Parametres (4 modes tarifs, langue, theme, widget)
 
 ---
 
@@ -204,6 +204,14 @@
 ---
 
 ## Changelog
+
+### 2025-01-24 - Phase 3 Complete
+- UI principale complete (Dashboard, Historique, Parametres)
+- Graphique d'historique avec barres et stats
+- 4 modes de tarification (Simple, HP/HC, Saisonnier, Tempo)
+- Widget systeme flottant avec puissance et cout
+- Notifications toast pour feedback utilisateur
+- i18n complet (140+ cles FR/EN)
 
 ### 2024-XX-XX - Phase 1 Complete
 - Setup projet Tauri v2 + Rust

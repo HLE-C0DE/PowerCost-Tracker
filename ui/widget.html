@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerCost Widget</title>
+    <style>
+        :root {
+            --bg-widget: rgba(15, 15, 20, 0.95);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --accent-primary: #6366f1;
+            --accent-green: #22c55e;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-widget);
+            color: var(--text-primary);
+            overflow: hidden;
+            user-select: none;
+            cursor: move;
+        }
+
+        .widget {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .widget-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-primary);
+        }
+
+        .widget-data {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .widget-power {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .widget-power .unit {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-left: 2px;
+        }
+
+        .widget-cost {
+            font-size: 0.85rem;
+            color: var(--accent-green);
+        }
+
+        .widget-cost.hidden {
+            display: none;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 16px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .widget:hover .close-btn {
+            opacity: 1;
+        }
+
+        .close-btn:hover {
+            background: rgba(239, 68, 68, 0.5);
+        }
+
+        .close-btn svg {
+            width: 10px;
+            height: 10px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="widget" data-tauri-drag-region>
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <div class="widget-data">
+            <div class="widget-power">
+                <span id="power-value">--</span>
+                <span class="unit">W</span>
+            </div>
+            <div class="widget-cost" id="cost-display">
+                <span id="currency-symbol"></span><span id="cost-value">--</span>
+            </div>
+        </div>
+        <button class="close-btn" id="close-widget">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+    </div>
+
+    <script type="module">
+        const { invoke } = window.__TAURI__.core;
+        const { listen } = window.__TAURI__.event;
+        const { getCurrentWindow } = window.__TAURI__.window;
+
+        let showCost = true;
+        let currencySymbol = '\u20AC';
+
+        async function init() {
+            // Load config
+            try {
+                const config = await invoke('get_config');
+                showCost = config.widget.show_cost;
+                currencySymbol = config.pricing.currency_symbol || '\u20AC';
+
+                document.getElementById('currency-symbol').textContent = currencySymbol;
+
+                if (!showCost) {
+                    document.getElementById('cost-display').classList.add('hidden');
+                }
+            } catch (e) {
+                console.error('Widget init error:', e);
+            }
+
+            // Listen for power updates
+            await listen('power-update', (event) => {
+                document.getElementById('power-value').textContent = event.payload.toFixed(1);
+            });
+
+            // Update cost periodically
+            setInterval(updateCost, 1000);
+
+            // Close button
+            document.getElementById('close-widget').addEventListener('click', async () => {
+                const win = getCurrentWindow();
+                await win.close();
+            });
+        }
+
+        async function updateCost() {
+            try {
+                const data = await invoke('get_dashboard_data');
+                document.getElementById('power-value').textContent = data.power_watts.toFixed(1);
+
+                if (showCost) {
+                    document.getElementById('cost-value').textContent = data.current_cost.toFixed(4);
+                }
+            } catch (e) {
+                console.error('Widget update error:', e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

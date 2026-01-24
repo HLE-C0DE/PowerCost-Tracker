@@ -79,6 +79,19 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.widget.position.bottom_left".into(), "Bottom Left".into());
     t.insert("settings.widget.position.bottom_right".into(), "Bottom Right".into());
     t.insert("settings.widget.opacity".into(), "Opacity".into());
+    t.insert("settings.widget.open".into(), "Open Widget".into());
+    t.insert("settings.widget.close".into(), "Close Widget".into());
+
+    // Settings - Pricing Tempo
+    t.insert("settings.pricing.tempo.blue".into(), "Blue Days".into());
+    t.insert("settings.pricing.tempo.white".into(), "White Days".into());
+    t.insert("settings.pricing.tempo.red".into(), "Red Days".into());
+    t.insert("settings.pricing.tempo.peak".into(), "Peak".into());
+    t.insert("settings.pricing.tempo.offpeak".into(), "Off-peak".into());
+    t.insert("settings.pricing.winter_months".into(), "Winter Months".into());
+
+    // Settings - Status
+    t.insert("settings.saved".into(), "Settings saved successfully".into());
 
     // Settings - Advanced
     t.insert("settings.advanced".into(), "Advanced".into());
@@ -109,6 +122,7 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("error.hardware_not_detected".into(), "Power monitoring hardware not detected".into());
     t.insert("error.using_estimation".into(), "Using power estimation mode".into());
     t.insert("error.permission_denied".into(), "Permission denied".into());
+    t.insert("error.save_failed".into(), "Failed to save settings".into());
     t.insert("warning.estimated_values".into(), "Values are estimated and may not be accurate".into());
 
     // Actions
