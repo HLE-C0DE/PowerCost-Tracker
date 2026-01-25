@@ -774,14 +774,17 @@ async function handleDashboardClick(e) {
                 showToast(`Pinned: ${name}`, 'success');
             }
 
-            // Refresh processes
+            // Refresh processes and update widget
             if (state.processAdvancedMode) {
                 state.allProcesses = await invoke('get_all_processes');
             } else {
-                // Refresh top processes for widget view
                 state.topProcesses = await invoke('get_top_processes', {});
             }
-            renderDashboard();
+            // Update just the process widget content
+            const processWidget = document.querySelector('[data-widget-id="processes"] .widget-content');
+            if (processWidget) {
+                processWidget.innerHTML = WIDGETS.processes.render({ topProcesses: state.topProcesses });
+            }
         } catch (error) {
             console.error('Failed to toggle pin:', error);
             showToast('Failed to update pin', 'error');
