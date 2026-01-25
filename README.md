@@ -1,69 +1,143 @@
 # PowerCost Tracker
 
 <p align="center">
-  <img src="assets/logo.svg" alt="PowerCost Tracker Logo" width="120">
+  <img src="assets/logo.svg" alt="PowerCost Tracker Logo" width="128">
+</p>
+
+<h3 align="center">Real-Time PC Power Consumption Monitor & Electricity Cost Calculator</h3>
+
+<p align="center">
+  Track your PC's energy usage, calculate electricity costs, and monitor hardware performance.<br>
+  Perfect for tracking costs of <b>gaming sessions</b>, <b>local LLM inference</b>, <b>AI training</b>, or <b>crypto mining</b>.
 </p>
 
 <p align="center">
-  <strong>A lightweight desktop application for monitoring PC power consumption and calculating electricity costs in real-time.</strong>
+  <a href="#installation">Installation</a> •
+  <a href="#features">Features</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#faq">FAQ</a>
 </p>
 
 <p align="center">
   <a href="README.fr.md">Francais</a> | English
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version 1.0.0">
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/RAM-<50MB-success.svg" alt="RAM Usage">
+  <img src="https://img.shields.io/badge/CPU-<1%25-success.svg" alt="CPU Usage">
+</p>
+
+---
+
+## Why PowerCost Tracker?
+
+Running a local LLM like LLaMA or Mistral? Playing games for hours? Training AI models? **Know exactly what it costs.**
+
+PowerCost Tracker monitors your PC's power consumption in real-time and calculates electricity costs based on your actual energy rates. No more guessing - see the real cost of your computing activities.
+
+### Use Cases
+
+- **Local LLM & AI Work** - Track power costs when running local language models, Stable Diffusion, or training neural networks
+- **Gaming Sessions** - See how much your gaming sessions really cost in electricity
+- **Crypto Mining** - Monitor power efficiency and profitability
+- **Work-from-Home** - Calculate actual PC electricity costs for expense reports
+- **Energy Optimization** - Identify power-hungry applications and optimize your setup
+
 ---
 
 ## Features
 
-### Real-time Monitoring
-- **Instant power reading** (Watts) from hardware sensors
-- **Live power graph** showing consumption history
-- **Cumulative energy** tracking since session start
-- **Multiple time period views** (session, day, week, month)
+### Real-Time Power Monitoring
 
-### Flexible Pricing Configuration
-- **Simple mode**: Single flat rate per kWh
-- **Peak/Off-peak mode**: Different rates by time of day (HP/HC)
-- **Seasonal mode**: Summer/winter rate differentiation
-- **Tempo mode**: EDF-style pricing with day colors (blue/white/red)
-- **Multi-currency support**: EUR, USD, GBP, CHF, and more
+- **Live power reading** in Watts from hardware sensors (Intel RAPL, AMD hwmon) or smart estimation
+- **Interactive power graph** with consumption history
+- **CPU, GPU, and RAM metrics** - usage, temperature, frequency
+- **Top processes by power consumption** - see what's using the most energy
+- **Session, daily, weekly, and monthly tracking**
 
-### Cost Estimation
-- Real-time cost calculation
-- Hourly, daily, and monthly projections
-- Works without pricing config (consumption-only mode)
+### Flexible Pricing Modes
 
-### Minimal Footprint
-- **< 50 MB RAM** usage
+Configure your actual electricity rates:
+
+| Mode | Description |
+|------|-------------|
+| **Simple** | Single flat rate per kWh |
+| **Peak/Off-Peak** | Different rates by time of day (HP/HC) |
+| **Seasonal** | Summer vs winter rate differentiation |
+| **Tempo** | EDF-style pricing with day colors (Blue/White/Red) |
+
+Supports EUR, USD, GBP, CHF, CAD, and more currencies.
+
+### Surplus Tracking (Session Mode)
+
+Track costs for specific activities:
+
+1. Set your baseline (idle) power consumption
+2. Start a tracking session when gaming or running LLMs
+3. See only the **surplus cost** - the extra electricity your activity is consuming
+4. Perfect for calculating actual costs of compute-intensive tasks
+
+### Hardware Monitoring Dashboard
+
+- **CPU**: Usage %, frequency, temperature
+- **GPU**: Usage %, power draw, VRAM, temperature (NVIDIA & AMD)
+- **RAM**: Usage percentage and amount
+- **Customizable widgets**: Drag-and-drop layout, resize, show/hide
+
+### Floating Widget
+
+A compact overlay that stays visible while you work or game:
+
+- Configurable data display (power, cost, CPU, GPU, temps)
+- Multiple sizes and themes
+- Adjustable opacity
+- Stays on top of other windows
+
+### Lightweight & Native
+
+- **< 50 MB RAM** typical usage
 - **< 1% CPU** when idle
 - **~5 MB** application size
-- No Electron - uses native OS webview
+- **No Electron bloat** - uses native OS webview via Tauri
+- **No external dependencies** - single portable executable option
+
+### Bilingual Interface
+
+Full support for **English** and **French** (Francais).
 
 ---
 
 ## Installation
 
-### Pre-built Binaries
+### Download Pre-Built Binaries
 
 Download the latest release for your platform:
 
-| Platform | Format |
-|----------|--------|
-| Windows | `.msi` installer or `.exe` portable |
-| Linux | `.deb`, `.rpm`, or `.AppImage` |
+| Platform | Format | Notes |
+|----------|--------|-------|
+| **Windows 10/11** | `.msi` installer | Recommended |
+| **Windows 10/11** | `.exe` portable | No installation required |
+| **Linux** | `.AppImage` | Universal, runs on most distros |
+| **Linux** | `.deb` | Debian, Ubuntu, Mint |
+| **Linux** | `.rpm` | Fedora, RHEL, CentOS |
 
-### Building from Source
+> **Windows**: WebView2 Runtime is required (included in Windows 11, auto-installed on Windows 10)
+
+### Build from Source
 
 #### Prerequisites
 
-- **Rust** 1.70 or later
-- **Node.js** 18 or later
-- **System dependencies**:
-  - Linux: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`
-  - Windows: WebView2 Runtime (included in Windows 11)
+- **Rust** 1.70 or later ([install](https://rustup.rs/))
+- **Node.js** 18 or later ([install](https://nodejs.org/))
+- **Platform dependencies**:
+  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev`
+  - **Windows**: WebView2 Runtime
 
-#### Build Steps
+#### Build Commands
 
 ```bash
 # Clone the repository
@@ -73,50 +147,59 @@ cd PowerCost-Tracker
 # Install frontend dependencies
 cd ui && npm install && cd ..
 
-# Build the application
+# Development mode (with hot reload)
+cargo tauri dev
+
+# Production build (creates installers in src-tauri/target/release/bundle/)
 cargo tauri build
 ```
-
-The built application will be in `src-tauri/target/release/`.
 
 ---
 
 ## Usage
 
-### Power Monitoring
+### Quick Start
 
-The application automatically detects available power monitoring sources:
+1. **Launch** PowerCost Tracker
+2. **View** your current power consumption on the dashboard
+3. **Configure** your electricity rate in Settings (optional but recommended)
+4. **Track** your costs over time
 
-| Platform | Source | Accuracy |
-|----------|--------|----------|
-| Linux | Intel RAPL | High (actual measurement) |
-| Linux | AMD hwmon | High (actual measurement) |
-| Linux | Battery sensor | Medium (for laptops) |
-| Windows | WMI + estimation | Low (based on CPU load) |
+### Power Sources
 
-If no hardware sensor is available, the app falls back to estimation mode based on CPU load.
+The application auto-detects the best available power source:
 
-### Configuring Pricing
+| Platform | Source | Accuracy | Notes |
+|----------|--------|----------|-------|
+| Linux | Intel RAPL | High | Requires permissions (see below) |
+| Linux | AMD hwmon | High | Native support |
+| Linux | Battery | Medium | For laptops |
+| Windows | WMI + CPU estimation | Medium | Combined with GPU power |
+| Windows | NVIDIA GPU | High | Via nvidia-smi |
+| Windows | AMD GPU | High | Via rocm-smi / amd-smi |
+| All | TDP estimation | Low | Fallback when no sensors |
 
-1. Open **Settings** from the sidebar
-2. Select your **Pricing Mode**:
-   - **Simple**: Enter your rate per kWh
-   - **Peak/Off-peak**: Set peak rate, off-peak rate, and time windows
-3. Choose your **Currency**
-4. Click **Save**
+### Linux Permissions (RAPL)
 
-### Reading the Dashboard
+Intel RAPL requires read access to `/sys/class/powercap/`. Choose one:
 
-- **Current Power**: Instantaneous power draw in Watts
-- **Session Energy**: Total energy consumed since app launch
-- **Session Cost**: Running cost for the current session
-- **Estimates**: Projected costs at current consumption rate
+**Option A: udev rule (Recommended)**
+```bash
+echo 'SUBSYSTEM=="powercap", ACTION=="add", RUN+="/bin/chmod -R a+r /sys/class/powercap/"' | \
+  sudo tee /etc/udev/rules.d/99-powercap.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+**Option B: Capability**
+```bash
+sudo setcap cap_sys_rawio+ep /path/to/powercost-tracker
+```
 
 ---
 
 ## Configuration
 
-Configuration is stored in:
+Configuration file location:
 - **Linux**: `~/.config/powercost-tracker/config.toml`
 - **Windows**: `%APPDATA%/PowerCost-Tracker/config.toml`
 
@@ -126,18 +209,17 @@ Configuration is stored in:
 [general]
 language = "auto"        # "auto", "en", "fr"
 theme = "dark"           # "dark", "light", "system"
-refresh_rate_ms = 1000   # Update interval (1000-60000)
-eco_mode = false         # Reduce refresh when minimized
+refresh_rate_ms = 1000   # Update interval in ms
 start_minimized = false
 start_with_system = false
 
 [pricing]
 mode = "simple"          # "simple", "peak_offpeak", "seasonal", "tempo"
 currency = "EUR"
-currency_symbol = "\u20AC"
+currency_symbol = "€"
 
 [pricing.simple]
-rate_per_kwh = 0.2276
+rate_per_kwh = 0.2276    # Your rate in currency/kWh
 
 [pricing.peak_offpeak]
 peak_rate = 0.27
@@ -147,99 +229,126 @@ offpeak_end = "06:00"
 
 [widget]
 enabled = true
-show_cost = true
 position = "bottom_right"
 opacity = 0.9
+
+[baseline]
+power_watts = 45.0       # Your PC's idle power for surplus tracking
 ```
+
+See `config/example.config.toml` for all options including seasonal and tempo pricing.
 
 ---
 
-## Linux Permissions
+## FAQ
 
-To read Intel RAPL data on Linux, the application needs access to `/sys/class/powercap/`. Options:
+### Why does it show "Estimated" on Windows?
 
-### Option 1: Run with elevated privileges (not recommended)
-```bash
-sudo powercost-tracker
-```
+Windows doesn't provide direct access to power sensors like Linux RAPL. The app uses CPU load estimation combined with actual GPU power (if NVIDIA/AMD GPU detected). This is normal and still provides useful relative measurements.
 
-### Option 2: Add udev rule (recommended)
-```bash
-# Create udev rule
-echo 'SUBSYSTEM=="powercap", ACTION=="add", RUN+="/bin/chmod -R a+r /sys/class/powercap/"' | \
-  sudo tee /etc/udev/rules.d/99-powercap.rules
+### How accurate is the power reading?
 
-# Reload rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
+- **Linux with RAPL**: Very accurate (actual hardware measurement)
+- **Windows with GPU**: Good (GPU power is real, CPU is estimated)
+- **Pure estimation**: Approximate (based on TDP and load)
 
-### Option 3: Grant capability
-```bash
-sudo setcap cap_sys_rawio+ep /path/to/powercost-tracker
-```
+For precise measurements, use a hardware power meter (like Kill-A-Watt) to calibrate.
 
----
+### How do I track my gaming session costs?
 
-## Troubleshooting
+1. Go to **Settings** > **Baseline & Surplus**
+2. Click **Detect Baseline** when your PC is idle
+3. Start your game
+4. Click **Start Session** on the dashboard
+5. Play your game
+6. Click **End Session** to see the surplus cost
 
-### "Estimated" badge showing
+### What pricing mode should I use?
 
-This means no hardware power sensor was detected. Possible causes:
-- **Linux**: RAPL not available or permission denied
-- **Windows**: Normal behavior (direct sensors not available)
-- **Virtual machine**: Power sensors not exposed
+- **Simple**: Fixed rate per kWh (most common)
+- **Peak/Off-Peak**: If your provider charges more during peak hours
+- **Seasonal**: If rates differ between summer and winter
+- **Tempo**: For French EDF Tempo subscribers with colored day pricing
 
-### Values seem incorrect
+### Does it work with laptops?
 
-Power estimation is based on CPU load and typical TDP values. For accurate readings:
-- Use hardware with RAPL support (Intel/AMD)
-- On Linux, ensure proper permissions (see above)
-- Consider using external power meters for validation
+Yes! On Linux, it can read battery discharge rate for power measurement. On Windows, estimation mode works on all hardware.
+
+### How much system resources does it use?
+
+- **RAM**: 30-50 MB typical
+- **CPU**: < 1% when idle, brief spikes during reads
+- **Disk**: SQLite database grows slowly with history
 
 ---
 
-## Architecture
+## Technical Details
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
+### Architecture
 
-### Tech Stack
+- **Backend**: Rust + Tauri v2 (native performance, small footprint)
+- **Frontend**: Vanilla JavaScript + CSS (no heavy frameworks)
+- **Database**: SQLite for historical data
+- **Configuration**: TOML format
 
-- **Backend**: Rust + Tauri v2
-- **Frontend**: Vanilla JS + CSS (no framework)
-- **Database**: SQLite (for history)
-- **Config**: TOML
+See [ARCHITECTURE.md](ARCHITECTURE.md) for in-depth technical documentation.
 
----
+### Data Storage
 
-## Roadmap
-
-### v0.1 (Current)
-- [x] Real-time power monitoring
-- [x] Multiple pricing modes
-- [x] Bilingual UI (EN/FR)
-- [x] Dark/light themes
-
-### v0.2 (Planned)
-- [ ] System tray widget
-- [ ] Session surplus tracking
-- [ ] Export to CSV
-
-### v0.3 (Planned)
-- [ ] Hardware component breakdown
-- [ ] Multiple profiles
-- [ ] Notification alerts
+| Table | Purpose |
+|-------|---------|
+| `power_readings` | Time-series power data |
+| `daily_stats` | Aggregated daily statistics |
+| `sessions` | Surplus tracking session history |
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please read the contributing guidelines before submitting PRs.
+Contributions are welcome!
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Setup
+
+```bash
+# Run in development mode with hot reload
+cargo tauri dev
+
+# Run tests
+cd src-tauri && cargo test
+
+# Run CLI demo (no UI)
+cd src-tauri && cargo run --bin powercost-demo
+```
+
+---
+
+## Roadmap
+
+### v1.0.0 (Current Release)
+
+- Real-time power monitoring (RAPL, WMI, GPU)
+- 4 flexible pricing modes
+- Hardware monitoring (CPU, GPU, RAM, temperatures)
+- Surplus/session tracking for activity cost calculation
+- Customizable dashboard with drag-and-drop widgets
+- Floating overlay widget
+- Bilingual UI (EN/FR)
+- Dark/Light themes
+- System tray integration
+
+### Future Plans
+
+- CSV/JSON data export
+- Power consumption alerts and notifications
+- Multiple hardware profiles
+- Component-level power breakdown
+- macOS support
 
 ---
 
@@ -247,10 +356,24 @@ Contributions are welcome! Please read the contributing guidelines before submit
 
 MIT License - see [LICENSE](LICENSE) for details.
 
+Free to use, modify, and distribute.
+
 ---
 
 ## Acknowledgments
 
-- [Tauri](https://tauri.app/) - For the amazing framework
-- [rusqlite](https://github.com/rusqlite/rusqlite) - SQLite bindings for Rust
-- Intel RAPL documentation for power monitoring insights
+- [Tauri](https://tauri.app/) - Lightweight native app framework
+- [rusqlite](https://github.com/rusqlite/rusqlite) - SQLite for Rust
+- Intel RAPL and AMD hwmon documentation
+- The open-source community
+
+---
+
+<p align="center">
+  <b>Know your PC's power cost. Track your energy. Save money.</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/HLE-C0DE/PowerCost-Tracker/issues">Report Bug</a> •
+  <a href="https://github.com/HLE-C0DE/PowerCost-Tracker/issues">Request Feature</a>
+</p>

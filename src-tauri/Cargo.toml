@@ -1,6 +1,6 @@
 [package]
 name = "powercost-tracker"
-version = "0.1.0"
+version = "1.0.0"
 description = "Lightweight PC power consumption tracker and cost calculator"
 authors = ["PowerCost Team"]
 license = "MIT"
