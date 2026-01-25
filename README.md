@@ -107,7 +107,8 @@ A compact overlay that stays visible while you work or game:
 - **No Electron bloat** - uses native OS webview via Tauri
 - **No external dependencies** - single portable executable option
 
-<img width="657" height="374" alt="image" src="https://github.com/user-attachments/assets/f7dae791-6b0b-40b5-9be7-79df6e6eb6ef" />
+<img width="658" height="374" alt="image" src="https://github.com/user-attachments/assets/93bc492b-7a45-45ee-b0c0-08e8f1987819" />
+
 PowerCost-Tracker vs NZXT CAM (actual softer i was using for tracking my CPU/GPU usage with dignity) 
 
 
