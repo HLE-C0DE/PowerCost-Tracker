@@ -126,6 +126,32 @@ impl PowerMonitor {
         // TODO: Implement Linux process metrics
         Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
     }
+
+    /// Get top processes with pinned processes prioritized
+    #[cfg(target_os = "windows")]
+    pub fn get_top_processes_with_pinned(&self, limit: usize, pinned: &[String]) -> Result<Vec<ProcessMetrics>> {
+        let monitor = windows::WmiMonitor::new()?;
+        monitor.get_top_processes_with_pinned(limit, pinned)
+    }
+
+    /// Get top processes with pinned (Linux stub)
+    #[cfg(target_os = "linux")]
+    pub fn get_top_processes_with_pinned(&self, _limit: usize, _pinned: &[String]) -> Result<Vec<ProcessMetrics>> {
+        Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
+    }
+
+    /// Get all processes (for discovery mode)
+    #[cfg(target_os = "windows")]
+    pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
+        let monitor = windows::WmiMonitor::new()?;
+        monitor.get_all_processes()
+    }
+
+    /// Get all processes (Linux stub)
+    #[cfg(target_os = "linux")]
+    pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
+        Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
+    }
 }
 
 /// Trait for power monitoring sources

@@ -239,12 +239,58 @@ async fn get_system_metrics(state: tauri::State<'_, TauriState>) -> Result<Syste
     monitor.get_system_metrics().map_err(|e| e.to_string())
 }
 
-/// Get top processes by CPU usage
+/// Get top processes by CPU usage (with pinned processes)
 #[tauri::command]
 async fn get_top_processes(state: tauri::State<'_, TauriState>, limit: Option<usize>) -> Result<Vec<ProcessMetrics>, String> {
+    let config = state.config.lock().await;
+    let limit = limit.unwrap_or(config.advanced.process_list_limit);
+    let pinned = config.advanced.pinned_processes.clone();
+    drop(config);
+
     let monitor = state.monitor.lock().await;
-    let limit = limit.unwrap_or(10);
-    monitor.get_top_processes(limit).map_err(|e| e.to_string())
+    monitor.get_top_processes_with_pinned(limit, &pinned).map_err(|e| e.to_string())
+}
+
+/// Get all processes (for discovery mode)
+#[tauri::command]
+async fn get_all_processes(state: tauri::State<'_, TauriState>) -> Result<Vec<ProcessMetrics>, String> {
+    let monitor = state.monitor.lock().await;
+    monitor.get_all_processes().map_err(|e| e.to_string())
+}
+
+/// Pin a process for tracking
+#[tauri::command]
+async fn pin_process(state: tauri::State<'_, TauriState>, name: String) -> Result<Vec<String>, String> {
+    let mut config = state.config.lock().await;
+    if !config.advanced.pinned_processes.iter().any(|p| p.eq_ignore_ascii_case(&name)) {
+        config.advanced.pinned_processes.push(name);
+        config.save().map_err(|e| e.to_string())?;
+    }
+    Ok(config.advanced.pinned_processes.clone())
+}
+
+/// Unpin a process
+#[tauri::command]
+async fn unpin_process(state: tauri::State<'_, TauriState>, name: String) -> Result<Vec<String>, String> {
+    let mut config = state.config.lock().await;
+    config.advanced.pinned_processes.retain(|p| !p.eq_ignore_ascii_case(&name));
+    config.save().map_err(|e| e.to_string())?;
+    Ok(config.advanced.pinned_processes.clone())
+}
+
+/// Get pinned processes list
+#[tauri::command]
+async fn get_pinned_processes(state: tauri::State<'_, TauriState>) -> Result<Vec<String>, String> {
+    let config = state.config.lock().await;
+    Ok(config.advanced.pinned_processes.clone())
+}
+
+/// Set process list limit
+#[tauri::command]
+async fn set_process_limit(state: tauri::State<'_, TauriState>, limit: usize) -> Result<(), String> {
+    let mut config = state.config.lock().await;
+    config.advanced.process_list_limit = limit;
+    config.save().map_err(|e| e.to_string())
 }
 
 // ===== Session Tracking Commands =====
@@ -411,6 +457,24 @@ async fn save_dashboard_config(
     config.save().map_err(|e| e.to_string())
 }
 
+/// Set autostart (start with system) enabled/disabled
+#[tauri::command]
+async fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let autostart_manager = app.autolaunch();
+
+    if enabled {
+        autostart_manager.enable().map_err(|e| e.to_string())?;
+        log::info!("Autostart enabled");
+    } else {
+        autostart_manager.disable().map_err(|e| e.to_string())?;
+        log::info!("Autostart disabled");
+    }
+
+    Ok(())
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -464,6 +528,10 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             get_power_watts,
@@ -483,6 +551,11 @@ fn main() {
             // New system metrics commands
             get_system_metrics,
             get_top_processes,
+            get_all_processes,
+            pin_process,
+            unpin_process,
+            get_pinned_processes,
+            set_process_limit,
             // Session tracking commands
             start_tracking_session,
             end_tracking_session,
@@ -495,9 +568,26 @@ fn main() {
             // Dashboard config commands
             get_dashboard_config,
             save_dashboard_config,
+            // Autostart command
+            set_autostart,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // Check if start_minimized is enabled and hide the main window
+            let state: tauri::State<'_, TauriState> = app.state();
+            let start_minimized = {
+                // Use block_on since we're in sync context
+                let config = tauri::async_runtime::block_on(state.config.lock());
+                config.general.start_minimized
+            };
+
+            if start_minimized {
+                if let Some(main_window) = app.get_webview_window("main") {
+                    let _ = main_window.hide();
+                    log::info!("Started minimized - main window hidden");
+                }
+            }
 
             // Start background monitoring task
             tauri::async_runtime::spawn(async move {

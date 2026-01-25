@@ -310,18 +310,39 @@ const WIDGET_REGISTRY = {
         defaultSize: 'medium',
         render: (data) => {
             const processes = data.topProcesses;
-            if (!processes || processes.length === 0) {
+            const advancedMode = state.processAdvancedMode || false;
+            const displayList = advancedMode ? (state.allProcesses || []) : (processes || []);
+
+            if (!displayList || displayList.length === 0) {
                 return `<div class="widget-na">No process data available</div>`;
             }
+
+            const pinnedIcon = `<svg class="pin-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" width="12" height="12"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+            const unpinnedIcon = `<svg class="pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+
             return `
-                <div class="process-list">
-                    ${processes.slice(0, 5).map(proc => `
-                        <div class="process-row">
-                            <span class="process-name">${proc.name.slice(0, 20)}</span>
-                            <div class="process-cpu-bar">
-                                <div class="process-cpu-fill" style="width: ${Math.min(proc.cpu_percent, 100)}%"></div>
-                            </div>
+                <div class="process-header">
+                    <div class="process-header-row">
+                        <span class="process-col-name">Process</span>
+                        <span class="process-col-cpu">CPU</span>
+                        <span class="process-col-ram">RAM</span>
+                        <span class="process-col-pin"></span>
+                    </div>
+                    <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? 'Show top' : 'Show all'}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="process-list-scroll">
+                    ${displayList.map(proc => `
+                        <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
+                            <span class="process-name" title="${proc.name}">${proc.name.slice(0, 18)}</span>
                             <span class="process-cpu">${formatNumber(proc.cpu_percent, 1)}%</span>
+                            <span class="process-ram">${formatNumber(proc.memory_percent, 1)}%</span>
+                            <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
+                                ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                            </button>
                         </div>
                     `).join('')}
                 </div>
@@ -359,6 +380,8 @@ const state = {
     ramHistory: [],
     sessionStartTime: null,
     lastDashboardData: null,
+    processAdvancedMode: false,
+    allProcesses: [],
 };
 
 // ===== Initialization =====
@@ -526,6 +549,59 @@ async function handleDashboardClick(e) {
                 console.error('Failed to set baseline:', error);
                 showToast('Failed to set baseline', 'error');
             }
+        }
+    }
+
+    // Handle process advanced mode toggle
+    const advancedToggle = e.target.closest('.process-advanced-toggle');
+    if (advancedToggle) {
+        e.stopPropagation();
+        state.processAdvancedMode = !state.processAdvancedMode;
+        if (state.processAdvancedMode) {
+            // Fetch all processes
+            try {
+                state.allProcesses = await invoke('get_all_processes');
+            } catch (error) {
+                console.error('Failed to get all processes:', error);
+                state.allProcesses = [];
+            }
+        }
+        // Re-render processes widget
+        if (state.lastDashboardData) {
+            const body = document.getElementById('widget-body-processes');
+            if (body) {
+                body.innerHTML = WIDGET_REGISTRY.processes.render(state.lastDashboardData);
+            }
+        }
+    }
+
+    // Handle process pin/unpin
+    const pinBtn = e.target.closest('.process-pin-btn');
+    if (pinBtn) {
+        e.stopPropagation();
+        const name = pinBtn.dataset.name;
+        if (!name) return;
+
+        try {
+            // Check if already pinned
+            const pinnedList = await invoke('get_pinned_processes');
+            const isPinned = pinnedList.some(p => p.toLowerCase() === name.toLowerCase());
+
+            if (isPinned) {
+                await invoke('unpin_process', { name });
+                showToast(`Unpinned: ${name}`, 'info');
+            } else {
+                await invoke('pin_process', { name });
+                showToast(`Pinned: ${name}`, 'success');
+            }
+
+            // Refresh processes
+            if (state.processAdvancedMode) {
+                state.allProcesses = await invoke('get_all_processes');
+            }
+        } catch (error) {
+            console.error('Failed to toggle pin:', error);
+            showToast('Failed to update pin', 'error');
         }
     }
 }
@@ -2006,69 +2082,109 @@ function renderRadialProgress(percent, label, color = '#6366f1') {
 }
 
 /**
- * Draws a mini sparkline chart on a canvas
+ * Draws a mini sparkline chart on a canvas - auto-fits to container
  * @param {string} canvasId - Canvas element ID
  * @param {number[]} historyArray - Array of values to plot
- * @param {string} color - Line color
+ * @param {string} color - Line color (hex format)
  */
 function renderMiniChart(canvasId, historyArray, color = '#6366f1') {
     const canvas = document.getElementById(canvasId);
     if (!canvas || historyArray.length < 2) return;
 
     const ctx = canvas.getContext('2d');
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = 50;
+
+    // Auto-fit to container - use widget body size
+    const container = canvas.closest('.card-body') || canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+
+    // Set canvas size based on container (with some padding for header)
+    const headerHeight = canvas.closest('.mini-chart-container')?.querySelector('.mini-chart-header')?.offsetHeight || 20;
+    canvas.width = Math.max(rect.width - 16, 100);
+    canvas.height = Math.max(rect.height - headerHeight - 24, 50);
 
     const data = historyArray;
-    const padding = 4;
-    const width = canvas.width - padding * 2;
-    const height = canvas.height - padding * 2;
+    const padding = { top: 8, right: 8, bottom: 8, left: 8 };
+    const width = canvas.width - padding.left - padding.right;
+    const height = canvas.height - padding.top - padding.bottom;
 
-    const maxVal = Math.max(...data) * 1.1 || 100;
-    const minVal = Math.min(...data) * 0.9 || 0;
-    const range = maxVal - minVal || 1;
+    // Use 0-100 range for percentage-based metrics
+    const maxVal = 100;
+    const minVal = 0;
+    const range = maxVal - minVal;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Parse hex color to rgba
+    const hexToRgba = (hex, alpha) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
     // Draw gradient fill
-    const gradient = ctx.createLinearGradient(0, padding, 0, height + padding);
-    gradient.addColorStop(0, color.replace(')', ', 0.3)').replace('rgb', 'rgba'));
-    gradient.addColorStop(1, 'transparent');
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, height + padding.top);
+    gradient.addColorStop(0, hexToRgba(color, 0.4));
+    gradient.addColorStop(1, hexToRgba(color, 0.05));
 
     ctx.beginPath();
-    ctx.moveTo(padding, height + padding);
+    ctx.moveTo(padding.left, height + padding.top);
     data.forEach((val, i) => {
-        const x = padding + (i / (data.length - 1)) * width;
-        const y = padding + height - ((val - minVal) / range) * height;
+        const x = padding.left + (i / (data.length - 1)) * width;
+        const y = padding.top + height - ((val - minVal) / range) * height;
         ctx.lineTo(x, y);
     });
-    ctx.lineTo(padding + width, height + padding);
+    ctx.lineTo(padding.left + width, height + padding.top);
     ctx.closePath();
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    // Draw line
+    // Draw line with glow effect
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 4;
     ctx.beginPath();
     data.forEach((val, i) => {
-        const x = padding + (i / (data.length - 1)) * width;
-        const y = padding + height - ((val - minVal) / range) * height;
+        const x = padding.left + (i / (data.length - 1)) * width;
+        const y = padding.top + height - ((val - minVal) / range) * height;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     });
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Draw endpoint dot
+    // Draw endpoint dot with pulse effect
     if (data.length > 0) {
         const lastVal = data[data.length - 1];
-        const x = padding + width;
-        const y = padding + height - ((lastVal - minVal) / range) * height;
+        const x = padding.left + width;
+        const y = padding.top + height - ((lastVal - minVal) / range) * height;
+
+        // Outer glow
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(color, 0.3);
+        ctx.fill();
+
+        // Inner dot
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
+    }
+
+    // Draw current value indicator line
+    if (data.length > 0) {
+        const lastVal = data[data.length - 1];
+        const y = padding.top + height - ((lastVal - minVal) / range) * height;
+        ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = hexToRgba(color, 0.5);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + width - 10, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 }
 

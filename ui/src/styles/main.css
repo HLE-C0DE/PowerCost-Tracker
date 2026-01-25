@@ -1431,28 +1431,142 @@ body {
 }
 
 /* ===== Process List Widget ===== */
-.process-list {
+.process-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xs);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.process-header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+}
+
+.process-col-name {
+    flex: 1;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.process-col-cpu,
+.process-col-ram {
+    flex: 0 0 40px;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    text-align: right;
+}
+
+.process-col-pin {
+    flex: 0 0 24px;
+}
+
+.process-advanced-toggle {
+    padding: 4px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+}
+
+.process-advanced-toggle.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.process-list-scroll {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .process-row {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    padding: var(--spacing-xs) 0;
+    padding: 3px 4px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+}
+
+.process-row:hover {
+    background: var(--bg-tertiary);
+}
+
+.process-row.pinned {
+    background: rgba(99, 102, 241, 0.15);
+    border-left: 2px solid var(--accent-primary);
 }
 
 .process-name {
-    flex: 0 0 80px;
-    font-size: 0.75rem;
+    flex: 1;
+    font-size: 0.7rem;
     color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+.process-cpu {
+    flex: 0 0 40px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    text-align: right;
+}
+
+.process-ram {
+    flex: 0 0 40px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--accent-yellow);
+    text-align: right;
+}
+
+.process-pin-btn {
+    flex: 0 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all var(--transition-fast);
+}
+
+.process-row:hover .process-pin-btn {
+    opacity: 1;
+}
+
+.process-row.pinned .process-pin-btn {
+    opacity: 1;
+    color: var(--accent-primary);
+}
+
+.process-pin-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent-primary);
+}
+
+.pin-icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* Legacy support */
 .process-cpu-bar {
     flex: 1;
     height: 6px;
@@ -1467,14 +1581,6 @@ body {
     background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
     border-radius: 3px;
     transition: width var(--transition-fast);
-}
-
-.process-cpu {
-    flex: 0 0 45px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    text-align: right;
 }
 
 /* ===== Set Baseline Button (in widgets) ===== */
@@ -1598,22 +1704,59 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--spacing-xs);
+    padding: 0 var(--spacing-xs);
 }
 
 .mini-chart-header .metric-label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .mini-chart-header .metric-value {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 1.1rem;
+    font-weight: 700;
 }
 
 .mini-chart {
     flex: 1;
     width: 100%;
-    min-height: 50px;
+    min-height: 60px;
+    height: 100%;
+}
+
+/* Chart container fills available space */
+.mini-chart-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 80px;
+}
+
+.mini-chart-container.compact {
+    min-height: 60px;
+}
+
+/* Better visibility for radial progress in widgets */
+.radial-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm);
+    height: 100%;
+}
+
+.radial-progress {
+    width: 100%;
+    max-width: 90px;
+    height: auto;
+    aspect-ratio: 1;
+}
+
+.widget-card[style*="row-span: 2"] .radial-progress {
+    max-width: 120px;
 }
 
 /* ===== Stream A: Progress Fill Colors ===== */

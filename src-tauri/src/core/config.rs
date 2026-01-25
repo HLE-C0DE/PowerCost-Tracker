@@ -370,9 +370,16 @@ pub struct AdvancedConfig {
     /// Active hardware profile
     #[serde(default = "default_profile")]
     pub active_profile: String,
+    /// Pinned process names for tracking
+    #[serde(default)]
+    pub pinned_processes: Vec<String>,
+    /// Number of processes to show in widget (default 10)
+    #[serde(default = "default_process_limit")]
+    pub process_list_limit: usize,
 }
 
 fn default_profile() -> String { "default".to_string() }
+fn default_process_limit() -> usize { 10 }
 
 impl Default for AdvancedConfig {
     fn default() -> Self {
@@ -380,6 +387,8 @@ impl Default for AdvancedConfig {
             baseline_watts: 0.0,
             baseline_auto: true,
             active_profile: default_profile(),
+            pinned_processes: Vec::new(),
+            process_list_limit: default_process_limit(),
         }
     }
 }

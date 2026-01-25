@@ -470,8 +470,13 @@ impl WmiMonitor {
         })
     }
 
-    /// Get top N processes by CPU usage
+    /// Get top N processes by CPU usage with optional pinned processes
     pub fn get_top_processes(&self, limit: usize) -> Result<Vec<ProcessMetrics>> {
+        self.get_top_processes_with_pinned(limit, &[])
+    }
+
+    /// Get top N processes by CPU usage, including pinned processes
+    pub fn get_top_processes_with_pinned(&self, limit: usize, pinned_names: &[String]) -> Result<Vec<ProcessMetrics>> {
         let mut sys = self.sys.lock().unwrap();
         sys.refresh_processes();
 
@@ -482,21 +487,65 @@ impl WmiMonitor {
             .iter()
             .map(|(pid, process)| {
                 let memory_bytes = process.memory();
+                let name = process.name().to_string();
+                let is_pinned = pinned_names.iter().any(|p| p.eq_ignore_ascii_case(&name));
+                ProcessMetrics {
+                    pid: pid.as_u32(),
+                    name,
+                    cpu_percent: process.cpu_usage() as f64,
+                    memory_bytes,
+                    memory_percent: (memory_bytes as f64 / total_memory as f64) * 100.0,
+                    gpu_percent: None, // GPU per-process not available via sysinfo
+                    is_pinned,
+                }
+            })
+            .collect();
+
+        // Separate pinned and non-pinned
+        let (mut pinned, mut others): (Vec<_>, Vec<_>) = processes.into_iter()
+            .partition(|p| p.is_pinned);
+
+        // Sort both by CPU usage descending
+        pinned.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal));
+        others.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Take top N from others, then prepend pinned
+        let remaining_slots = limit.saturating_sub(pinned.len());
+        others.truncate(remaining_slots);
+
+        // Combine: pinned first, then top others
+        pinned.extend(others);
+
+        Ok(pinned)
+    }
+
+    /// Get all processes (for advanced/discovery mode)
+    pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
+        let mut sys = self.sys.lock().unwrap();
+        sys.refresh_processes();
+
+        let total_memory = sys.total_memory();
+
+        let mut processes: Vec<ProcessMetrics> = sys
+            .processes()
+            .iter()
+            .filter(|(_, process)| process.cpu_usage() > 0.0 || process.memory() > 0)
+            .map(|(pid, process)| {
+                let memory_bytes = process.memory();
                 ProcessMetrics {
                     pid: pid.as_u32(),
                     name: process.name().to_string(),
                     cpu_percent: process.cpu_usage() as f64,
                     memory_bytes,
                     memory_percent: (memory_bytes as f64 / total_memory as f64) * 100.0,
+                    gpu_percent: None,
+                    is_pinned: false,
                 }
             })
             .collect();
 
         // Sort by CPU usage descending
         processes.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Filter out processes with 0 CPU usage and take top N
-        processes.truncate(limit);
 
         Ok(processes)
     }

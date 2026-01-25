@@ -138,6 +138,10 @@ pub struct ProcessMetrics {
     pub cpu_percent: f64,
     pub memory_bytes: u64,
     pub memory_percent: f64,
+    #[serde(default)]
+    pub gpu_percent: Option<f64>,
+    #[serde(default)]
+    pub is_pinned: bool,
 }
 
 /// Tracking session for baseline/surplus calculation
