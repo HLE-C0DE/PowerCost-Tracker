@@ -17,6 +17,7 @@ const state = {
     maxHistoryPoints: 60, // 1 minute of data at 1s refresh
     currencySymbol: '\u20AC',
     historyData: [], // Historical data for the history view
+    dashboardIntervalId: null, // Track interval for refresh rate changes
 };
 
 // ===== Initialization =====
@@ -100,8 +101,18 @@ function setupNavigation() {
 // ===== Dashboard Updates =====
 async function startDashboardUpdates() {
     updateDashboard();
-    // Refresh every second (will be adjusted by backend based on config)
-    setInterval(updateDashboard, 1000);
+    // Use refresh rate from config (default to 1000ms if not set)
+    const refreshRate = state.config?.general?.refresh_rate_ms || 1000;
+    state.dashboardIntervalId = setInterval(updateDashboard, refreshRate);
+}
+
+function restartDashboardUpdates() {
+    // Clear existing interval and start new one with updated refresh rate
+    if (state.dashboardIntervalId) {
+        clearInterval(state.dashboardIntervalId);
+    }
+    const refreshRate = state.config?.general?.refresh_rate_ms || 1000;
+    state.dashboardIntervalId = setInterval(updateDashboard, refreshRate);
 }
 
 async function updateDashboard() {
@@ -579,6 +590,9 @@ async function saveSettings() {
         await invoke('set_config', { config });
         state.config = config;
         state.currencySymbol = config.pricing.currency_symbol;
+
+        // Restart dashboard updates with new refresh rate
+        restartDashboardUpdates();
 
         // Apply theme immediately
         document.documentElement.setAttribute('data-theme', config.general.theme);
