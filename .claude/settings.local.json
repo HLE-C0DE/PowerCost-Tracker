@@ -9,7 +9,32 @@
       "Bash(git merge:*)",
       "Bash(git config:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(cargo tauri dev:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout:*)",
+      "Bash(cargo tauri icon:*)",
+      "Bash(cargo build:*)",
+      "Bash(npm run build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo test:*)",
+      "Bash(taskkill:*)",
+      "Bash(dir \"%APPDATA%\\\\PowerCost-Tracker\"\" 2>nul || dir \"%APPDATA%powercost-tracker\"\")",
+      "Bash(dir \"C:\\\\Users\\\\lescu\\\\AppData\\\\Roaming\")",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(cargo tauri build:*)",
+      "Bash(cargo tree:*)",
+      "Bash(git reset:*)",
+      "Bash(powershell -Command \"Get-Content \"\"$env:APPDATA\\\\PowerCost-Tracker\\\\config.toml\"\" 2>$null\")",
+      "Bash(powershell -Command:*)",
+      "Bash(nvidia-smi pmon:*)",
+      "Bash(nvidia-smi:*)",
+      "Bash(rocm-smi:*)",
+      "Bash(amd-smi process:*)",
+      "Bash(git -C \"C:\\\\Users\\\\lescu\\\\Desktop\\\\Projects\\\\PowerCost-Tracker\" status)",
+      "Bash(npm run tauri:*)"
     ]
   }
 }
