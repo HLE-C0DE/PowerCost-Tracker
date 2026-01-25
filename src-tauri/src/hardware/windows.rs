@@ -12,17 +12,29 @@ use std::sync::Mutex;
 use std::time::Duration;
 use sysinfo::ProcessRefreshKind;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Windows flag to hide console window when spawning processes
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// Default timeout for GPU commands (nvidia-smi, rocm-smi, etc.)
 const GPU_COMMAND_TIMEOUT_MS: u64 = 1500;
 
 /// Run a command with a timeout. Returns None if timeout exceeded or command fails.
+/// On Windows, hides the console window to prevent flashing.
 fn run_command_with_timeout(program: &str, args: &[&str], timeout_ms: u64) -> Option<Output> {
-    let mut child = Command::new(program)
-        .args(args)
+    let mut cmd = Command::new(program);
+    cmd.args(args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .ok()?;
+        .stderr(Stdio::piped());
+
+    // Hide console window on Windows
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = cmd.spawn().ok()?;
 
     let timeout = Duration::from_millis(timeout_ms);
     let start = std::time::Instant::now();
@@ -184,8 +196,16 @@ impl WmiMonitor {
 
     /// Detect available GPU monitoring tool
     fn detect_gpu_source() -> GpuSource {
+        // Helper to create a command with hidden console window on Windows
+        fn create_hidden_command(program: &str) -> Command {
+            let mut cmd = Command::new(program);
+            #[cfg(target_os = "windows")]
+            cmd.creation_flags(CREATE_NO_WINDOW);
+            cmd
+        }
+
         // Check for NVIDIA GPU (nvidia-smi)
-        if let Ok(output) = Command::new("nvidia-smi")
+        if let Ok(output) = create_hidden_command("nvidia-smi")
             .arg("--query-gpu=name")
             .arg("--format=csv,noheader")
             .output()
@@ -197,7 +217,7 @@ impl WmiMonitor {
         }
 
         // Check for AMD GPU (rocm-smi)
-        if let Ok(output) = Command::new("rocm-smi").arg("--showpower").output() {
+        if let Ok(output) = create_hidden_command("rocm-smi").arg("--showpower").output() {
             if output.status.success() {
                 log::info!("AMD GPU detected via rocm-smi");
                 return GpuSource::Amd;
@@ -205,7 +225,7 @@ impl WmiMonitor {
         }
 
         // Also try amd-smi (newer AMD tool)
-        if let Ok(output) = Command::new("amd-smi").arg("metric").arg("-p").output() {
+        if let Ok(output) = create_hidden_command("amd-smi").arg("metric").arg("-p").output() {
             if output.status.success() {
                 log::info!("AMD GPU detected via amd-smi");
                 return GpuSource::Amd;
@@ -230,11 +250,14 @@ impl WmiMonitor {
 
     /// Check if running on a laptop (check for battery via PowerShell)
     fn check_is_laptop() -> bool {
-        // Use PowerShell to check for battery
-        if let Ok(output) = Command::new("powershell")
-            .args(["-Command", "(Get-WmiObject Win32_Battery).EstimatedChargeRemaining"])
-            .output()
-        {
+        // Use PowerShell to check for battery (with hidden console window)
+        let mut cmd = Command::new("powershell");
+        cmd.args(["-Command", "(Get-WmiObject Win32_Battery).EstimatedChargeRemaining"]);
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        if let Ok(output) = cmd.output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 // If we get a number back, there's a battery
