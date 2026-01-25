@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Gradient vert-cyan -->
+    <linearGradient id="minimalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Ombre -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#06B6D4" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Fond carré arrondi -->
+  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="url(#minimalGrad)" filter="url(#shadow)"/>
+  
+  <!-- Éclair minimaliste centré -->
+  <path d="M300 100 
+           L180 260 
+           L255 260 
+           L220 412 
+           L350 235 
+           L270 235 
+           L300 100 Z" 
+        fill="#FFFFFF"/>
+  
+  <!-- Ligne de graphique simple en bas -->
+  <path d="M100 380 Q180 350, 256 370 T412 340" 
+        fill="none" 
+        stroke="rgba(255,255,255,0.5)" 
+        stroke-width="6" 
+        stroke-linecap="round"/>
+  
+  <!-- Point lumineux sur le graphique -->
+  <circle cx="412" cy="340" r="10" fill="#FFFFFF"/>
+</svg>
