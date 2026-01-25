@@ -16,6 +16,8 @@ const WIDGET_REGISTRY = {
         title: 'Current Power',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
         defaultSize: 'large',
+        defaultColSpan: 2,
+        defaultRowSpan: 2,  // Needs height for chart
         render: (data) => `
             <div class="widget-value power-value">${formatNumber(data.power_watts, 1)}<span class="unit">W</span></div>
             <div class="power-graph"><canvas id="power-chart"></canvas></div>
@@ -72,6 +74,8 @@ const WIDGET_REGISTRY = {
         title: 'CPU',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
         defaultSize: 'medium',
+        defaultColSpan: 2,
+        defaultRowSpan: 2,  // Needs height for chart/radial modes
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const cpu = data.systemMetrics?.cpu;
@@ -138,6 +142,8 @@ const WIDGET_REGISTRY = {
         title: 'GPU',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>`,
         defaultSize: 'medium',
+        defaultColSpan: 2,
+        defaultRowSpan: 2,  // Needs height for chart/radial modes
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const gpu = data.systemMetrics?.gpu;
@@ -344,6 +350,8 @@ const WIDGET_REGISTRY = {
         title: 'Top Processes',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
         defaultSize: 'large',
+        defaultColSpan: 2,
+        defaultRowSpan: 3,  // Needs height for process list
         render: (data) => {
             const processes = data.topProcesses;
             const advancedMode = state.processAdvancedMode || false;
@@ -830,12 +838,18 @@ function migrateDashboardConfig() {
     }
 
     for (const widget of sorted) {
-        // Determine span based on size
-        let colSpan = 1, rowSpan = 1;
-        if (widget.size === 'large') {
-            colSpan = 2; rowSpan = 2;
-        } else if (widget.size === 'medium') {
-            colSpan = 2; rowSpan = 1;
+        // Get default spans from widget registry, falling back to size-based logic
+        const widgetDef = WIDGET_REGISTRY[widget.id];
+        let colSpan = widgetDef?.defaultColSpan || 1;
+        let rowSpan = widgetDef?.defaultRowSpan || 1;
+
+        // Override with size if no defaults in registry
+        if (!widgetDef?.defaultColSpan && !widgetDef?.defaultRowSpan) {
+            if (widget.size === 'large') {
+                colSpan = 2; rowSpan = 2;
+            } else if (widget.size === 'medium') {
+                colSpan = 2; rowSpan = 1;
+            }
         }
 
         // Find next available position
@@ -1411,9 +1425,9 @@ function handleResize(e) {
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.resizeWidgetId);
     if (!widget) return;
 
-    // Calculate new spans (min 1, max based on grid)
-    const newColSpan = Math.max(1, Math.min(3, state.resizeStartSpan.col + colDelta));
-    const newRowSpan = Math.max(1, Math.min(2, state.resizeStartSpan.row + rowDelta));
+    // Calculate new spans (min 1, max 4 for cols, max 5 for rows)
+    const newColSpan = Math.max(1, Math.min(4, state.resizeStartSpan.col + colDelta));
+    const newRowSpan = Math.max(1, Math.min(5, state.resizeStartSpan.row + rowDelta));
 
     // Ensure widget doesn't exceed grid bounds
     const maxColSpan = cols - (widget.col || 1) + 1;
@@ -1647,11 +1661,18 @@ function forceGridMigration() {
     }
 
     for (const widget of sorted) {
-        let colSpan = 1, rowSpan = 1;
-        if (widget.size === 'large') {
-            colSpan = 2; rowSpan = 2;
-        } else if (widget.size === 'medium') {
-            colSpan = 2; rowSpan = 1;
+        // Get default spans from widget registry, falling back to size-based logic
+        const widgetDef = WIDGET_REGISTRY[widget.id];
+        let colSpan = widgetDef?.defaultColSpan || 1;
+        let rowSpan = widgetDef?.defaultRowSpan || 1;
+
+        // Override with size if no defaults in registry
+        if (!widgetDef?.defaultColSpan && !widgetDef?.defaultRowSpan) {
+            if (widget.size === 'large') {
+                colSpan = 2; rowSpan = 2;
+            } else if (widget.size === 'medium') {
+                colSpan = 2; rowSpan = 1;
+            }
         }
 
         const pos = findNextFreePosition(colSpan, rowSpan);
