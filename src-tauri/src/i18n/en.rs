@@ -205,5 +205,34 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("tray.show".into(), "Show".into());
     t.insert("tray.exit".into(), "Exit".into());
 
+    // Widget titles and labels
+    t.insert("widget.cpu".into(), "CPU".into());
+    t.insert("widget.gpu".into(), "GPU".into());
+    t.insert("widget.ram".into(), "RAM".into());
+    t.insert("widget.surplus".into(), "Surplus".into());
+    t.insert("widget.session_controls".into(), "Session".into());
+    t.insert("widget.processes".into(), "Top Processes".into());
+    t.insert("widget.loading".into(), "Loading...".into());
+    t.insert("widget.no_gpu".into(), "No GPU detected".into());
+    t.insert("widget.no_process_data".into(), "No process data available".into());
+    t.insert("widget.temp".into(), "Temp".into());
+    t.insert("widget.power".into(), "Power".into());
+    t.insert("widget.usage".into(), "Usage".into());
+    t.insert("widget.cost".into(), "Cost".into());
+    t.insert("widget.baseline".into(), "Baseline".into());
+    t.insert("widget.current".into(), "Current".into());
+    t.insert("widget.set_baseline".into(), "Set Baseline".into());
+    t.insert("widget.update_baseline".into(), "Update Baseline".into());
+    t.insert("widget.start_session_to_track".into(), "Start a session to track surplus".into());
+    t.insert("widget.session_active".into(), "Session Active".into());
+    t.insert("widget.show_top".into(), "Show top".into());
+    t.insert("widget.search_processes".into(), "Search processes".into());
+    t.insert("widget.pin".into(), "Pin".into());
+    t.insert("widget.unpin".into(), "Unpin".into());
+    t.insert("widget.size.small".into(), "Small".into());
+    t.insert("widget.size.medium".into(), "Medium".into());
+    t.insert("widget.size.large".into(), "Large".into());
+    t.insert("widget.no_processes_found".into(), "No processes found".into());
+
     t
 }

@@ -205,5 +205,34 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("tray.show".into(), "Afficher".into());
     t.insert("tray.exit".into(), "Quitter".into());
 
+    // Widget titles and labels
+    t.insert("widget.cpu".into(), "CPU".into());
+    t.insert("widget.gpu".into(), "GPU".into());
+    t.insert("widget.ram".into(), "RAM".into());
+    t.insert("widget.surplus".into(), "Surplus".into());
+    t.insert("widget.session_controls".into(), "Session".into());
+    t.insert("widget.processes".into(), "Processus actifs".into());
+    t.insert("widget.loading".into(), "Chargement...".into());
+    t.insert("widget.no_gpu".into(), "Aucun GPU d\u{00E9}tect\u{00E9}".into());
+    t.insert("widget.no_process_data".into(), "Aucune donn\u{00E9}e de processus disponible".into());
+    t.insert("widget.temp".into(), "Temp".into());
+    t.insert("widget.power".into(), "Puissance".into());
+    t.insert("widget.usage".into(), "Utilisation".into());
+    t.insert("widget.cost".into(), "Co\u{00FB}t".into());
+    t.insert("widget.baseline".into(), "Base".into());
+    t.insert("widget.current".into(), "Actuel".into());
+    t.insert("widget.set_baseline".into(), "D\u{00E9}finir la base".into());
+    t.insert("widget.update_baseline".into(), "Mettre \u{00E0} jour la base".into());
+    t.insert("widget.start_session_to_track".into(), "D\u{00E9}marrez une session pour suivre le surplus".into());
+    t.insert("widget.session_active".into(), "Session active".into());
+    t.insert("widget.show_top".into(), "Afficher le top".into());
+    t.insert("widget.search_processes".into(), "Rechercher des processus".into());
+    t.insert("widget.pin".into(), "\u{00C9}pingler".into());
+    t.insert("widget.unpin".into(), "D\u{00E9}s\u{00E9}pingler".into());
+    t.insert("widget.size.small".into(), "Petit".into());
+    t.insert("widget.size.medium".into(), "Moyen".into());
+    t.insert("widget.size.large".into(), "Grand".into());
+    t.insert("widget.no_processes_found".into(), "Aucun processus trouv\u{00E9}".into());
+
     t
 }

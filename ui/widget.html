@@ -255,11 +255,17 @@
         }
 
         let config = null;
+        let translations = {};
         let currencySymbol = '\u20AC';
         let currentWindow = null;
         let displayItems = ['power', 'cost'];
         let widgetSize = 'normal';
         let widgetTheme = 'default';
+
+        // Translation helper
+        function t(key) {
+            return translations[key] || key;
+        }
 
         async function init() {
             const tauri = await waitForTauri();
@@ -285,9 +291,12 @@
                 }
             });
 
-            // Load config
+            // Load config and translations
             try {
-                config = await invoke('get_config');
+                [config, translations] = await Promise.all([
+                    invoke('get_config'),
+                    invoke('get_translations')
+                ]);
                 currencySymbol = config.pricing.currency_symbol || '\u20AC';
                 displayItems = config.widget.display_items || ['power', 'cost'];
                 widgetSize = config.widget.size || 'normal';
@@ -392,7 +401,7 @@
                     case 'power':
                         html += `
                             <div class="widget-item">
-                                <span class="widget-label">Power</span>
+                                <span class="widget-label">${t('widget.power')}</span>
                                 <span class="widget-power">
                                     <span id="power-value">${data.power_watts.toFixed(1)}</span>
                                     <span class="unit">W</span>
@@ -404,7 +413,7 @@
                         if (config?.widget?.show_cost !== false) {
                             html += `
                                 <div class="widget-item">
-                                    <span class="widget-label">Cost</span>
+                                    <span class="widget-label">${t('widget.cost')}</span>
                                     <span class="widget-cost">${currencySymbol}${data.current_cost.toFixed(4)}</span>
                                 </div>
                             `;
@@ -447,7 +456,7 @@
                             const temp = cpuTemp ?? gpuTemp;
                             html += `
                                 <div class="widget-item">
-                                    <span class="widget-label">Temp</span>
+                                    <span class="widget-label">${t('widget.temp')}</span>
                                     <span class="widget-metric widget-temp">${temp.toFixed(0)}°C</span>
                                 </div>
                             `;

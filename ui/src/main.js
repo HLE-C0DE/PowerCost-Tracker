@@ -10,10 +10,11 @@ const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 // ===== Widget Registry =====
+// Note: titleKey is used for translations - actual title is retrieved via getWidgetTitle()
 const WIDGET_REGISTRY = {
     power: {
         id: 'power',
-        title: 'Current Power',
+        titleKey: 'dashboard.current_power',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
         defaultSize: 'large',
         defaultColSpan: 2,
@@ -25,7 +26,7 @@ const WIDGET_REGISTRY = {
     },
     session_energy: {
         id: 'session_energy',
-        title: 'Session Energy',
+        titleKey: 'dashboard.session_energy',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
         render: (data) => {
@@ -36,42 +37,42 @@ const WIDGET_REGISTRY = {
     },
     session_cost: {
         id: 'session_cost',
-        title: 'Session Cost',
+        titleKey: 'dashboard.session_cost',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
         defaultSize: 'small',
         render: (data) => `<div class="widget-value small cost-value">${state.currencySymbol}${formatNumber(data.current_cost, 4)}</div>`,
     },
     hourly_estimate: {
         id: 'hourly_estimate',
-        title: 'Hourly Estimate',
+        titleKey: 'dashboard.hourly_estimate',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.hourly_cost_estimate, 4)}<span class="unit">/h</span></div>`,
+        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.hourly_cost_estimate, 4)}<span class="unit">${t('unit.per_hour')}</span></div>`,
     },
     daily_estimate: {
         id: 'daily_estimate',
-        title: 'Daily Estimate',
+        titleKey: 'dashboard.daily_estimate',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.daily_cost_estimate, 2)}<span class="unit">/day</span></div>`,
+        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.daily_cost_estimate, 2)}<span class="unit">${t('unit.per_day')}</span></div>`,
     },
     monthly_estimate: {
         id: 'monthly_estimate',
-        title: 'Monthly Estimate',
+        titleKey: 'dashboard.monthly_estimate',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.monthly_cost_estimate, 2)}<span class="unit">/mo</span></div>`,
+        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.monthly_cost_estimate, 2)}<span class="unit">${t('unit.per_month')}</span></div>`,
     },
     session_duration: {
         id: 'session_duration',
-        title: 'Time Awake',
+        titleKey: 'dashboard.session_duration',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
         render: (data) => `<div class="widget-value small">${formatDuration(data.session_duration_secs)}</div>`,
     },
     cpu: {
         id: 'cpu',
-        title: 'CPU',
+        titleKey: 'widget.cpu',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
         defaultSize: 'medium',
         defaultColSpan: 2,
@@ -79,7 +80,7 @@ const WIDGET_REGISTRY = {
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const cpu = data.systemMetrics?.cpu;
-            if (!cpu) return `<div class="widget-loading">Loading...</div>`;
+            if (!cpu) return `<div class="widget-loading">${t('widget.loading')}</div>`;
             const hasTemp = cpu.temperature_celsius != null;
             const temp = hasTemp ? `${formatNumber(cpu.temperature_celsius, 0)}°C` : '';
             const globalDisplay = state.dashboardConfig?.global_display || 'normal';
@@ -116,7 +117,7 @@ const WIDGET_REGISTRY = {
                 return `
                     <div class="widget-value">${formatNumber(cpu.usage_percent, 0)}<span class="unit">%</span></div>
                     ${hasTemp ? `<div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                        <span class="metric-label">Temp</span>
+                        <span class="metric-label">${t('widget.temp')}</span>
                         <span class="metric-value">${temp}</span>
                     </div>` : ''}
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
@@ -126,12 +127,12 @@ const WIDGET_REGISTRY = {
             // Default bar mode
             return `
                 <div class="metric-row">
-                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">Usage</span>
+                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">${t('widget.usage')}</span>
                     <div class="progress-bar"><div class="progress-fill" style="width: ${cpu.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
                 </div>
                 ${hasTemp ? `<div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                    <span class="metric-label">Temp</span>
+                    <span class="metric-label">${t('widget.temp')}</span>
                     <span class="metric-value">${temp}</span>
                 </div>` : ''}
                 <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
@@ -140,7 +141,7 @@ const WIDGET_REGISTRY = {
     },
     gpu: {
         id: 'gpu',
-        title: 'GPU',
+        titleKey: 'widget.gpu',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>`,
         defaultSize: 'medium',
         defaultColSpan: 2,
@@ -148,7 +149,7 @@ const WIDGET_REGISTRY = {
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const gpu = data.systemMetrics?.gpu;
-            if (!gpu) return `<div class="widget-na">No GPU detected</div>`;
+            if (!gpu) return `<div class="widget-na">${t('widget.no_gpu')}</div>`;
             const usage = gpu.usage_percent != null ? gpu.usage_percent : 0;
             const usageStr = gpu.usage_percent != null ? `${formatNumber(gpu.usage_percent, 0)}%` : '--';
             const temp = gpu.temperature_celsius != null ? `${formatNumber(gpu.temperature_celsius, 0)}°C` : '--';
@@ -191,11 +192,11 @@ const WIDGET_REGISTRY = {
                 return `
                     <div class="widget-value">${usageStr}</div>
                     <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                        <span class="metric-label">Temp</span>
+                        <span class="metric-label">${t('widget.temp')}</span>
                         <span class="metric-value">${temp}</span>
                     </div>
                     <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                        <span class="metric-label">Power</span>
+                        <span class="metric-label">${t('widget.power')}</span>
                         <span class="metric-value">${power}</span>
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
@@ -205,16 +206,16 @@ const WIDGET_REGISTRY = {
             // Default bar mode
             return `
                 <div class="metric-row">
-                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">Usage</span>
+                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">${t('widget.usage')}</span>
                     <div class="progress-bar"><div class="progress-fill gpu-fill" style="width: ${usage}%"></div></div>
                     <span class="metric-value">${usageStr}</span>
                 </div>
                 <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                    <span class="metric-label">Temp</span>
+                    <span class="metric-label">${t('widget.temp')}</span>
                     <span class="metric-value">${temp}</span>
                 </div>
                 <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                    <span class="metric-label">Power</span>
+                    <span class="metric-label">${t('widget.power')}</span>
                     <span class="metric-value">${power}</span>
                 </div>
                 <div class="metric-row ${globalDisplay !== 'normal' ? 'hidden' : ''}">
@@ -227,7 +228,7 @@ const WIDGET_REGISTRY = {
     },
     ram: {
         id: 'ram',
-        title: 'RAM',
+        titleKey: 'widget.ram',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="10" y1="2" x2="10" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="18" y1="2" x2="18" y2="6"/></svg>`,
         defaultSize: 'large',
         defaultColSpan: 2,
@@ -235,7 +236,7 @@ const WIDGET_REGISTRY = {
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const mem = data.systemMetrics?.memory;
-            if (!mem) return `<div class="widget-loading">Loading...</div>`;
+            if (!mem) return `<div class="widget-loading">${t('widget.loading')}</div>`;
             const usedGB = mem.used_bytes / (1024 * 1024 * 1024);
             const totalGB = mem.total_bytes / (1024 * 1024 * 1024);
             const globalDisplay = state.dashboardConfig?.global_display || 'normal';
@@ -283,39 +284,39 @@ const WIDGET_REGISTRY = {
     },
     surplus: {
         id: 'surplus',
-        title: 'Surplus',
+        titleKey: 'widget.surplus',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
         defaultSize: 'medium',
         render: (data) => {
             const session = data.activeSession;
             if (!session) return `
-                <div class="widget-na">Start a session to track surplus</div>
-                <button class="btn btn-sm btn-secondary set-baseline-btn" data-power="${formatNumber(data.power_watts, 1)}">Set Baseline (${formatNumber(data.power_watts, 1)} W)</button>
+                <div class="widget-na">${t('widget.start_session_to_track')}</div>
+                <button class="btn btn-sm btn-secondary set-baseline-btn" data-power="${formatNumber(data.power_watts, 1)}">${t('widget.set_baseline')} (${formatNumber(data.power_watts, 1)} W)</button>
             `;
             return `
                 <div class="metric-row">
-                    <span class="metric-label">Baseline</span>
+                    <span class="metric-label">${t('widget.baseline')}</span>
                     <span class="metric-value">${formatNumber(session.baseline_watts, 1)} W</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Current</span>
+                    <span class="metric-label">${t('widget.current')}</span>
                     <span class="metric-value">${formatNumber(data.power_watts, 1)} W</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Surplus</span>
+                    <span class="metric-label">${t('session.surplus')}</span>
                     <span class="metric-value surplus-value">${formatNumber(session.surplus_wh, 2)} Wh</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Cost</span>
+                    <span class="metric-label">${t('widget.cost')}</span>
                     <span class="metric-value">${state.currencySymbol}${formatNumber(session.surplus_cost || 0, 4)}</span>
                 </div>
-                <button class="btn btn-sm btn-secondary set-baseline-btn" data-power="${formatNumber(data.power_watts, 1)}">Update Baseline</button>
+                <button class="btn btn-sm btn-secondary set-baseline-btn" data-power="${formatNumber(data.power_watts, 1)}">${t('widget.update_baseline')}</button>
             `;
         },
     },
     session_controls: {
         id: 'session_controls',
-        title: 'Session Controls',
+        titleKey: 'widget.session_controls',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
         defaultSize: 'medium',
         render: (data) => {
@@ -330,18 +331,18 @@ const WIDGET_REGISTRY = {
                     <div class="session-widget-info">
                         <div class="session-widget-status">
                             <span class="session-widget-indicator ${session ? 'active' : ''}"></span>
-                            <span class="session-widget-label">${session ? 'Session Active' : 'No active session'}</span>
+                            <span class="session-widget-label">${session ? t('widget.session_active') : t('session.no_active')}</span>
                         </div>
                         <span class="session-widget-duration">${duration}</span>
                     </div>
                     <div class="session-widget-stats ${session ? '' : 'hidden'}">
-                        <span class="session-widget-stat">Surplus: ${surplusWh} Wh</span>
-                        <span class="session-widget-stat">Cost: ${surplusCost}</span>
+                        <span class="session-widget-stat">${t('session.surplus')}: ${surplusWh} Wh</span>
+                        <span class="session-widget-stat">${t('widget.cost')}: ${surplusCost}</span>
                     </div>
                     <div class="session-widget-btns">
                         ${session
-                            ? '<button class="btn btn-secondary btn-sm session-widget-end-btn">End Session</button>'
-                            : '<button class="btn btn-primary btn-sm session-widget-start-btn">Start Session</button>'
+                            ? `<button class="btn btn-secondary btn-sm session-widget-end-btn">${t('session.end')}</button>`
+                            : `<button class="btn btn-primary btn-sm session-widget-start-btn">${t('session.start')}</button>`
                         }
                     </div>
                 </div>
@@ -350,7 +351,7 @@ const WIDGET_REGISTRY = {
     },
     processes: {
         id: 'processes',
-        title: 'Top Processes',
+        titleKey: 'widget.processes',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
         defaultSize: 'large',
         defaultColSpan: 2,
@@ -361,7 +362,7 @@ const WIDGET_REGISTRY = {
             const displayList = advancedMode ? (state.allProcesses || []) : (processes || []);
 
             if (!displayList || displayList.length === 0) {
-                return `<div class="widget-na">No process data available</div>`;
+                return `<div class="widget-na">${t('widget.no_process_data')}</div>`;
             }
 
             const pinnedIcon = `<svg class="pin-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" width="12" height="12"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
@@ -371,13 +372,13 @@ const WIDGET_REGISTRY = {
                 <div class="process-widget">
                     <div class="process-header">
                         <div class="process-header-row">
-                            <span class="process-col-name">Process</span>
-                            <span class="process-col-cpu">CPU</span>
-                            <span class="process-col-gpu">GPU</span>
-                            <span class="process-col-ram">RAM</span>
+                            <span class="process-col-name">${t('processes.header.name')}</span>
+                            <span class="process-col-cpu">${t('processes.header.cpu')}</span>
+                            <span class="process-col-gpu">${t('processes.header.gpu')}</span>
+                            <span class="process-col-ram">${t('processes.header.ram')}</span>
                             <span class="process-col-pin"></span>
                         </div>
-                        <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? 'Show top' : 'Search processes'}">
+                        <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? t('widget.show_top') : t('widget.search_processes')}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                             </svg>
@@ -394,7 +395,7 @@ const WIDGET_REGISTRY = {
                                     <span class="process-cpu">${cpuVal}%</span>
                                     <span class="process-gpu">${gpuVal}%</span>
                                     <span class="process-ram">${ramVal}%</span>
-                                    <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
+                                    <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? t('widget.unpin') : t('widget.pin')}">
                                         ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
                                     </button>
                                 </div>
@@ -406,6 +407,13 @@ const WIDGET_REGISTRY = {
         },
     },
 };
+
+// Helper function to get widget title from translations
+function getWidgetTitle(widgetId) {
+    const widget = WIDGET_REGISTRY[widgetId];
+    if (!widget) return widgetId;
+    return t(widget.titleKey) || widget.titleKey;
+}
 
 // ===== State Management =====
 const state = {
@@ -692,7 +700,7 @@ function renderProcessModalList(processes) {
     const list = document.getElementById('process-modal-list');
 
     if (processes.length === 0) {
-        list.innerHTML = '<div class="process-modal-empty">No processes found</div>';
+        list.innerHTML = `<div class="process-modal-empty">${t('widget.no_processes_found')}</div>`;
         return;
     }
 
@@ -709,7 +717,7 @@ function renderProcessModalList(processes) {
                 <span class="process-modal-cpu">${cpuVal}%</span>
                 <span class="process-modal-gpu">${gpuVal}%</span>
                 <span class="process-modal-ram">${ramVal}%</span>
-                <button class="process-modal-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
+                <button class="process-modal-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? t('widget.unpin') : t('widget.pin')}">
                     ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
                 </button>
             </div>
@@ -955,7 +963,7 @@ function renderDashboard() {
         card.innerHTML = `
             <div class="card-header">
                 ${widgetDef.icon}
-                <span>${widgetDef.title}</span>
+                <span>${getWidgetTitle(widgetConfig.id)}</span>
             </div>
             <div class="card-body" id="widget-body-${widgetConfig.id}">
                 <div class="widget-loading">Loading...</div>
@@ -1104,7 +1112,7 @@ function renderVisibilityPanel() {
         const item = document.createElement('div');
         item.className = 'visibility-item';
         item.innerHTML = `
-            <span class="visibility-item-label">${widgetDef.title}</span>
+            <span class="visibility-item-label">${getWidgetTitle(widgetConfig.id)}</span>
             <div class="visibility-item-controls">
                 ${displayModeSelect}
                 <label class="toggle">
@@ -1672,11 +1680,11 @@ function openEditModal() {
         item.dataset.widgetId = widgetConfig.id;
         item.innerHTML = `
             <span class="drag-handle">&#x2630;</span>
-            <span class="widget-toggle-title">${widgetDef.title}</span>
+            <span class="widget-toggle-title">${getWidgetTitle(widgetConfig.id)}</span>
             <select class="widget-size-select" data-widget-id="${widgetConfig.id}">
-                <option value="small" ${currentSize === 'small' ? 'selected' : ''}>Small</option>
-                <option value="medium" ${currentSize === 'medium' ? 'selected' : ''}>Medium</option>
-                <option value="large" ${currentSize === 'large' ? 'selected' : ''}>Large</option>
+                <option value="small" ${currentSize === 'small' ? 'selected' : ''}>${t('widget.size.small')}</option>
+                <option value="medium" ${currentSize === 'medium' ? 'selected' : ''}>${t('widget.size.medium')}</option>
+                <option value="large" ${currentSize === 'large' ? 'selected' : ''}>${t('widget.size.large')}</option>
             </select>
             <label class="toggle">
                 <input type="checkbox" class="widget-toggle-checkbox" data-widget-id="${widgetConfig.id}" ${widgetConfig.visible ? 'checked' : ''}>
@@ -2300,7 +2308,7 @@ function updateSessionBar(session) {
     if (session) {
         document.getElementById('start-session-btn').classList.add('hidden');
         document.getElementById('end-session-btn').classList.remove('hidden');
-        document.getElementById('session-label').textContent = 'Session Active';
+        document.getElementById('session-label').textContent = t('widget.session_active');
 
         const elapsed = Math.floor(Date.now() / 1000) - session.start_time;
         document.getElementById('session-duration-display').textContent = formatDuration(elapsed);
