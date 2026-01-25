@@ -3,8 +3,9 @@
 //! Uses sysinfo for CPU monitoring and nvidia-smi/rocm-smi for GPU power.
 //! WMI is complex and has version-specific API changes, so we avoid it for simplicity.
 
-use crate::core::{CpuMetrics, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
+use crate::core::{CpuMetrics, DetailedMetrics, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
 use crate::hardware::PowerSource;
+use std::any::Any;
 use std::collections::HashMap;
 use std::process::{Command, Output, Stdio};
 use std::sync::Mutex;
@@ -141,12 +142,22 @@ impl WmiMonitor {
     pub fn new() -> Result<Self> {
         // Initialize sysinfo
         let mut sys = sysinfo::System::new();
-        sys.refresh_cpu_usage();
 
-        // Wait a bit and refresh again for accurate readings
-        // sysinfo requires two consecutive calls to get accurate CPU usage
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        // First refresh: establish baselines for CPU and processes
         sys.refresh_cpu_usage();
+        sys.refresh_processes_specifics(
+            ProcessRefreshKind::new().with_cpu().with_memory()
+        );
+
+        // Wait for baseline (200ms for process data)
+        // sysinfo requires two consecutive calls to get accurate CPU/process usage
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        // Second refresh: now values will be accurate
+        sys.refresh_cpu_usage();
+        sys.refresh_processes_specifics(
+            ProcessRefreshKind::new().with_cpu().with_memory()
+        );
 
         // Detect GPU monitoring source
         let gpu_source = Self::detect_gpu_source();
@@ -437,6 +448,85 @@ impl WmiMonitor {
         Ok(total_power)
     }
 
+    /// Fast path for power reading - uses CPU power + cached GPU data (accepts 10s stale)
+    /// Returns (power_watts, cpu_usage_percent, cached_gpu_usage_percent, cached_gpu_power_watts)
+    /// This method NEVER blocks on GPU commands - it only uses cached values
+    pub fn get_power_watts_fast_impl(&self) -> Result<(f64, f64, Option<f64>, Option<f64>)> {
+        let mut total_power = 0.0;
+
+        // Get CPU usage and power (fast - uses sysinfo which is non-blocking)
+        let cpu_info = self.get_cpu_info();
+        let cpu_power = self.calculate_cpu_power(&cpu_info);
+        total_power += cpu_power;
+
+        // Get cached GPU data with extended staleness tolerance (10s for fast path)
+        let (gpu_usage, gpu_power_watts) = self.get_cached_gpu_data_for_fast_path();
+
+        // Add GPU power if we have cached data
+        if let Some(power) = gpu_power_watts {
+            total_power += power;
+        }
+
+        // Add base system power
+        total_power += self.estimate_base_power();
+
+        Ok((total_power, cpu_info.average_load, gpu_usage, gpu_power_watts))
+    }
+
+    /// Get cached GPU data with extended staleness tolerance for fast path (10s)
+    /// This NEVER triggers a GPU command - it only reads from cache
+    fn get_cached_gpu_data_for_fast_path(&self) -> (Option<f64>, Option<f64>) {
+        // Extended staleness tolerance for fast path: 10 seconds
+        const FAST_PATH_CACHE_TTL_MS: u64 = 10000;
+
+        // Check GPU metrics cache for usage
+        let gpu_usage = {
+            let cache = self.gpu_metrics_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(metrics) = cached.get(FAST_PATH_CACHE_TTL_MS) {
+                    metrics.and_then(|m| m.usage_percent)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        // Check GPU power cache
+        let gpu_power = {
+            let cache = self.gpu_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(info) = cached.get(FAST_PATH_CACHE_TTL_MS) {
+                    info.map(|i| i.power_watts)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        (gpu_usage, gpu_power)
+    }
+
+    /// Collect all detailed metrics in one blocking call
+    /// This consolidates all slow operations: GPU commands, temps, processes
+    /// Should be called from a background task, not the main monitoring loop
+    pub fn collect_detailed_metrics_impl(&self, limit: usize, pinned: &[String]) -> Result<DetailedMetrics> {
+        // Get full system metrics (this will refresh GPU cache via nvidia-smi)
+        let system_metrics = self.get_system_metrics().ok();
+
+        // Get top processes (uses sysinfo which is relatively fast)
+        let top_processes = self.get_top_processes_with_pinned(limit, pinned).unwrap_or_default();
+
+        Ok(DetailedMetrics {
+            system_metrics,
+            top_processes,
+            timestamp: chrono::Utc::now().timestamp(),
+        })
+    }
+
     /// Get detailed power reading with component breakdown
     pub fn get_reading(&self) -> Result<PowerReading> {
         let mut components = HashMap::new();
@@ -483,6 +573,14 @@ impl PowerSource for WmiMonitor {
         self.get_power_watts()
     }
 
+    fn get_power_watts_fast(&self) -> Result<(f64, f64, Option<f64>, Option<f64>)> {
+        self.get_power_watts_fast_impl()
+    }
+
+    fn collect_detailed_metrics(&self, limit: usize, pinned: &[String]) -> Result<DetailedMetrics> {
+        self.collect_detailed_metrics_impl(limit, pinned)
+    }
+
     fn get_reading(&self) -> Result<PowerReading> {
         self.get_reading()
     }
@@ -498,6 +596,10 @@ impl PowerSource for WmiMonitor {
     fn is_estimated(&self) -> bool {
         self.gpu_source == GpuSource::None
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 // ===== System Metrics Implementation =====
@@ -506,7 +608,8 @@ impl WmiMonitor {
     /// Get comprehensive system metrics including CPU, GPU, and memory
     pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
         let mut sys = self.sys.lock().unwrap();
-        sys.refresh_cpu_usage();
+        // NOTE: Do NOT refresh CPU here - it interferes with critical loop baseline.
+        // CPU values are already refreshed by get_cpu_info() in the critical loop.
         sys.refresh_memory();
 
         // CPU metrics
@@ -560,8 +663,9 @@ impl WmiMonitor {
     /// Get top N processes by CPU usage, including pinned processes
     pub fn get_top_processes_with_pinned(&self, limit: usize, pinned_names: &[String]) -> Result<Vec<ProcessMetrics>> {
         let mut sys = self.sys.lock().unwrap();
-        // Must use refresh_processes_specifics with memory flag - refresh_processes() alone doesn't include memory in sysinfo 0.30+
-        sys.refresh_processes_specifics(ProcessRefreshKind::new().with_memory());
+        // Must use refresh_processes_specifics with cpu AND memory flags
+        // CPU flag is required for per-process CPU usage calculation
+        sys.refresh_processes_specifics(ProcessRefreshKind::new().with_cpu().with_memory());
         sys.refresh_memory();
 
         let total_memory = sys.total_memory();
@@ -625,8 +729,9 @@ impl WmiMonitor {
     /// Get all processes (for advanced/discovery mode)
     pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
         let mut sys = self.sys.lock().unwrap();
-        // Must use refresh_processes_specifics with memory flag - refresh_processes() alone doesn't include memory in sysinfo 0.30+
-        sys.refresh_processes_specifics(ProcessRefreshKind::new().with_memory());
+        // Must use refresh_processes_specifics with cpu AND memory flags
+        // CPU flag is required for per-process CPU usage calculation
+        sys.refresh_processes_specifics(ProcessRefreshKind::new().with_cpu().with_memory());
         sys.refresh_memory();
 
         let total_memory = sys.total_memory();
