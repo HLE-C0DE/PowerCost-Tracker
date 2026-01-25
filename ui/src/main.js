@@ -1666,9 +1666,12 @@ function drawPowerGraph() {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+
+    // Use actual container size
+    canvas.width = Math.max(rect.width, 100);
+    canvas.height = Math.max(rect.height, 60);
 
     const data = state.powerHistory;
     if (data.length < 2) return;
@@ -1748,10 +1751,11 @@ function setupSessionControls() {
 
 async function startSession() {
     try {
-        const sessionId = await invoke('start_tracking_session', { label: null });
-        document.getElementById('start-session-btn').classList.add('hidden');
-        document.getElementById('end-session-btn').classList.remove('hidden');
-        document.getElementById('session-label').textContent = 'Session Active';
+        await invoke('start_tracking_session', { label: null });
+        // Fetch fresh session data
+        state.activeSession = await invoke('get_session_stats').catch(() => null);
+        // Re-render session widget
+        refreshSessionWidget();
         showToast('Session started', 'success');
     } catch (error) {
         console.error('Failed to start session:', error);
@@ -1762,11 +1766,9 @@ async function startSession() {
 async function endSession() {
     try {
         const session = await invoke('end_tracking_session');
-        document.getElementById('start-session-btn').classList.remove('hidden');
-        document.getElementById('end-session-btn').classList.add('hidden');
-        document.getElementById('session-label').textContent = 'No active session';
-        document.getElementById('session-duration-display').textContent = '--:--:--';
         state.activeSession = null;
+        // Re-render session widget
+        refreshSessionWidget();
 
         if (session) {
             showToast(`Session ended: ${formatNumber(session.surplus_wh, 2)} Wh surplus`, 'success');
@@ -1774,6 +1776,14 @@ async function endSession() {
     } catch (error) {
         console.error('Failed to end session:', error);
         showToast('Failed to end session', 'error');
+    }
+}
+
+function refreshSessionWidget() {
+    const widgetBody = document.getElementById('widget-body-session_controls');
+    if (widgetBody && state.lastDashboardData) {
+        state.lastDashboardData.activeSession = state.activeSession;
+        widgetBody.innerHTML = WIDGET_REGISTRY.session_controls.render(state.lastDashboardData);
     }
 }
 
@@ -2259,14 +2269,20 @@ function renderMiniChart(canvasId, historyArray, color = '#6366f1') {
 
     const ctx = canvas.getContext('2d');
 
-    // Auto-fit to container - use widget body size
-    const container = canvas.closest('.card-body') || canvas.parentElement;
-    const rect = container.getBoundingClientRect();
+    // Auto-fit to widget card body
+    const cardBody = canvas.closest('.card-body');
+    if (!cardBody) return;
 
-    // Set canvas size based on container (with some padding for header)
-    const headerHeight = canvas.closest('.mini-chart-container')?.querySelector('.mini-chart-header')?.offsetHeight || 20;
-    canvas.width = Math.max(rect.width - 16, 100);
-    canvas.height = Math.max(rect.height - headerHeight - 24, 50);
+    const bodyRect = cardBody.getBoundingClientRect();
+    const chartContainer = canvas.closest('.mini-chart-container');
+    const header = chartContainer?.querySelector('.mini-chart-header');
+    const headerHeight = header ? header.offsetHeight : 0;
+    const metricInfo = cardBody.querySelector('.metric-info');
+    const metricInfoHeight = metricInfo ? metricInfo.offsetHeight + 8 : 0;
+
+    // Fill available space in card body
+    canvas.width = Math.max(bodyRect.width - 16, 100);
+    canvas.height = Math.max(bodyRect.height - headerHeight - metricInfoHeight - 16, 60);
 
     const data = historyArray;
     const padding = { top: 8, right: 8, bottom: 8, left: 8 };

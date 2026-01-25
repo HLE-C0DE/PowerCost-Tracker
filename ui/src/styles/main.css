@@ -584,6 +584,7 @@ body {
 .widget-small {
     grid-column: span 1;
     min-height: 80px;
+    align-self: start;
 }
 
 .widget-medium {
@@ -628,6 +629,14 @@ body {
     justify-content: center;
     min-height: 0;
     overflow: hidden;
+    height: 100%;
+}
+
+/* Ensure widget card uses full grid cell height */
+.widget-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .widget-value {
@@ -724,7 +733,8 @@ body {
 /* Power Graph */
 .power-graph {
     margin-top: var(--spacing-sm);
-    height: 80px;
+    flex: 1;
+    min-height: 60px;
 }
 
 #power-chart {
@@ -2007,10 +2017,13 @@ body {
     flex-direction: column;
     height: 100%;
     min-height: 80px;
+    flex: 1;
 }
 
-.mini-chart-container.compact {
-    min-height: 60px;
+.mini-chart-container .mini-chart {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
 }
 
 /* Better visibility for radial progress in widgets */
@@ -2020,18 +2033,21 @@ body {
     justify-content: center;
     gap: var(--spacing-md);
     padding: var(--spacing-sm);
-    height: 100%;
+    flex: 1;
+    min-height: 0;
 }
 
 .radial-progress {
-    width: 100%;
-    max-width: 90px;
-    height: auto;
+    width: auto;
+    height: 100%;
+    max-height: 120px;
     aspect-ratio: 1;
 }
 
-.widget-card[style*="row-span: 2"] .radial-progress {
-    max-width: 120px;
+/* Scale radial for larger widgets */
+.widget-card[style*="span 2"] .radial-progress,
+.widget-card[style*="span 3"] .radial-progress {
+    max-height: 160px;
 }
 
 /* ===== Stream A: Progress Fill Colors ===== */
