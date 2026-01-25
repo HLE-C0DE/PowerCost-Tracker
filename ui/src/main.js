@@ -31,7 +31,7 @@ const WIDGET_REGISTRY = {
         render: (data) => {
             const energyWh = data.cumulative_wh;
             const display = energyWh >= 1000 ? `${formatNumber(energyWh / 1000, 2)} kWh` : `${formatNumber(energyWh, 1)} Wh`;
-            return `<div class="widget-value">${display}</div>`;
+            return `<div class="widget-value small">${display}</div>`;
         },
     },
     session_cost: {
@@ -39,7 +39,7 @@ const WIDGET_REGISTRY = {
         title: 'Session Cost',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value cost-value">${state.currencySymbol}${formatNumber(data.current_cost, 4)}</div>`,
+        render: (data) => `<div class="widget-value small cost-value">${state.currencySymbol}${formatNumber(data.current_cost, 4)}</div>`,
     },
     hourly_estimate: {
         id: 'hourly_estimate',
@@ -228,7 +228,9 @@ const WIDGET_REGISTRY = {
         id: 'ram',
         title: 'RAM',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="10" y1="2" x2="10" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="18" y1="2" x2="18" y2="6"/></svg>`,
-        defaultSize: 'small',
+        defaultSize: 'large',
+        defaultColSpan: 2,
+        defaultRowSpan: 2,
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const mem = data.systemMetrics?.memory;
@@ -1290,21 +1292,67 @@ function saveDragOriginalPosition(widgetId) {
 
 function resolveCollisions(movedWidget) {
     const widgets = state.dashboardConfig.widgets.filter(w => w.visible && w.id !== movedWidget.id);
+    const cols = getActualGridCols();
 
-    // Find overlapping widget and SWAP positions instead of pushing down
-    for (const widget of widgets) {
-        if (widgetsOverlap(movedWidget, widget)) {
-            // Swap: move the overlapped widget to where the dragged widget came from
-            if (dragOriginalPosition) {
-                widget.col = dragOriginalPosition.col;
-                widget.row = dragOriginalPosition.row;
-            } else {
-                // Fallback: find first empty spot
-                const emptySpot = findEmptySpot(widget, movedWidget);
-                widget.col = emptySpot.col;
-                widget.row = emptySpot.row;
-            }
+    // Phase 1: Find all overlapping widgets
+    const overlapping = widgets.filter(w => widgetsOverlap(movedWidget, w));
+
+    if (overlapping.length === 0) {
+        dragOriginalPosition = null;
+        return;
+    }
+
+    // Phase 2: Find primary overlap (closest center to moved widget's center)
+    const movedCenterCol = (movedWidget.col || 1) + (movedWidget.col_span || 1) / 2;
+    const movedCenterRow = (movedWidget.row || 1) + (movedWidget.row_span || 1) / 2;
+
+    let primaryOverlap = null;
+    let minDistance = Infinity;
+
+    for (const widget of overlapping) {
+        const widgetCenterCol = (widget.col || 1) + (widget.col_span || 1) / 2;
+        const widgetCenterRow = (widget.row || 1) + (widget.row_span || 1) / 2;
+        const distance = Math.abs(movedCenterCol - widgetCenterCol) + Math.abs(movedCenterRow - widgetCenterRow);
+
+        if (distance < minDistance) {
+            minDistance = distance;
+            primaryOverlap = widget;
         }
+    }
+
+    // Phase 3: Handle primary swap
+    const swappedIds = new Set();
+
+    if (primaryOverlap && dragOriginalPosition) {
+        // Check if the swapped widget can fit at the original position
+        const origCol = dragOriginalPosition.col;
+        const origRow = dragOriginalPosition.row;
+        const widgetColSpan = primaryOverlap.col_span || 1;
+
+        // Ensure swap position is within grid bounds
+        const clampedCol = Math.min(origCol, cols - widgetColSpan + 1);
+
+        if (canFitAtPosition(primaryOverlap, clampedCol, origRow, [movedWidget.id])) {
+            primaryOverlap.col = clampedCol;
+            primaryOverlap.row = origRow;
+            swappedIds.add(primaryOverlap.id);
+        } else {
+            // Can't fit at swap position, find an empty spot
+            const emptySpot = findEmptySpot(primaryOverlap, movedWidget);
+            primaryOverlap.col = emptySpot.col;
+            primaryOverlap.row = emptySpot.row;
+            swappedIds.add(primaryOverlap.id);
+        }
+    }
+
+    // Phase 4: Handle secondary overlaps (widgets that overlap but weren't swapped)
+    for (const widget of overlapping) {
+        if (swappedIds.has(widget.id)) continue;
+
+        // Find an empty spot for this widget
+        const emptySpot = findEmptySpot(widget, movedWidget);
+        widget.col = emptySpot.col;
+        widget.row = emptySpot.row;
     }
 
     // Clear original position after swap
@@ -1312,14 +1360,67 @@ function resolveCollisions(movedWidget) {
 
     // Final pass: resolve any remaining collisions by compacting
     compactGrid();
+
+    // Verify no collisions remain
+    verifyNoCollisions();
 }
 
-// Find an empty spot for a widget, avoiding the excluded widget
+// Check if a widget can fit at the given position without overlapping others
+function canFitAtPosition(widget, col, row, excludeIds) {
+    const cols = getActualGridCols();
+    const colSpan = widget.col_span || 1;
+    const rowSpan = widget.row_span || 1;
+
+    // Check grid bounds
+    if (col < 1 || col + colSpan - 1 > cols || row < 1) {
+        return false;
+    }
+
+    const testWidget = { col, row, col_span: colSpan, row_span: rowSpan };
+    const otherWidgets = state.dashboardConfig.widgets.filter(
+        w => w.visible && w.id !== widget.id && !excludeIds.includes(w.id)
+    );
+
+    for (const other of otherWidgets) {
+        if (widgetsOverlap(testWidget, other)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Verify no widgets overlap and log warning if they do
+function verifyNoCollisions() {
+    const widgets = state.dashboardConfig.widgets.filter(w => w.visible);
+
+    for (let i = 0; i < widgets.length; i++) {
+        for (let j = i + 1; j < widgets.length; j++) {
+            if (widgetsOverlap(widgets[i], widgets[j])) {
+                console.warn(`Collision detected between ${widgets[i].id} and ${widgets[j].id}`);
+                // Try to fix by moving the second widget
+                const emptySpot = findEmptySpot(widgets[j], widgets[i]);
+                widgets[j].col = emptySpot.col;
+                widgets[j].row = emptySpot.row;
+            }
+        }
+    }
+}
+
+// Find an empty spot for a widget, avoiding the excluded widget(s)
+// excludeWidget can be a single widget or an array of widgets
 function findEmptySpot(widget, excludeWidget) {
     const cols = getActualGridCols();
     const colSpan = widget.col_span || 1;
     const rowSpan = widget.row_span || 1;
-    const allWidgets = state.dashboardConfig.widgets.filter(w => w.visible && w.id !== widget.id && w.id !== excludeWidget.id);
+
+    // Normalize excludeWidget to an array
+    const excludeWidgets = Array.isArray(excludeWidget) ? excludeWidget : [excludeWidget];
+    const excludeIds = excludeWidgets.map(w => w.id);
+
+    const allWidgets = state.dashboardConfig.widgets.filter(
+        w => w.visible && w.id !== widget.id && !excludeIds.includes(w.id)
+    );
 
     // Try each position starting from top-left
     for (let row = 1; row <= 20; row++) {
@@ -1327,16 +1428,21 @@ function findEmptySpot(widget, excludeWidget) {
             const testWidget = { col, row, col_span: colSpan, row_span: rowSpan };
             let hasOverlap = false;
 
-            // Check against moved widget
-            if (widgetsOverlap(testWidget, excludeWidget)) {
-                hasOverlap = true;
+            // Check against excluded widgets
+            for (const excluded of excludeWidgets) {
+                if (excluded && widgetsOverlap(testWidget, excluded)) {
+                    hasOverlap = true;
+                    break;
+                }
             }
 
             // Check against all other widgets
-            for (const other of allWidgets) {
-                if (widgetsOverlap(testWidget, other)) {
-                    hasOverlap = true;
-                    break;
+            if (!hasOverlap) {
+                for (const other of allWidgets) {
+                    if (widgetsOverlap(testWidget, other)) {
+                        hasOverlap = true;
+                        break;
+                    }
                 }
             }
 
@@ -1405,6 +1511,9 @@ function startResize(e, widgetId) {
         col: widget.col_span || 1,
         row: widget.row_span || 1
     };
+
+    // Save original position for collision resolution during resize
+    saveDragOriginalPosition(widgetId);
 
     e.preventDefault();
 }

@@ -49,7 +49,6 @@ enum CpuCategory {
     // Fallbacks
     GenericDesktop,
     GenericLaptop,
-    Unknown,
 }
 
 /// TDP profile containing power characteristics
@@ -125,7 +124,6 @@ fn get_tdp_profile(category: CpuCategory) -> TdpProfile {
         // Generic fallbacks
         CpuCategory::GenericDesktop => TdpProfile::new(85.0, 0.12, 1.4),
         CpuCategory::GenericLaptop => TdpProfile::new(25.0, 0.14, 1.5),
-        CpuCategory::Unknown => TdpProfile::new(65.0, 0.12, 1.3),
     }
 }
 
@@ -364,14 +362,6 @@ impl EstimationMonitor {
         }
     }
 
-    /// Create with custom power values (for manual override)
-    pub fn with_power_values(idle_power: f64, max_load_power: f64) -> Self {
-        let mut monitor = Self::new();
-        monitor.idle_power_override = Some(idle_power);
-        monitor.max_power_override = Some(idle_power + max_load_power);
-        monitor
-    }
-
     /// Get the effective idle power
     fn get_idle_power(&self) -> f64 {
         self.idle_power_override
@@ -382,26 +372,6 @@ impl EstimationMonitor {
     fn get_max_power(&self) -> f64 {
         self.max_power_override
             .unwrap_or_else(|| self.cpu_specs.profile.max_power())
-    }
-
-    /// Get the detected TDP
-    pub fn get_detected_tdp(&self) -> f64 {
-        self.cpu_specs.profile.tdp
-    }
-
-    /// Get the detected CPU name
-    pub fn get_cpu_name(&self) -> &str {
-        &self.cpu_specs.name
-    }
-
-    /// Get the detected core count
-    pub fn get_core_count(&self) -> usize {
-        self.cpu_specs.core_count
-    }
-
-    /// Check if detected as laptop
-    pub fn is_laptop(&self) -> bool {
-        self.cpu_specs.is_laptop
     }
 
     /// Calculate estimated power consumption

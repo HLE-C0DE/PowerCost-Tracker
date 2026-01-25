@@ -4,6 +4,8 @@ mod config;
 mod error;
 mod types;
 
-pub use config::{Config, GeneralConfig, PricingConfig, WidgetConfig, AdvancedConfig, SimplePricing, PeakOffpeakPricing, SeasonalPricing, TempoPricing, DashboardConfig, DashboardWidget};
+// SimplePricing is used by bin/demo.rs
+#[allow(unused_imports)]
+pub use config::{Config, PricingConfig, DashboardConfig, SimplePricing};
 pub use error::{Error, Result};
 pub use types::{PowerReading, DashboardData, AppState, SystemMetrics, CpuMetrics, GpuMetrics, MemoryMetrics, ProcessMetrics, Session, BaselineDetection};

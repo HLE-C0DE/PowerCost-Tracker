@@ -23,8 +23,6 @@ enum GpuSource {
 /// CPU load information
 #[derive(Debug, Clone)]
 struct CpuInfo {
-    /// Load percentage per processor (0-100)
-    pub load_percentages: Vec<u16>,
     /// Average load across all processors
     pub average_load: f64,
 }
@@ -36,8 +34,6 @@ struct GpuInfo {
     pub power_watts: f64,
     /// GPU name/model
     pub name: String,
-    /// Source of the reading
-    pub source: GpuSource,
 }
 
 /// Cached value with timestamp
@@ -187,22 +183,14 @@ impl WmiMonitor {
         let mut sys = self.sys.lock().unwrap();
         sys.refresh_cpu_usage();
 
-        let load_percentages: Vec<u16> = sys
-            .cpus()
-            .iter()
-            .map(|cpu| cpu.cpu_usage() as u16)
-            .collect();
-
-        let average_load = if load_percentages.is_empty() {
+        let cpus = sys.cpus();
+        let average_load = if cpus.is_empty() {
             0.0
         } else {
-            load_percentages.iter().map(|&l| l as f64).sum::<f64>() / load_percentages.len() as f64
+            cpus.iter().map(|cpu| cpu.cpu_usage() as f64).sum::<f64>() / cpus.len() as f64
         };
 
-        CpuInfo {
-            load_percentages,
-            average_load,
-        }
+        CpuInfo { average_load }
     }
 
     /// Get GPU power via nvidia-smi
@@ -230,7 +218,6 @@ impl WmiMonitor {
             return Some(GpuInfo {
                 power_watts: power,
                 name,
-                source: GpuSource::Nvidia,
             });
         }
 
@@ -250,7 +237,6 @@ impl WmiMonitor {
                     return Some(GpuInfo {
                         power_watts: power,
                         name: "AMD GPU".to_string(),
-                        source: GpuSource::Amd,
                     });
                 }
             }
@@ -267,7 +253,6 @@ impl WmiMonitor {
                     return Some(GpuInfo {
                         power_watts: power,
                         name: "AMD GPU".to_string(),
-                        source: GpuSource::Amd,
                     });
                 }
             }
@@ -283,7 +268,6 @@ impl WmiMonitor {
                             return Some(GpuInfo {
                                 power_watts: power,
                                 name: "AMD GPU".to_string(),
-                                source: GpuSource::Amd,
                             });
                         }
                     }
@@ -533,7 +517,7 @@ impl WmiMonitor {
 
         let total_memory = sys.total_memory();
 
-        let mut processes: Vec<ProcessMetrics> = sys
+        let processes: Vec<ProcessMetrics> = sys
             .processes()
             .iter()
             .map(|(pid, process)| {
