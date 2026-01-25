@@ -58,8 +58,41 @@ impl Config {
         }
 
         let content = fs::read_to_string(&path)?;
-        toml::from_str(&content)
-            .map_err(|e| Error::Config(format!("Failed to parse config: {}", e)))
+        let mut config: Config = toml::from_str(&content)
+            .map_err(|e| Error::Config(format!("Failed to parse config: {}", e)))?;
+
+        // Merge missing widgets from defaults
+        config.merge_missing_widgets();
+
+        Ok(config)
+    }
+
+    /// Merge any missing widgets from default config into current config
+    fn merge_missing_widgets(&mut self) {
+        let default_widgets = default_dashboard_widgets();
+        let existing_ids: std::collections::HashSet<_> =
+            self.dashboard.widgets.iter().map(|w| w.id.clone()).collect();
+
+        for default_widget in default_widgets {
+            if !existing_ids.contains(&default_widget.id) {
+                // Assign a new position at the end
+                let max_pos = self.dashboard.widgets.iter()
+                    .map(|w| w.position)
+                    .max()
+                    .unwrap_or(0);
+                let max_row = self.dashboard.widgets.iter()
+                    .map(|w| w.row + w.row_span)
+                    .max()
+                    .unwrap_or(1);
+
+                let mut new_widget = default_widget;
+                new_widget.position = max_pos + 1;
+                new_widget.row = max_row;
+                new_widget.col = 1;
+
+                self.dashboard.widgets.push(new_widget);
+            }
+        }
     }
 
     /// Save configuration to disk
@@ -357,29 +390,38 @@ pub struct DashboardConfig {
     /// Layout type: "default" or "custom"
     #[serde(default = "default_layout")]
     pub layout: String,
+    /// Global display mode: "normal", "minimize", "hard"
+    /// - "normal": Full display with labels and details
+    /// - "minimize": Compact display with reduced labels
+    /// - "hard": Data-only display, no labels
+    #[serde(default = "default_global_display")]
+    pub global_display: String,
     /// Widget configurations
     #[serde(default = "default_dashboard_widgets")]
     pub widgets: Vec<DashboardWidget>,
 }
 
 fn default_layout() -> String { "default".to_string() }
+fn default_global_display() -> String { "normal".to_string() }
 
 fn default_dashboard_widgets() -> Vec<DashboardWidget> {
     vec![
         // Row 1-2: Power widget (large, spans 2 cols x 2 rows) + 4 small stats
-        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 1, col_span: 2, row_span: 2 },
-        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1, col: 3, row: 1, col_span: 1, row_span: 1 },
-        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2, col: 4, row: 1, col_span: 1, row_span: 1 },
-        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3, col: 5, row: 1, col_span: 1, row_span: 1 },
-        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4, col: 6, row: 1, col_span: 1, row_span: 1 },
-        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5, col: 3, row: 2, col_span: 1, row_span: 1 },
-        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6, col: 4, row: 2, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 1, col_span: 2, row_span: 2, display_mode: "chart".to_string() },
+        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1, col: 3, row: 1, col_span: 1, row_span: 1, display_mode: "text".to_string() },
+        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2, col: 4, row: 1, col_span: 1, row_span: 1, display_mode: "text".to_string() },
+        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3, col: 5, row: 1, col_span: 1, row_span: 1, display_mode: "text".to_string() },
+        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4, col: 6, row: 1, col_span: 1, row_span: 1, display_mode: "text".to_string() },
+        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5, col: 3, row: 2, col_span: 1, row_span: 1, display_mode: "text".to_string() },
+        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6, col: 4, row: 2, col_span: 1, row_span: 1, display_mode: "text".to_string() },
         // Row 2 cont: CPU and GPU
-        DashboardWidget { id: "cpu".to_string(), visible: true, size: "medium".to_string(), position: 7, col: 5, row: 2, col_span: 2, row_span: 1 },
+        DashboardWidget { id: "cpu".to_string(), visible: true, size: "medium".to_string(), position: 7, col: 5, row: 2, col_span: 2, row_span: 1, display_mode: "bar".to_string() },
         // Row 3: GPU, RAM, Surplus
-        DashboardWidget { id: "gpu".to_string(), visible: true, size: "medium".to_string(), position: 8, col: 1, row: 3, col_span: 2, row_span: 1 },
-        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9, col: 3, row: 3, col_span: 1, row_span: 1 },
-        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 10, col: 4, row: 3, col_span: 2, row_span: 1 },
+        DashboardWidget { id: "gpu".to_string(), visible: true, size: "medium".to_string(), position: 8, col: 1, row: 3, col_span: 2, row_span: 1, display_mode: "bar".to_string() },
+        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9, col: 3, row: 3, col_span: 1, row_span: 1, display_mode: "bar".to_string() },
+        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 10, col: 4, row: 3, col_span: 2, row_span: 1, display_mode: "text".to_string() },
+        // Row 4: Processes widget
+        DashboardWidget { id: "processes".to_string(), visible: true, size: "medium".to_string(), position: 11, col: 1, row: 4, col_span: 2, row_span: 1, display_mode: "text".to_string() },
     ]
 }
 
@@ -387,6 +429,7 @@ impl Default for DashboardConfig {
     fn default() -> Self {
         Self {
             layout: default_layout(),
+            global_display: default_global_display(),
             widgets: default_dashboard_widgets(),
         }
     }
@@ -417,6 +460,9 @@ pub struct DashboardWidget {
     /// Row span (1-2 for height)
     #[serde(default = "default_row_span")]
     pub row_span: u32,
+    /// Display mode: "text", "bar", "radial", "chart"
+    #[serde(default = "default_display_mode")]
+    pub display_mode: String,
 }
 
 fn default_widget_size_small() -> String { "small".to_string() }
@@ -424,3 +470,4 @@ fn default_col() -> u32 { 1 }
 fn default_row() -> u32 { 1 }
 fn default_col_span() -> u32 { 1 }
 fn default_row_span() -> u32 { 1 }
+fn default_display_mode() -> String { "text".to_string() }
