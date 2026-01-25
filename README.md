@@ -109,7 +109,7 @@ A compact overlay that stays visible while you work or game:
 
 <img width="658" height="374" alt="image" src="https://github.com/user-attachments/assets/93bc492b-7a45-45ee-b0c0-08e8f1987819" />
 
-PowerCost-Tracker vs NZXT CAM (actual softer i was using for tracking my CPU/GPU usage with dignity) 
+PowerCost-Tracker vs NZXT CAM (actual software i was using for track my CPU/GPU usage with dignity) 
 
 
 ### Bilingual Interface
