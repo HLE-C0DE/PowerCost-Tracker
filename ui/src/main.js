@@ -62,7 +62,7 @@ const WIDGET_REGISTRY = {
     },
     session_duration: {
         id: 'session_duration',
-        title: 'Session Duration',
+        title: 'Time Awake',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
         render: (data) => `<div class="widget-value small">${formatDuration(data.session_duration_secs)}</div>`,
@@ -234,7 +234,7 @@ const WIDGET_REGISTRY = {
             // Radial mode
             if (displayMode === 'radial') {
                 return `
-                    <div class="radial-container compact">
+                    <div class="radial-container">
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
@@ -244,8 +244,9 @@ const WIDGET_REGISTRY = {
             // Chart mode
             if (displayMode === 'chart') {
                 return `
-                    <div class="mini-chart-container compact">
+                    <div class="mini-chart-container">
                         <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                            <span class="metric-label">RAM</span>
                             <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
                         </div>
                         <canvas id="ram-mini-chart" class="mini-chart"></canvas>
@@ -303,6 +304,41 @@ const WIDGET_REGISTRY = {
             `;
         },
     },
+    session_controls: {
+        id: 'session_controls',
+        title: 'Session Controls',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
+        defaultSize: 'medium',
+        render: (data) => {
+            const session = data.activeSession;
+            const elapsed = session ? Math.floor(Date.now() / 1000) - session.start_time : 0;
+            const duration = session ? formatDuration(elapsed) : '--:--:--';
+            const surplusWh = session ? formatNumber(session.surplus_wh, 2) : '--';
+            const surplusCost = session ? `${state.currencySymbol}${formatNumber(session.surplus_cost || 0, 4)}` : '--';
+
+            return `
+                <div class="session-widget">
+                    <div class="session-widget-info">
+                        <div class="session-widget-status">
+                            <span class="session-widget-indicator ${session ? 'active' : ''}"></span>
+                            <span class="session-widget-label">${session ? 'Session Active' : 'No active session'}</span>
+                        </div>
+                        <span class="session-widget-duration">${duration}</span>
+                    </div>
+                    <div class="session-widget-stats ${session ? '' : 'hidden'}">
+                        <span class="session-widget-stat">Surplus: ${surplusWh} Wh</span>
+                        <span class="session-widget-stat">Cost: ${surplusCost}</span>
+                    </div>
+                    <div class="session-widget-btns">
+                        ${session
+                            ? '<button class="btn btn-secondary btn-sm session-widget-end-btn">End Session</button>'
+                            : '<button class="btn btn-primary btn-sm session-widget-start-btn">Start Session</button>'
+                        }
+                    </div>
+                </div>
+            `;
+        },
+    },
     processes: {
         id: 'processes',
         title: 'Top Processes',
@@ -326,11 +362,10 @@ const WIDGET_REGISTRY = {
                         <div class="process-header-row">
                             <span class="process-col-name">Process</span>
                             <span class="process-col-cpu">CPU</span>
-                            <span class="process-col-gpu">GPU</span>
                             <span class="process-col-ram">RAM</span>
                             <span class="process-col-pin"></span>
                         </div>
-                        <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? 'Show top' : 'Show all'}">
+                        <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? 'Show top' : 'Search processes'}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                             </svg>
@@ -339,13 +374,11 @@ const WIDGET_REGISTRY = {
                     <div class="process-list-scroll">
                         ${displayList.map(proc => {
                             const cpuVal = (proc.cpu_percent != null && !isNaN(proc.cpu_percent)) ? formatNumber(proc.cpu_percent, 1) : '--';
-                            const gpuVal = (proc.gpu_percent != null && !isNaN(proc.gpu_percent)) ? formatNumber(proc.gpu_percent, 1) : '--';
                             const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
                             return `
                                 <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
-                                    <span class="process-name" title="${proc.name}">${proc.name.slice(0, 16)}</span>
+                                    <span class="process-name" title="${proc.name}">${proc.name.slice(0, 20)}</span>
                                     <span class="process-cpu">${cpuVal}%</span>
-                                    <span class="process-gpu">${gpuVal}%</span>
                                     <span class="process-ram">${ramVal}%</span>
                                     <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
                                         ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
@@ -518,6 +551,126 @@ function setupDashboard() {
 
     // Stream A: Setup global display toggle buttons
     setupGlobalDisplayToggle();
+
+    // Process search modal handlers
+    setupProcessModal();
+}
+
+// ===== Process Search Modal =====
+function setupProcessModal() {
+    const modal = document.getElementById('process-search-modal');
+    const closeBtn = document.getElementById('close-process-modal');
+    const searchInput = document.getElementById('process-search-input');
+
+    closeBtn.addEventListener('click', closeProcessModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) closeProcessModal();
+    });
+
+    searchInput.addEventListener('input', (e) => {
+        filterProcessList(e.target.value);
+    });
+
+    // Handle pin clicks in modal
+    document.getElementById('process-modal-list').addEventListener('click', async (e) => {
+        const pinBtn = e.target.closest('.process-modal-pin-btn');
+        if (pinBtn) {
+            const name = pinBtn.dataset.name;
+            if (!name) return;
+
+            try {
+                const pinnedList = await invoke('get_pinned_processes');
+                const isPinned = pinnedList.some(p => p.toLowerCase() === name.toLowerCase());
+
+                if (isPinned) {
+                    await invoke('unpin_process', { name });
+                    showToast(`Unpinned: ${name}`, 'info');
+                } else {
+                    await invoke('pin_process', { name });
+                    showToast(`Pinned: ${name}`, 'success');
+                }
+
+                // Refresh the modal list
+                await refreshProcessModalList();
+            } catch (error) {
+                console.error('Failed to toggle pin:', error);
+                showToast('Failed to update pin', 'error');
+            }
+        }
+    });
+}
+
+async function openProcessModal() {
+    const modal = document.getElementById('process-search-modal');
+    const loadingBar = document.getElementById('process-loading-bar');
+    const searchInput = document.getElementById('process-search-input');
+
+    modal.classList.remove('hidden');
+    searchInput.value = '';
+    loadingBar.classList.remove('hidden');
+
+    try {
+        state.allProcesses = await invoke('get_all_processes');
+        loadingBar.classList.add('hidden');
+        renderProcessModalList(state.allProcesses);
+    } catch (error) {
+        console.error('Failed to get all processes:', error);
+        loadingBar.classList.add('hidden');
+        state.allProcesses = [];
+        renderProcessModalList([]);
+    }
+
+    searchInput.focus();
+}
+
+function closeProcessModal() {
+    const modal = document.getElementById('process-search-modal');
+    modal.classList.add('hidden');
+    state.allProcesses = [];
+}
+
+async function refreshProcessModalList() {
+    try {
+        state.allProcesses = await invoke('get_all_processes');
+        const searchInput = document.getElementById('process-search-input');
+        filterProcessList(searchInput.value);
+    } catch (error) {
+        console.error('Failed to refresh processes:', error);
+    }
+}
+
+function filterProcessList(query) {
+    const filtered = query
+        ? state.allProcesses.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+        : state.allProcesses;
+    renderProcessModalList(filtered);
+}
+
+function renderProcessModalList(processes) {
+    const list = document.getElementById('process-modal-list');
+
+    if (processes.length === 0) {
+        list.innerHTML = '<div class="process-modal-empty">No processes found</div>';
+        return;
+    }
+
+    const pinnedIcon = `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="14" height="14"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+    const unpinnedIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+
+    list.innerHTML = processes.map(proc => {
+        const cpuVal = (proc.cpu_percent != null && !isNaN(proc.cpu_percent)) ? formatNumber(proc.cpu_percent, 1) : '--';
+        const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
+        return `
+            <div class="process-modal-row ${proc.is_pinned ? 'pinned' : ''}">
+                <span class="process-modal-name" title="${proc.name}">${proc.name}</span>
+                <span class="process-modal-cpu">${cpuVal}%</span>
+                <span class="process-modal-ram">${ramVal}%</span>
+                <button class="process-modal-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
+                    ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                </button>
+            </div>
+        `;
+    }).join('');
 }
 
 /**
@@ -561,27 +714,28 @@ async function handleDashboardClick(e) {
         }
     }
 
-    // Handle process advanced mode toggle
+    // Handle process search button - open modal
     const advancedToggle = e.target.closest('.process-advanced-toggle');
     if (advancedToggle) {
         e.stopPropagation();
-        state.processAdvancedMode = !state.processAdvancedMode;
-        if (state.processAdvancedMode) {
-            // Fetch all processes
-            try {
-                state.allProcesses = await invoke('get_all_processes');
-            } catch (error) {
-                console.error('Failed to get all processes:', error);
-                state.allProcesses = [];
-            }
-        }
-        // Re-render processes widget
-        if (state.lastDashboardData) {
-            const body = document.getElementById('widget-body-processes');
-            if (body) {
-                body.innerHTML = WIDGET_REGISTRY.processes.render(state.lastDashboardData);
-            }
-        }
+        openProcessModal();
+        return;
+    }
+
+    // Handle session widget start button
+    const sessionStartBtn = e.target.closest('.session-widget-start-btn');
+    if (sessionStartBtn) {
+        e.stopPropagation();
+        startSession();
+        return;
+    }
+
+    // Handle session widget end button
+    const sessionEndBtn = e.target.closest('.session-widget-end-btn');
+    if (sessionEndBtn) {
+        e.stopPropagation();
+        endSession();
+        return;
     }
 
     // Handle process pin/unpin
@@ -867,7 +1021,7 @@ async function fixLayout() {
     forceGridMigration();
     await saveDashboardConfigQuiet();
     renderDashboard();
-    showToast('Layout fixed - widgets auto-arranged', 'success');
+    showToast('Default layout applied', 'success');
 }
 
 function renderVisibilityPanel() {

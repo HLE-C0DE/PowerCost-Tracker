@@ -92,21 +92,21 @@
                         Edit Mode
                     </span>
                     <div class="edit-toolbar-actions">
-                        <button class="btn btn-secondary btn-sm" id="toggle-visibility-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            Toggle Widgets
-                        </button>
-                        <button class="btn btn-secondary btn-sm" id="fix-layout-btn" title="Auto-arrange widgets">
+                        <button class="btn btn-secondary btn-sm" id="fix-layout-btn" title="Reset widgets to default positions">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <rect x="3" y="3" width="7" height="7"/>
                                 <rect x="14" y="3" width="7" height="7"/>
                                 <rect x="3" y="14" width="7" height="7"/>
                                 <rect x="14" y="14" width="7" height="7"/>
                             </svg>
-                            Fix Layout
+                            Default Layout
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="toggle-visibility-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Toggle Widgets
                         </button>
                         <button class="btn btn-primary btn-sm" id="exit-edit-mode-btn">Done</button>
                     </div>
@@ -133,8 +133,8 @@
                     <!-- Widgets will be dynamically rendered here -->
                 </div>
 
-                <!-- Session Control Bar -->
-                <div class="session-bar" id="session-bar">
+                <!-- Session Control Bar (Legacy - hidden, use Session Controls widget instead) -->
+                <div class="session-bar hidden" id="session-bar">
                     <div class="session-info">
                         <span class="session-label" id="session-label">No active session</span>
                         <span class="session-duration" id="session-duration-display">--:--:--</span>
@@ -465,6 +465,41 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Process Search Modal -->
+    <div class="modal hidden" id="process-search-modal">
+        <div class="modal-content process-modal-content">
+            <div class="modal-header">
+                <h2>All Processes</h2>
+                <button class="btn btn-icon modal-close" id="close-process-modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="process-search-bar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" id="process-search-input" placeholder="Search processes..." autocomplete="off">
+                </div>
+                <div class="process-loading-bar hidden" id="process-loading-bar">
+                    <div class="process-loading-progress"></div>
+                </div>
+                <div class="process-modal-header">
+                    <span class="process-modal-col-name">Process</span>
+                    <span class="process-modal-col-cpu">CPU %</span>
+                    <span class="process-modal-col-ram">RAM %</span>
+                    <span class="process-modal-col-pin"></span>
+                </div>
+                <div class="process-modal-list" id="process-modal-list">
+                    <!-- Processes will be rendered here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Edit Dashboard Modal -->

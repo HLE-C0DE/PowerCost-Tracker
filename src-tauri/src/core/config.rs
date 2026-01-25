@@ -429,8 +429,9 @@ fn default_dashboard_widgets() -> Vec<DashboardWidget> {
         DashboardWidget { id: "gpu".to_string(), visible: true, size: "medium".to_string(), position: 8, col: 1, row: 3, col_span: 2, row_span: 1, display_mode: "bar".to_string() },
         DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9, col: 3, row: 3, col_span: 1, row_span: 1, display_mode: "bar".to_string() },
         DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 10, col: 4, row: 3, col_span: 2, row_span: 1, display_mode: "text".to_string() },
-        // Row 4: Processes widget
+        // Row 4: Processes widget and Session Controls
         DashboardWidget { id: "processes".to_string(), visible: true, size: "medium".to_string(), position: 11, col: 1, row: 4, col_span: 2, row_span: 1, display_mode: "text".to_string() },
+        DashboardWidget { id: "session_controls".to_string(), visible: true, size: "medium".to_string(), position: 12, col: 3, row: 4, col_span: 2, row_span: 1, display_mode: "text".to_string() },
     ]
 }
 
