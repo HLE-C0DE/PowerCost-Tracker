@@ -1610,8 +1610,9 @@ body {
 }
 
 .process-modal-row.pinned {
-    background: rgba(99, 102, 241, 0.15);
-    border-left: 2px solid var(--accent-primary);
+    background: rgba(99, 102, 241, 0.2);
+    border-left: 3px solid var(--accent-primary);
+    box-shadow: inset 0 0 10px rgba(99, 102, 241, 0.15);
 }
 
 .process-modal-name {
@@ -1722,9 +1723,16 @@ body {
 }
 
 .process-row.pinned {
-    background: rgba(99, 102, 241, 0.15);
-    border-left: 2px solid var(--accent-primary);
+    background: rgba(99, 102, 241, 0.2);
+    border-left: 3px solid var(--accent-primary);
     padding-left: 4px;
+    box-shadow: inset 0 0 8px rgba(99, 102, 241, 0.15);
+}
+
+.pinned-indicator {
+    font-size: 0.65rem;
+    margin-right: 4px;
+    opacity: 0.9;
 }
 
 .process-name {

@@ -557,9 +557,17 @@ impl WmiMonitor {
         let (mut pinned, mut others): (Vec<_>, Vec<_>) = processes.into_iter()
             .partition(|p| p.is_pinned);
 
-        // Sort both by CPU usage descending
-        pinned.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal));
-        others.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal));
+        // Helper to calculate combined usage score (40% CPU + 40% GPU + 20% Memory)
+        let usage_score = |p: &ProcessMetrics| -> f64 {
+            let cpu = p.cpu_percent;
+            let gpu = p.gpu_percent.unwrap_or(0.0);
+            let mem = p.memory_percent;
+            cpu * 0.4 + gpu * 0.4 + mem * 0.2
+        };
+
+        // Sort both by global usage score descending
+        pinned.sort_by(|a, b| usage_score(b).partial_cmp(&usage_score(a)).unwrap_or(std::cmp::Ordering::Equal));
+        others.sort_by(|a, b| usage_score(b).partial_cmp(&usage_score(a)).unwrap_or(std::cmp::Ordering::Equal));
 
         // Take top N from others, then prepend pinned
         let remaining_slots = limit.saturating_sub(pinned.len());

@@ -389,7 +389,7 @@ const WIDGET_REGISTRY = {
                             const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
                             return `
                                 <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
-                                    <span class="process-name" title="${proc.name}">${proc.name.slice(0, 20)}</span>
+                                    <span class="process-name" title="${proc.name}">${proc.is_pinned ? '<span class="pinned-indicator">📌</span>' : ''}${proc.name.slice(0, 20)}</span>
                                     <span class="process-cpu">${cpuVal}%</span>
                                     <span class="process-gpu">${gpuVal}%</span>
                                     <span class="process-ram">${ramVal}%</span>
@@ -677,7 +677,7 @@ function renderProcessModalList(processes) {
         const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
         return `
             <div class="process-modal-row ${proc.is_pinned ? 'pinned' : ''}">
-                <span class="process-modal-name" title="${proc.name}">${proc.name}</span>
+                <span class="process-modal-name" title="${proc.name}">${proc.is_pinned ? '<span class="pinned-indicator">📌</span>' : ''}${proc.name}</span>
                 <span class="process-modal-cpu">${cpuVal}%</span>
                 <span class="process-modal-gpu">${gpuVal}%</span>
                 <span class="process-modal-ram">${ramVal}%</span>
@@ -777,7 +777,11 @@ async function handleDashboardClick(e) {
             // Refresh processes
             if (state.processAdvancedMode) {
                 state.allProcesses = await invoke('get_all_processes');
+            } else {
+                // Refresh top processes for widget view
+                state.topProcesses = await invoke('get_top_processes', {});
             }
+            renderDashboard();
         } catch (error) {
             console.error('Failed to toggle pin:', error);
             showToast('Failed to update pin', 'error');
