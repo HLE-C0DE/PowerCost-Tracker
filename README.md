@@ -20,10 +20,6 @@
 </p>
 
 <p align="center">
-  <a href="README.fr.md">Francais</a> | English
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version 1.0.0">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg" alt="Platform">
