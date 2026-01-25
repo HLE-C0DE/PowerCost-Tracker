@@ -9,8 +9,15 @@
 <body>
     <div id="app">
         <!-- Navigation -->
-        <nav class="sidebar">
+        <nav class="sidebar" id="sidebar">
             <div class="logo">
+                <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
                 <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                 </svg>
@@ -34,8 +41,15 @@
                 </a></li>
                 <li><a href="#settings" class="nav-link" data-view="settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                        <line x1="4" y1="21" x2="4" y2="14"/>
+                        <line x1="4" y1="10" x2="4" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12" y2="3"/>
+                        <line x1="20" y1="21" x2="20" y2="16"/>
+                        <line x1="20" y1="12" x2="20" y2="3"/>
+                        <line x1="1" y1="14" x2="7" y2="14"/>
+                        <line x1="9" y1="8" x2="15" y2="8"/>
+                        <line x1="17" y1="16" x2="23" y2="16"/>
                     </svg>
                     <span data-i18n="nav.settings">Settings</span>
                 </a></li>
@@ -49,6 +63,12 @@
                 <header class="view-header">
                     <h1 data-i18n="nav.dashboard">Dashboard</h1>
                     <div class="header-controls">
+                        <!-- Stream A: Global Display Toggle -->
+                        <div class="global-display-toggle" id="global-display-toggle" title="Display Mode">
+                            <button class="global-display-btn active" data-mode="normal">Normal</button>
+                            <button class="global-display-btn" data-mode="minimize">Minimal</button>
+                            <button class="global-display-btn" data-mode="hard">Data</button>
+                        </div>
                         <div class="status-badge" id="source-badge">
                             <span class="status-dot"></span>
                             <span id="power-source">--</span>
@@ -259,6 +279,22 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.start_minimized">Start Minimized</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-start-minimized">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.start_with_system">Start with System</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-start-with-system">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
 
                     <!-- Baseline Settings -->
@@ -284,6 +320,11 @@
                         </div>
 
                         <button class="btn btn-secondary" id="detect-baseline-btn">Detect Now</button>
+
+                        <div class="setting-row" style="margin-top: var(--spacing-md);">
+                            <label>Process List Limit</label>
+                            <input type="number" id="setting-process-limit" step="1" value="10" min="5" max="50">
+                        </div>
                     </div>
 
                     <!-- Pricing Settings -->

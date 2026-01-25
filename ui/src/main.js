@@ -307,7 +307,7 @@ const WIDGET_REGISTRY = {
         id: 'processes',
         title: 'Top Processes',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
-        defaultSize: 'medium',
+        defaultSize: 'large',
         render: (data) => {
             const processes = data.topProcesses;
             const advancedMode = state.processAdvancedMode || false;
@@ -321,30 +321,39 @@ const WIDGET_REGISTRY = {
             const unpinnedIcon = `<svg class="pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
 
             return `
-                <div class="process-header">
-                    <div class="process-header-row">
-                        <span class="process-col-name">Process</span>
-                        <span class="process-col-cpu">CPU</span>
-                        <span class="process-col-ram">RAM</span>
-                        <span class="process-col-pin"></span>
-                    </div>
-                    <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? 'Show top' : 'Show all'}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="process-list-scroll">
-                    ${displayList.map(proc => `
-                        <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
-                            <span class="process-name" title="${proc.name}">${proc.name.slice(0, 18)}</span>
-                            <span class="process-cpu">${formatNumber(proc.cpu_percent, 1)}%</span>
-                            <span class="process-ram">${formatNumber(proc.memory_percent, 1)}%</span>
-                            <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
-                                ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
-                            </button>
+                <div class="process-widget">
+                    <div class="process-header">
+                        <div class="process-header-row">
+                            <span class="process-col-name">Process</span>
+                            <span class="process-col-cpu">CPU</span>
+                            <span class="process-col-gpu">GPU</span>
+                            <span class="process-col-ram">RAM</span>
+                            <span class="process-col-pin"></span>
                         </div>
-                    `).join('')}
+                        <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? 'Show top' : 'Show all'}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="process-list-scroll">
+                        ${displayList.map(proc => {
+                            const cpuVal = (proc.cpu_percent != null && !isNaN(proc.cpu_percent)) ? formatNumber(proc.cpu_percent, 1) : '--';
+                            const gpuVal = (proc.gpu_percent != null && !isNaN(proc.gpu_percent)) ? formatNumber(proc.gpu_percent, 1) : '--';
+                            const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
+                            return `
+                                <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
+                                    <span class="process-name" title="${proc.name}">${proc.name.slice(0, 16)}</span>
+                                    <span class="process-cpu">${cpuVal}%</span>
+                                    <span class="process-gpu">${gpuVal}%</span>
+                                    <span class="process-ram">${ramVal}%</span>
+                                    <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
+                                        ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                                    </button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
                 </div>
             `;
         },
@@ -1413,7 +1422,7 @@ async function updateDashboard() {
             invoke('get_dashboard_data'),
             invoke('get_system_metrics').catch(() => null),
             invoke('get_session_stats').catch(() => null),
-            invoke('get_top_processes', { limit: 5 }).catch(() => []),
+            invoke('get_top_processes', {}).catch(() => []),
         ]);
 
         state.systemMetrics = systemMetrics;
@@ -1874,6 +1883,7 @@ function applyConfig(config) {
 
     document.getElementById('setting-baseline-auto').checked = config.advanced.baseline_auto;
     document.getElementById('setting-baseline-watts').value = config.advanced.baseline_watts;
+    document.getElementById('setting-process-limit').value = config.advanced.process_list_limit || 10;
     document.getElementById('manual-baseline-row').style.display = config.advanced.baseline_auto ? 'none' : 'flex';
 
     document.getElementById('setting-pricing-mode').value = config.pricing.mode;
@@ -1971,6 +1981,8 @@ async function saveSettings() {
                 baseline_watts: parseFloat(document.getElementById('setting-baseline-watts').value) || 0,
                 baseline_auto: document.getElementById('setting-baseline-auto').checked,
                 active_profile: state.config?.advanced?.active_profile || 'default',
+                pinned_processes: state.config?.advanced?.pinned_processes || [],
+                process_list_limit: parseInt(document.getElementById('setting-process-limit').value) || 10,
             },
             dashboard: state.dashboardConfig || state.config?.dashboard,
         };
