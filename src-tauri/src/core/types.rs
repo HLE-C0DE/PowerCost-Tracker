@@ -179,3 +179,49 @@ pub struct BaselineDetection {
     pub sample_count: usize,
     pub confidence: f64,
 }
+
+/// Critical metrics that need fast updates (power, CPU%, GPU%, cost, timer)
+/// Updated at the user's fast refresh rate (e.g., 1s)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CriticalMetrics {
+    /// Current power consumption in watts
+    pub power_watts: f64,
+    /// CPU usage percentage (0-100)
+    pub cpu_usage_percent: f64,
+    /// GPU usage percentage (0-100), if available
+    pub gpu_usage_percent: Option<f64>,
+    /// GPU power in watts (from cache), if available
+    pub gpu_power_watts: Option<f64>,
+    /// Cumulative energy since session start in Wh
+    pub cumulative_wh: f64,
+    /// Current cost since session start
+    pub current_cost: f64,
+    /// Estimated hourly cost at current consumption
+    pub hourly_cost_estimate: f64,
+    /// Estimated daily cost at current consumption
+    pub daily_cost_estimate: f64,
+    /// Estimated monthly cost at current consumption
+    pub monthly_cost_estimate: f64,
+    /// Session duration in seconds
+    pub session_duration_secs: u64,
+    /// Active session data if tracking
+    pub active_session: Option<Session>,
+    /// Power reading source
+    pub source: String,
+    /// Whether power reading is estimated
+    pub is_estimated: bool,
+    /// Timestamp of this reading
+    pub timestamp: i64,
+}
+
+/// Detailed metrics that can be updated less frequently (processes, temps, VRAM)
+/// Updated at the slow refresh rate (e.g., 5s) to avoid blocking GPU commands
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetailedMetrics {
+    /// Full system metrics including CPU, GPU, and memory
+    pub system_metrics: Option<SystemMetrics>,
+    /// Top processes by resource usage
+    pub top_processes: Vec<ProcessMetrics>,
+    /// Timestamp of this reading
+    pub timestamp: i64,
+}

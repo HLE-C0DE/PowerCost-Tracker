@@ -14,7 +14,8 @@ pub mod baseline;
 
 pub use baseline::BaselineDetector;
 
-use crate::core::{Error, PowerReading, ProcessMetrics, Result, SystemMetrics};
+use crate::core::{DetailedMetrics, Error, PowerReading, ProcessMetrics, Result, SystemMetrics};
+use std::any::Any;
 
 /// Power monitor that abstracts over different hardware sources
 pub struct PowerMonitor {
@@ -96,14 +97,26 @@ impl PowerMonitor {
         self.source.is_estimated()
     }
 
-    /// Get system metrics (CPU, GPU, RAM)
+    /// Get power reading using fast path (CPU-only + cached GPU, no blocking commands)
+    /// Returns (power_watts, cpu_usage_percent, cached_gpu_usage_percent, cached_gpu_power_watts)
+    pub fn get_power_watts_fast(&self) -> Result<(f64, f64, Option<f64>, Option<f64>)> {
+        self.source.get_power_watts_fast()
+    }
+
+    /// Collect detailed metrics (processes, temps, VRAM) - may block for GPU commands
+    pub fn collect_detailed_metrics(&self, limit: usize, pinned: &[String]) -> Result<DetailedMetrics> {
+        self.source.collect_detailed_metrics(limit, pinned)
+    }
+
+    /// Get system metrics (CPU, GPU, RAM) - uses stored source for cache sharing
     #[cfg(target_os = "windows")]
     pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
-        // Downcast to WmiMonitor to access system metrics
-        // For now, we'll create a new instance for the call
-        // TODO: Improve this with trait method or stored reference
-        let monitor = windows::WmiMonitor::new()?;
-        monitor.get_system_metrics()
+        // Downcast to WmiMonitor to access system metrics using the stored instance
+        if let Some(wmi) = self.source.as_any().downcast_ref::<windows::WmiMonitor>() {
+            wmi.get_system_metrics()
+        } else {
+            Err(Error::HardwareNotSupported("System metrics not available for this source".to_string()))
+        }
     }
 
     /// Get system metrics (Linux stub)
@@ -113,11 +126,14 @@ impl PowerMonitor {
         Err(Error::HardwareNotSupported("System metrics not yet implemented for Linux".to_string()))
     }
 
-    /// Get top processes by CPU usage
+    /// Get top processes by CPU usage - uses stored source for cache sharing
     #[cfg(target_os = "windows")]
     pub fn get_top_processes(&self, limit: usize) -> Result<Vec<ProcessMetrics>> {
-        let monitor = windows::WmiMonitor::new()?;
-        monitor.get_top_processes(limit)
+        if let Some(wmi) = self.source.as_any().downcast_ref::<windows::WmiMonitor>() {
+            wmi.get_top_processes(limit)
+        } else {
+            Err(Error::HardwareNotSupported("Process metrics not available for this source".to_string()))
+        }
     }
 
     /// Get top processes (Linux stub)
@@ -127,11 +143,14 @@ impl PowerMonitor {
         Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
     }
 
-    /// Get top processes with pinned processes prioritized
+    /// Get top processes with pinned processes prioritized - uses stored source
     #[cfg(target_os = "windows")]
     pub fn get_top_processes_with_pinned(&self, limit: usize, pinned: &[String]) -> Result<Vec<ProcessMetrics>> {
-        let monitor = windows::WmiMonitor::new()?;
-        monitor.get_top_processes_with_pinned(limit, pinned)
+        if let Some(wmi) = self.source.as_any().downcast_ref::<windows::WmiMonitor>() {
+            wmi.get_top_processes_with_pinned(limit, pinned)
+        } else {
+            Err(Error::HardwareNotSupported("Process metrics not available for this source".to_string()))
+        }
     }
 
     /// Get top processes with pinned (Linux stub)
@@ -140,11 +159,14 @@ impl PowerMonitor {
         Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
     }
 
-    /// Get all processes (for discovery mode)
+    /// Get all processes (for discovery mode) - uses stored source
     #[cfg(target_os = "windows")]
     pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
-        let monitor = windows::WmiMonitor::new()?;
-        monitor.get_all_processes()
+        if let Some(wmi) = self.source.as_any().downcast_ref::<windows::WmiMonitor>() {
+            wmi.get_all_processes()
+        } else {
+            Err(Error::HardwareNotSupported("Process metrics not available for this source".to_string()))
+        }
     }
 
     /// Get all processes (Linux stub)
@@ -155,9 +177,22 @@ impl PowerMonitor {
 }
 
 /// Trait for power monitoring sources
-pub trait PowerSource {
+pub trait PowerSource: Send + Sync {
     /// Get current power in watts
     fn get_power_watts(&self) -> Result<f64>;
+
+    /// Get power reading using fast path (CPU-only + cached GPU, no blocking commands)
+    /// Returns (power_watts, cpu_usage_percent, cached_gpu_usage_percent, cached_gpu_power_watts)
+    fn get_power_watts_fast(&self) -> Result<(f64, f64, Option<f64>, Option<f64>)> {
+        // Default implementation falls back to normal method
+        let power = self.get_power_watts()?;
+        Ok((power, 0.0, None, None))
+    }
+
+    /// Collect detailed metrics (processes, temps, VRAM) - may block for GPU commands
+    fn collect_detailed_metrics(&self, _limit: usize, _pinned: &[String]) -> Result<DetailedMetrics> {
+        Err(Error::HardwareNotSupported("Detailed metrics not implemented".to_string()))
+    }
 
     /// Get a full reading with metadata
     fn get_reading(&self) -> Result<PowerReading>;
@@ -167,4 +202,7 @@ pub trait PowerSource {
 
     /// Whether readings are estimated
     fn is_estimated(&self) -> bool;
+
+    /// Downcast support for type-specific operations
+    fn as_any(&self) -> &dyn Any;
 }

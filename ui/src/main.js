@@ -416,10 +416,16 @@ const state = {
     maxHistoryPoints: 60,
     currencySymbol: '\u20AC',
     historyData: [],
-    dashboardIntervalId: null,
+    // Tiered update interval IDs
+    criticalIntervalId: null,  // Fast updates (power, CPU%, GPU%, cost)
+    detailedIntervalId: null,  // Slow updates (processes, temps, VRAM)
+    dashboardIntervalId: null, // Legacy - kept for backwards compat
     systemMetrics: null,
     activeSession: null,
     topProcesses: [],
+    // Cached metrics from backend
+    criticalMetrics: null,
+    detailedMetrics: null,
     isEditMode: false,
     draggedWidget: null,
     draggedWidgetId: null,
@@ -441,6 +447,10 @@ const state = {
     allProcesses: [],
 };
 
+// Widget classification for tiered updates
+const CRITICAL_WIDGETS = ['power', 'cpu', 'gpu', 'session_cost', 'session_energy', 'session_duration', 'hourly_estimate', 'daily_estimate', 'monthly_estimate', 'session_controls'];
+const DETAILED_WIDGETS = ['processes', 'ram', 'surplus'];
+
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -457,6 +467,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         startDashboardUpdates();
 
+        // Listen for tiered push updates from backend
+        await listen('critical-update', (event) => {
+            handleCriticalUpdate(event.payload);
+        });
+
+        await listen('detailed-update', (event) => {
+            handleDetailedUpdate(event.payload);
+        });
+
+        // Legacy power-update listener (for backwards compat)
         await listen('power-update', (event) => {
             updatePowerDisplay(event.payload);
         });
@@ -1807,21 +1827,248 @@ function forceGridMigration() {
     }
 }
 
-// ===== Dashboard Updates =====
+// ===== Dashboard Updates (Tiered Architecture) =====
+
+// Widget classification for which widgets update at which rate
+function isCriticalWidget(widgetId) {
+    return CRITICAL_WIDGETS.includes(widgetId);
+}
+
+function isDetailedWidget(widgetId) {
+    return DETAILED_WIDGETS.includes(widgetId);
+}
+
 async function startDashboardUpdates() {
+    // Initial full update
     await updateDashboard();
-    const refreshRate = state.config?.general?.refresh_rate_ms || 1000;
-    state.dashboardIntervalId = setInterval(updateDashboard, refreshRate);
+
+    // Start tiered update timers
+    const fastRate = state.config?.general?.refresh_rate_ms || 1000;
+    const slowRate = state.config?.general?.slow_refresh_rate_ms || 5000;
+
+    // Critical updates (power, CPU%, GPU%, cost) - fast rate
+    state.criticalIntervalId = setInterval(updateCriticalWidgets, fastRate);
+
+    // Detailed updates (processes, temps, VRAM) - slow rate
+    state.detailedIntervalId = setInterval(updateDetailedWidgets, slowRate);
+
+    // Keep legacy interval for backwards compat (but it does nothing now)
+    state.dashboardIntervalId = null;
+
+    console.log(`Dashboard updates started: critical=${fastRate}ms, detailed=${slowRate}ms`);
 }
 
 function restartDashboardUpdates() {
+    // Clear all intervals
+    if (state.criticalIntervalId) {
+        clearInterval(state.criticalIntervalId);
+        state.criticalIntervalId = null;
+    }
+    if (state.detailedIntervalId) {
+        clearInterval(state.detailedIntervalId);
+        state.detailedIntervalId = null;
+    }
     if (state.dashboardIntervalId) {
         clearInterval(state.dashboardIntervalId);
+        state.dashboardIntervalId = null;
     }
-    const refreshRate = state.config?.general?.refresh_rate_ms || 1000;
-    state.dashboardIntervalId = setInterval(updateDashboard, refreshRate);
+
+    // Restart with current config
+    const fastRate = state.config?.general?.refresh_rate_ms || 1000;
+    const slowRate = state.config?.general?.slow_refresh_rate_ms || 5000;
+
+    state.criticalIntervalId = setInterval(updateCriticalWidgets, fastRate);
+    state.detailedIntervalId = setInterval(updateDetailedWidgets, slowRate);
+
+    console.log(`Dashboard updates restarted: critical=${fastRate}ms, detailed=${slowRate}ms`);
 }
 
+// Handle push updates from backend (critical-update event)
+function handleCriticalUpdate(metrics) {
+    if (state.isEditMode) return;
+
+    state.criticalMetrics = metrics;
+    state.activeSession = metrics.active_session;
+
+    // Build data object compatible with widget renderers
+    const data = buildDashboardData();
+
+    // Update only critical widgets
+    renderWidgetsByType(data, 'critical');
+
+    // Update power source badge
+    const powerSource = document.getElementById('power-source');
+    if (powerSource) {
+        powerSource.textContent = metrics.source;
+    }
+
+    // Update estimation warning
+    const warningBanner = document.getElementById('estimation-warning');
+    const statusDot = document.querySelector('.status-dot');
+    if (warningBanner && statusDot) {
+        if (metrics.is_estimated) {
+            warningBanner.classList.remove('hidden');
+            statusDot.classList.add('estimated');
+        } else {
+            warningBanner.classList.add('hidden');
+            statusDot.classList.remove('estimated');
+        }
+    }
+
+    // Update power history for graph
+    updatePowerHistory(metrics.power_watts);
+
+    // Update session bar
+    updateSessionBar(metrics.active_session);
+}
+
+// Handle push updates from backend (detailed-update event)
+function handleDetailedUpdate(metrics) {
+    if (state.isEditMode) return;
+
+    state.detailedMetrics = metrics;
+    state.systemMetrics = metrics.system_metrics;
+    state.topProcesses = metrics.top_processes;
+
+    // Update metrics history for mini-charts
+    updateMetricsHistory(metrics.system_metrics);
+
+    // Build data object compatible with widget renderers
+    const data = buildDashboardData();
+
+    // Update only detailed widgets
+    renderWidgetsByType(data, 'detailed');
+
+    // Draw mini-charts after DOM is updated
+    drawMiniCharts();
+}
+
+// Build dashboard data object from cached metrics
+function buildDashboardData() {
+    const cm = state.criticalMetrics;
+    const dm = state.detailedMetrics;
+
+    return {
+        power_watts: cm?.power_watts || 0,
+        cumulative_wh: cm?.cumulative_wh || 0,
+        current_cost: cm?.current_cost || 0,
+        hourly_cost_estimate: cm?.hourly_cost_estimate || 0,
+        daily_cost_estimate: cm?.daily_cost_estimate || 0,
+        monthly_cost_estimate: cm?.monthly_cost_estimate || 0,
+        session_duration_secs: cm?.session_duration_secs || 0,
+        source: cm?.source || '--',
+        is_estimated: cm?.is_estimated || false,
+        systemMetrics: dm?.system_metrics || state.systemMetrics || {
+            cpu: { usage_percent: cm?.cpu_usage_percent || 0 },
+            gpu: cm?.gpu_usage_percent != null ? { usage_percent: cm.gpu_usage_percent, power_watts: cm.gpu_power_watts } : null,
+            memory: dm?.system_metrics?.memory || null,
+        },
+        activeSession: cm?.active_session || state.activeSession,
+        topProcesses: dm?.top_processes || state.topProcesses || [],
+    };
+}
+
+// Render widgets by type (critical or detailed)
+function renderWidgetsByType(data, type) {
+    for (const widgetConfig of state.dashboardConfig?.widgets || []) {
+        if (!widgetConfig.visible) continue;
+
+        const isCritical = isCriticalWidget(widgetConfig.id);
+        const isDetailed = isDetailedWidget(widgetConfig.id);
+
+        // Only update widgets of the requested type
+        if (type === 'critical' && !isCritical) continue;
+        if (type === 'detailed' && !isDetailed) continue;
+
+        const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
+        if (!widgetDef) continue;
+
+        const body = document.getElementById(`widget-body-${widgetConfig.id}`);
+        if (body) {
+            if (widgetDef.supportsDisplayModes) {
+                const displayMode = widgetConfig.display_mode || 'text';
+                body.innerHTML = widgetDef.render(data, displayMode);
+            } else {
+                body.innerHTML = widgetDef.render(data);
+            }
+        }
+    }
+}
+
+// Polling fallback for critical widgets (if push events aren't working)
+async function updateCriticalWidgets() {
+    if (state.isEditMode) return;
+
+    try {
+        // Try to get cached critical metrics from backend
+        const metrics = await invoke('get_critical_metrics').catch(() => null);
+
+        if (metrics) {
+            handleCriticalUpdate(metrics);
+        } else {
+            // Fallback to legacy dashboard data call
+            const dashboardData = await invoke('get_dashboard_data');
+            const sessionStats = await invoke('get_session_stats').catch(() => null);
+
+            state.activeSession = sessionStats;
+
+            const data = {
+                ...dashboardData,
+                systemMetrics: state.systemMetrics,
+                activeSession: sessionStats,
+                topProcesses: state.topProcesses,
+            };
+
+            state.lastDashboardData = data;
+            renderWidgetsByType(data, 'critical');
+
+            // Update power source badge
+            const powerSource = document.getElementById('power-source');
+            if (powerSource) {
+                powerSource.textContent = dashboardData.source;
+            }
+
+            updatePowerHistory(dashboardData.power_watts);
+            updateSessionBar(sessionStats);
+        }
+    } catch (error) {
+        console.error('Critical update error:', error);
+    }
+}
+
+// Polling fallback for detailed widgets (if push events aren't working)
+async function updateDetailedWidgets() {
+    if (state.isEditMode) return;
+
+    try {
+        // Try to get cached detailed metrics from backend
+        const metrics = await invoke('get_detailed_metrics').catch(() => null);
+
+        if (metrics) {
+            handleDetailedUpdate(metrics);
+        } else {
+            // Fallback to individual calls
+            const [systemMetrics, topProcesses] = await Promise.all([
+                invoke('get_system_metrics').catch(() => null),
+                invoke('get_top_processes', {}).catch(() => []),
+            ]);
+
+            state.systemMetrics = systemMetrics;
+            state.topProcesses = topProcesses;
+
+            updateMetricsHistory(systemMetrics);
+
+            const data = buildDashboardData();
+            renderWidgetsByType(data, 'detailed');
+
+            drawMiniCharts();
+        }
+    } catch (error) {
+        console.error('Detailed update error:', error);
+    }
+}
+
+// Legacy full dashboard update (used for initial load)
 async function updateDashboard() {
     // Stream I: Skip updates in edit mode to prevent data flickering during drag/resize
     if (state.isEditMode) return;
@@ -2296,6 +2543,7 @@ function applyConfig(config) {
     document.getElementById('setting-language').value = config.general.language;
     document.getElementById('setting-theme').value = config.general.theme;
     document.getElementById('setting-refresh-rate').value = config.general.refresh_rate_ms;
+    document.getElementById('setting-slow-refresh-rate').value = config.general.slow_refresh_rate_ms || 5000;
     document.getElementById('setting-eco-mode').checked = config.general.eco_mode;
     document.getElementById('setting-start-minimized').checked = config.general.start_minimized || false;
     document.getElementById('setting-start-with-system').checked = config.general.start_with_system || false;
@@ -2358,6 +2606,7 @@ async function saveSettings() {
                 language: document.getElementById('setting-language').value,
                 theme: document.getElementById('setting-theme').value,
                 refresh_rate_ms: parseInt(document.getElementById('setting-refresh-rate').value),
+                slow_refresh_rate_ms: parseInt(document.getElementById('setting-slow-refresh-rate').value),
                 eco_mode: document.getElementById('setting-eco-mode').checked,
                 start_minimized: document.getElementById('setting-start-minimized').checked,
                 start_with_system: newStartWithSystem,

@@ -261,14 +261,24 @@
                         </div>
 
                         <div class="setting-row">
-                            <label data-i18n="settings.refresh_rate">Refresh Rate</label>
+                            <label data-i18n="settings.refresh_rate">Refresh Rate (Critical)</label>
                             <select id="setting-refresh-rate">
+                                <option value="500">0.5s</option>
                                 <option value="1000">1s</option>
                                 <option value="2000">2s</option>
                                 <option value="5000">5s</option>
                                 <option value="10000">10s</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <label>Refresh Rate (Detailed)</label>
+                            <select id="setting-slow-refresh-rate">
+                                <option value="3000">3s</option>
+                                <option value="5000">5s</option>
+                                <option value="10000">10s</option>
+                                <option value="15000">15s</option>
                                 <option value="30000">30s</option>
-                                <option value="60000">60s</option>
                             </select>
                         </div>
 

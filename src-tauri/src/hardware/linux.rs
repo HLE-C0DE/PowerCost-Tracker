@@ -7,6 +7,7 @@
 
 use crate::core::{Error, PowerReading, Result};
 use crate::hardware::PowerSource;
+use std::any::Any;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -146,6 +147,10 @@ impl PowerSource for RaplMonitor {
     fn is_estimated(&self) -> bool {
         false
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 /// AMD/generic hwmon power monitor
@@ -204,6 +209,10 @@ impl PowerSource for HwmonMonitor {
 
     fn is_estimated(&self) -> bool {
         false
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -266,5 +275,9 @@ impl PowerSource for BatteryMonitor {
 
     fn is_estimated(&self) -> bool {
         false
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

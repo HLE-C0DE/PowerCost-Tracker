@@ -8,4 +8,4 @@ mod types;
 #[allow(unused_imports)]
 pub use config::{Config, PricingConfig, DashboardConfig, SimplePricing};
 pub use error::{Error, Result};
-pub use types::{PowerReading, DashboardData, AppState, SystemMetrics, CpuMetrics, GpuMetrics, MemoryMetrics, ProcessMetrics, Session, BaselineDetection};
+pub use types::{PowerReading, DashboardData, AppState, SystemMetrics, CpuMetrics, GpuMetrics, MemoryMetrics, ProcessMetrics, Session, BaselineDetection, CriticalMetrics, DetailedMetrics};

@@ -8,6 +8,7 @@
 
 use crate::core::{PowerReading, Result};
 use crate::hardware::PowerSource;
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use sysinfo::System;
@@ -484,6 +485,10 @@ impl PowerSource for EstimationMonitor {
 
     fn is_estimated(&self) -> bool {
         true
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

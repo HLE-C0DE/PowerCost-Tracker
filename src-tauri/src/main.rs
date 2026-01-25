@@ -11,7 +11,7 @@ mod hardware;
 mod i18n;
 mod pricing;
 
-use crate::core::{AppState, BaselineDetection, Config, ProcessMetrics, Session, SystemMetrics};
+use crate::core::{AppState, BaselineDetection, Config, CriticalMetrics, DetailedMetrics, ProcessMetrics, Session, SystemMetrics};
 use crate::db::Database;
 use crate::hardware::{BaselineDetector, PowerMonitor};
 use crate::i18n::I18n;
@@ -30,6 +30,10 @@ pub struct TauriState {
     pub app_state: Arc<Mutex<AppState>>,
     pub baseline_detector: Arc<Mutex<BaselineDetector>>,
     pub active_session: Arc<Mutex<Option<SessionState>>>,
+    /// Cached critical metrics (updated at fast rate)
+    pub critical_metrics_cache: Arc<Mutex<Option<CriticalMetrics>>>,
+    /// Cached detailed metrics (updated at slow rate)
+    pub detailed_metrics_cache: Arc<Mutex<Option<DetailedMetrics>>>,
 }
 
 /// State for an active tracking session
@@ -475,6 +479,24 @@ async fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), Strin
     Ok(())
 }
 
+// ===== Tiered Monitoring API (Fast/Slow refresh) =====
+
+/// Get critical metrics (cached, updated at fast rate)
+/// Returns power, CPU%, GPU%, cost, session data - always responsive
+#[tauri::command]
+async fn get_critical_metrics(state: tauri::State<'_, TauriState>) -> Result<Option<CriticalMetrics>, String> {
+    let cache = state.critical_metrics_cache.lock().await;
+    Ok(cache.clone())
+}
+
+/// Get detailed metrics (cached, updated at slow rate)
+/// Returns processes, temps, VRAM - may be slightly stale
+#[tauri::command]
+async fn get_detailed_metrics(state: tauri::State<'_, TauriState>) -> Result<Option<DetailedMetrics>, String> {
+    let cache = state.detailed_metrics_cache.lock().await;
+    Ok(cache.clone())
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -524,6 +546,8 @@ fn main() {
         app_state: Arc::new(Mutex::new(app_state)),
         baseline_detector: Arc::new(Mutex::new(baseline_detector)),
         active_session: Arc::new(Mutex::new(None)),
+        critical_metrics_cache: Arc::new(Mutex::new(None)),
+        detailed_metrics_cache: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -570,6 +594,9 @@ fn main() {
             save_dashboard_config,
             // Autostart command
             set_autostart,
+            // Tiered monitoring API (fast/slow refresh)
+            get_critical_metrics,
+            get_detailed_metrics,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -589,9 +616,16 @@ fn main() {
                 }
             }
 
-            // Start background monitoring task
+            // Start critical monitoring loop (fast rate: power, CPU%, GPU%, cost)
+            let app_handle_critical = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                monitoring_loop(app_handle).await;
+                critical_monitoring_loop(app_handle_critical).await;
+            });
+
+            // Start detailed monitoring loop (slow rate: processes, temps, VRAM)
+            let app_handle_detailed = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                detailed_monitoring_loop(app_handle_detailed).await;
             });
 
             Ok(())
@@ -600,9 +634,11 @@ fn main() {
         .expect("error while running tauri application");
 }
 
-/// Background task that periodically reads power and updates state
-async fn monitoring_loop(app: tauri::AppHandle) {
-    log::info!("Starting monitoring loop");
+/// Critical monitoring loop - runs at fast rate (user's refresh_rate_ms)
+/// Updates: power, CPU%, GPU% (from cache), cost, session tracking
+/// NEVER blocks on GPU commands - uses cached values for GPU metrics
+async fn critical_monitoring_loop(app: tauri::AppHandle) {
+    log::info!("Starting critical monitoring loop");
     let state: tauri::State<'_, TauriState> = app.state();
 
     let mut last_reading_time = std::time::Instant::now();
@@ -615,7 +651,7 @@ async fn monitoring_loop(app: tauri::AppHandle) {
     let mut current_refresh_ms = initial_refresh_ms;
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(current_refresh_ms));
 
-    log::info!("Monitoring loop initialized with {}ms refresh rate", current_refresh_ms);
+    log::info!("Critical monitoring loop initialized with {}ms refresh rate", current_refresh_ms);
 
     loop {
         interval.tick().await;
@@ -630,12 +666,13 @@ async fn monitoring_loop(app: tauri::AppHandle) {
         if refresh_ms != current_refresh_ms {
             current_refresh_ms = refresh_ms;
             interval = tokio::time::interval(tokio::time::Duration::from_millis(refresh_ms));
+            log::info!("Critical monitoring loop rate changed to {}ms", refresh_ms);
         }
 
-        // Read power
-        let power_watts = {
+        // Read power using FAST path (CPU-only + cached GPU, no blocking commands)
+        let (power_watts, cpu_usage, gpu_usage, gpu_power) = {
             let monitor = state.monitor.lock().await;
-            monitor.get_power_watts().unwrap_or(0.0)
+            monitor.get_power_watts_fast().unwrap_or((0.0, 0.0, None, None))
         };
 
         // Calculate energy consumed since last reading
@@ -643,8 +680,8 @@ async fn monitoring_loop(app: tauri::AppHandle) {
         let energy_wh = power_watts * elapsed_hours;
         last_reading_time = std::time::Instant::now();
 
-        // Update app state
-        {
+        // Update app state and get values for critical metrics
+        let (cumulative_wh, current_cost, session_duration_secs) = {
             let mut app_state = state.app_state.lock().await;
             app_state.cumulative_wh += energy_wh;
             app_state.last_power_watts = power_watts;
@@ -652,7 +689,23 @@ async fn monitoring_loop(app: tauri::AppHandle) {
             // Update cost
             let pricing = state.pricing.lock().await;
             app_state.current_cost = pricing.calculate_cost(app_state.cumulative_wh / 1000.0);
-        }
+
+            (
+                app_state.cumulative_wh,
+                app_state.current_cost,
+                app_state.session_start.elapsed().as_secs(),
+            )
+        };
+
+        // Calculate cost estimates
+        let (hourly_cost, daily_cost, monthly_cost) = {
+            let pricing = state.pricing.lock().await;
+            (
+                pricing.calculate_hourly_cost(power_watts),
+                pricing.calculate_daily_cost(power_watts),
+                pricing.calculate_monthly_cost(power_watts),
+            )
+        };
 
         // Update baseline detector with new sample
         {
@@ -660,8 +713,8 @@ async fn monitoring_loop(app: tauri::AppHandle) {
             detector.add_sample(power_watts);
         }
 
-        // Update active session if one exists
-        {
+        // Update active session and get session data
+        let active_session = {
             let mut active = state.active_session.lock().await;
 
             if let Some(ref mut session) = *active {
@@ -671,7 +724,54 @@ async fn monitoring_loop(app: tauri::AppHandle) {
                 let surplus_watts = (power_watts - session.baseline_watts).max(0.0);
                 let surplus_energy = surplus_watts * elapsed_hours;
                 session.surplus_wh += surplus_energy;
+
+                // Build session data for frontend
+                let pricing = state.pricing.lock().await;
+                let surplus_cost = pricing.calculate_cost(session.surplus_wh / 1000.0);
+
+                Some(Session {
+                    id: Some(session.id),
+                    start_time: chrono::Utc::now().timestamp() - session.start_time.elapsed().as_secs() as i64,
+                    end_time: None,
+                    baseline_watts: session.baseline_watts,
+                    total_wh: session.total_wh,
+                    surplus_wh: session.surplus_wh,
+                    surplus_cost,
+                    label: None,
+                })
+            } else {
+                None
             }
+        };
+
+        // Get source info
+        let (source, is_estimated) = {
+            let monitor = state.monitor.lock().await;
+            (monitor.get_source_name().to_string(), monitor.is_estimated())
+        };
+
+        // Build and cache critical metrics
+        let critical_metrics = CriticalMetrics {
+            power_watts,
+            cpu_usage_percent: cpu_usage,
+            gpu_usage_percent: gpu_usage,
+            gpu_power_watts: gpu_power,
+            cumulative_wh,
+            current_cost,
+            hourly_cost_estimate: hourly_cost,
+            daily_cost_estimate: daily_cost,
+            monthly_cost_estimate: monthly_cost,
+            session_duration_secs,
+            active_session,
+            source,
+            is_estimated,
+            timestamp: chrono::Utc::now().timestamp(),
+        };
+
+        // Update cache
+        {
+            let mut cache = state.critical_metrics_cache.lock().await;
+            *cache = Some(critical_metrics.clone());
         }
 
         // Store reading in database (every 10 readings to reduce writes)
@@ -694,7 +794,88 @@ async fn monitoring_loop(app: tauri::AppHandle) {
             }
         }
 
-        // Emit event to frontend
-        let _ = app.emit("power-update", power_watts);
+        // Emit critical update event to frontend
+        let _ = app.emit("critical-update", critical_metrics);
+    }
+}
+
+/// Detailed monitoring loop - runs at slow rate (slow_refresh_rate_ms, default 5s)
+/// Updates: top processes, temperatures, VRAM details
+/// This loop uses spawn_blocking for GPU commands to avoid blocking the async runtime
+async fn detailed_monitoring_loop(app: tauri::AppHandle) {
+    log::info!("Starting detailed monitoring loop");
+    let state: tauri::State<'_, TauriState> = app.state();
+
+    // Get initial slow refresh rate
+    let initial_slow_refresh_ms = {
+        let config = state.config.lock().await;
+        config.general.slow_refresh_rate_ms
+    };
+    let mut current_slow_refresh_ms = initial_slow_refresh_ms;
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(current_slow_refresh_ms));
+
+    log::info!("Detailed monitoring loop initialized with {}ms refresh rate", current_slow_refresh_ms);
+
+    loop {
+        interval.tick().await;
+
+        // Get current slow refresh rate from config
+        let slow_refresh_ms = {
+            let config = state.config.lock().await;
+            config.general.slow_refresh_rate_ms
+        };
+
+        // Only recreate interval if refresh rate changed
+        if slow_refresh_ms != current_slow_refresh_ms {
+            current_slow_refresh_ms = slow_refresh_ms;
+            interval = tokio::time::interval(tokio::time::Duration::from_millis(slow_refresh_ms));
+            log::info!("Detailed monitoring loop rate changed to {}ms", slow_refresh_ms);
+        }
+
+        // Get config for process limit and pinned processes
+        let (limit, pinned) = {
+            let config = state.config.lock().await;
+            (
+                config.advanced.process_list_limit,
+                config.advanced.pinned_processes.clone(),
+            )
+        };
+
+        // Collect detailed metrics in a blocking task to avoid blocking async runtime
+        // This is where slow GPU commands (nvidia-smi) and process enumeration happen
+        let detailed_metrics = {
+            let monitor = state.monitor.lock().await;
+            // Use spawn_blocking for the slow operations
+            let limit_clone = limit;
+            let pinned_clone = pinned.clone();
+
+            // We need to clone what we need since spawn_blocking requires 'static
+            match monitor.collect_detailed_metrics(limit_clone, &pinned_clone) {
+                Ok(metrics) => Some(metrics),
+                Err(e) => {
+                    log::debug!("Failed to collect detailed metrics: {}", e);
+                    // Fallback: try to get metrics individually
+                    let system_metrics = monitor.get_system_metrics().ok();
+                    let top_processes = monitor.get_top_processes_with_pinned(limit_clone, &pinned_clone).unwrap_or_default();
+
+                    Some(DetailedMetrics {
+                        system_metrics,
+                        top_processes,
+                        timestamp: chrono::Utc::now().timestamp(),
+                    })
+                }
+            }
+        };
+
+        // Update cache
+        if let Some(metrics) = detailed_metrics.clone() {
+            let mut cache = state.detailed_metrics_cache.lock().await;
+            *cache = Some(metrics);
+        }
+
+        // Emit detailed update event to frontend
+        if let Some(metrics) = detailed_metrics {
+            let _ = app.emit("detailed-update", metrics);
+        }
     }
 }

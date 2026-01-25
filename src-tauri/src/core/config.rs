@@ -114,9 +114,12 @@ pub struct GeneralConfig {
     /// Theme: "dark", "light", "system"
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// Refresh rate in milliseconds
+    /// Refresh rate in milliseconds (for critical/fast metrics)
     #[serde(default = "default_refresh_rate")]
     pub refresh_rate_ms: u64,
+    /// Slow refresh rate in milliseconds (for detailed metrics like processes, temps)
+    #[serde(default = "default_slow_refresh_rate")]
+    pub slow_refresh_rate_ms: u64,
     /// Eco mode (reduced refresh rate when minimized)
     #[serde(default)]
     pub eco_mode: bool,
@@ -131,6 +134,7 @@ pub struct GeneralConfig {
 fn default_language() -> String { "auto".to_string() }
 fn default_theme() -> String { "dark".to_string() }
 fn default_refresh_rate() -> u64 { 1000 }
+fn default_slow_refresh_rate() -> u64 { 5000 }
 
 impl Default for GeneralConfig {
     fn default() -> Self {
@@ -138,6 +142,7 @@ impl Default for GeneralConfig {
             language: default_language(),
             theme: default_theme(),
             refresh_rate_ms: default_refresh_rate(),
+            slow_refresh_rate_ms: default_slow_refresh_rate(),
             eco_mode: false,
             start_minimized: false,
             start_with_system: false,
