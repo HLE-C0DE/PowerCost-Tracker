@@ -57,6 +57,20 @@ PowerCost Tracker monitors your PC's power consumption in real-time and calculat
 - **Top processes by power consumption** - see what's using the most energy
 - **Session, daily, weekly, and monthly tracking**
 
+
+### Lightweight & Native
+
+- **< 50 MB RAM** typical usage
+- **< 1% CPU** when idle
+- **~5 MB** application size
+- **No Electron bloat** - uses native OS webview via Tauri
+- **No external dependencies** - single portable executable option
+
+<img width="660" height="374" alt="image" src="https://github.com/user-attachments/assets/5ce8969f-efd0-4102-9087-62954c1d5ab8" />
+
+PowerCost-Tracker vs Windows TaskManager vs NZXT CAM (software I used to track my CPU/GPU usage with dignity) 
+
+
 ### Flexible Pricing Modes
 
 Configure your actual electricity rates:
@@ -94,18 +108,6 @@ A compact overlay that stays visible while you work or game:
 - Multiple sizes and themes
 - Adjustable opacity
 - Stays on top of other windows
-
-### Lightweight & Native
-
-- **< 50 MB RAM** typical usage
-- **< 1% CPU** when idle
-- **~5 MB** application size
-- **No Electron bloat** - uses native OS webview via Tauri
-- **No external dependencies** - single portable executable option
-
-<img width="660" height="374" alt="image" src="https://github.com/user-attachments/assets/5ce8969f-efd0-4102-9087-62954c1d5ab8" />
-
-PowerCost-Tracker vs Windows TaskManager vs NZXT CAM (software I used to track my CPU/GPU usage with dignity) 
 
 
 ### Bilingual Interface
