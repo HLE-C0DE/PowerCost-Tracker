@@ -80,7 +80,8 @@ const WIDGET_REGISTRY = {
         render: (data, displayMode = 'bar') => {
             const cpu = data.systemMetrics?.cpu;
             if (!cpu) return `<div class="widget-loading">Loading...</div>`;
-            const temp = cpu.temperature_celsius ? `${formatNumber(cpu.temperature_celsius, 0)}°C` : '--';
+            const hasTemp = cpu.temperature_celsius != null;
+            const temp = hasTemp ? `${formatNumber(cpu.temperature_celsius, 0)}°C` : '';
             const globalDisplay = state.dashboardConfig?.global_display || 'normal';
 
             // Radial mode
@@ -88,9 +89,9 @@ const WIDGET_REGISTRY = {
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(cpu.usage_percent, 'CPU', '#6366f1')}
-                        <div class="radial-details ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        ${hasTemp ? `<div class="radial-details ${globalDisplay === 'hard' ? 'hidden' : ''}">
                             <span class="metric-value">${temp}</span>
-                        </div>
+                        </div>` : ''}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
                 `;
@@ -114,10 +115,10 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'text') {
                 return `
                     <div class="widget-value">${formatNumber(cpu.usage_percent, 0)}<span class="unit">%</span></div>
-                    <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                    ${hasTemp ? `<div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
                         <span class="metric-label">Temp</span>
                         <span class="metric-value">${temp}</span>
-                    </div>
+                    </div>` : ''}
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
                 `;
             }
@@ -129,10 +130,10 @@ const WIDGET_REGISTRY = {
                     <div class="progress-bar"><div class="progress-fill" style="width: ${cpu.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
                 </div>
-                <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                ${hasTemp ? `<div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
                     <span class="metric-label">Temp</span>
                     <span class="metric-value">${temp}</span>
-                </div>
+                </div>` : ''}
                 <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
             `;
         },

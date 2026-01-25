@@ -6,9 +6,60 @@
 use crate::core::{CpuMetrics, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
 use crate::hardware::PowerSource;
 use std::collections::HashMap;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 use std::sync::Mutex;
+use std::time::Duration;
 use sysinfo::ProcessRefreshKind;
+
+/// Default timeout for GPU commands (nvidia-smi, rocm-smi, etc.)
+const GPU_COMMAND_TIMEOUT_MS: u64 = 1500;
+
+/// Run a command with a timeout. Returns None if timeout exceeded or command fails.
+fn run_command_with_timeout(program: &str, args: &[&str], timeout_ms: u64) -> Option<Output> {
+    let mut child = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+
+    let timeout = Duration::from_millis(timeout_ms);
+    let start = std::time::Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Process finished
+                let stdout = child.stdout.take().map(|mut s| {
+                    let mut buf = Vec::new();
+                    std::io::Read::read_to_end(&mut s, &mut buf).ok();
+                    buf
+                }).unwrap_or_default();
+
+                let stderr = child.stderr.take().map(|mut s| {
+                    let mut buf = Vec::new();
+                    std::io::Read::read_to_end(&mut s, &mut buf).ok();
+                    buf
+                }).unwrap_or_default();
+
+                return Some(Output { status, stdout, stderr });
+            }
+            Ok(None) => {
+                // Still running
+                if start.elapsed() > timeout {
+                    // Timeout - kill the process
+                    let _ = child.kill();
+                    let _ = child.wait(); // Reap the zombie
+                    log::warn!("{} command timed out after {}ms", program, timeout_ms);
+                    return None;
+                }
+                // Sleep briefly before checking again
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
+    }
+}
 
 /// Available GPU monitoring sources
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -197,15 +248,13 @@ impl WmiMonitor {
         CpuInfo { average_load }
     }
 
-    /// Get GPU power via nvidia-smi
+    /// Get GPU power via nvidia-smi (with timeout)
     fn get_nvidia_gpu_power(&self) -> Option<GpuInfo> {
-        let output = Command::new("nvidia-smi")
-            .args([
-                "--query-gpu=power.draw,name",
-                "--format=csv,noheader,nounits",
-            ])
-            .output()
-            .ok()?;
+        let output = run_command_with_timeout(
+            "nvidia-smi",
+            &["--query-gpu=power.draw,name", "--format=csv,noheader,nounits"],
+            GPU_COMMAND_TIMEOUT_MS,
+        )?;
 
         if !output.status.success() {
             return None;
@@ -228,13 +277,10 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU power via rocm-smi (AMD)
+    /// Get GPU power via rocm-smi (AMD) - with timeout
     fn get_amd_gpu_power(&self) -> Option<GpuInfo> {
         // Try rocm-smi first
-        if let Ok(output) = Command::new("rocm-smi")
-            .args(["--showpower", "--json"])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout("rocm-smi", &["--showpower", "--json"], GPU_COMMAND_TIMEOUT_MS) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(power) = Self::parse_rocm_smi_power(&stdout) {
@@ -247,10 +293,7 @@ impl WmiMonitor {
         }
 
         // Try amd-smi as fallback
-        if let Ok(output) = Command::new("amd-smi")
-            .args(["metric", "-p", "--json"])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout("amd-smi", &["metric", "-p", "--json"], GPU_COMMAND_TIMEOUT_MS) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(power) = Self::parse_amd_smi_power(&stdout) {
@@ -263,7 +306,7 @@ impl WmiMonitor {
         }
 
         // Try simple text output
-        if let Ok(output) = Command::new("rocm-smi").args(["--showpower"]).output() {
+        if let Some(output) = run_command_with_timeout("rocm-smi", &["--showpower"], GPU_COMMAND_TIMEOUT_MS) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 for line in stdout.lines() {
@@ -326,13 +369,13 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU power based on detected source (cached for 500ms)
+    /// Get GPU power based on detected source (cached for 2000ms to reduce command overhead)
     fn get_gpu_power(&self) -> Option<GpuInfo> {
-        // Check cache first (500ms TTL)
+        // Check cache first (2000ms TTL - GPU commands are slow)
         {
             let cache = self.gpu_cache.lock().unwrap();
             if let Some(ref cached) = *cache {
-                if let Some(value) = cached.get(500) {
+                if let Some(value) = cached.get(2000) {
                     return value;
                 }
             }
@@ -648,17 +691,15 @@ impl WmiMonitor {
         result
     }
 
-    /// Actually fetch CPU temperature (slow - calls powershell)
+    /// Actually fetch CPU temperature (slow - calls powershell, with timeout)
     fn fetch_cpu_temperature(&self) -> Option<f64> {
         // Try WMI query for thermal zone temperature
         // Temperature is in tenths of Kelvin, convert: (value / 10) - 273.15
-        if let Ok(output) = Command::new("powershell")
-            .args([
-                "-Command",
-                "Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi 2>$null | Select-Object -First 1 -ExpandProperty CurrentTemperature"
-            ])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout(
+            "powershell",
+            &["-Command", "Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi 2>$null | Select-Object -First 1 -ExpandProperty CurrentTemperature"],
+            GPU_COMMAND_TIMEOUT_MS,
+        ) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Ok(temp_decikelvin) = stdout.trim().parse::<f64>() {
@@ -671,13 +712,11 @@ impl WmiMonitor {
         }
 
         // Try Open Hardware Monitor WMI if available
-        if let Ok(output) = Command::new("powershell")
-            .args([
-                "-Command",
-                "Get-WmiObject Sensor -Namespace root/OpenHardwareMonitor 2>$null | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1 -ExpandProperty Value"
-            ])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout(
+            "powershell",
+            &["-Command", "Get-WmiObject Sensor -Namespace root/OpenHardwareMonitor 2>$null | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1 -ExpandProperty Value"],
+            GPU_COMMAND_TIMEOUT_MS,
+        ) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Ok(temp) = stdout.trim().parse::<f64>() {
@@ -691,13 +730,13 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU metrics including usage, power, temperature, and VRAM (cached for 500ms)
+    /// Get GPU metrics including usage, power, temperature, and VRAM (cached for 2000ms)
     fn get_gpu_metrics(&self) -> Option<GpuMetrics> {
-        // Check cache first (500ms TTL)
+        // Check cache first (2000ms TTL - GPU commands are slow)
         {
             let cache = self.gpu_metrics_cache.lock().unwrap();
             if let Some(ref cached) = *cache {
-                if let Some(value) = cached.get(500) {
+                if let Some(value) = cached.get(2000) {
                     return value;
                 }
             }
@@ -719,15 +758,13 @@ impl WmiMonitor {
         result
     }
 
-    /// Get NVIDIA GPU metrics via nvidia-smi
+    /// Get NVIDIA GPU metrics via nvidia-smi (with timeout)
     fn get_nvidia_gpu_metrics(&self) -> Option<GpuMetrics> {
-        let output = Command::new("nvidia-smi")
-            .args([
-                "--query-gpu=name,utilization.gpu,power.draw,temperature.gpu,memory.used,memory.total,clocks.gr",
-                "--format=csv,noheader,nounits",
-            ])
-            .output()
-            .ok()?;
+        let output = run_command_with_timeout(
+            "nvidia-smi",
+            &["--query-gpu=name,utilization.gpu,power.draw,temperature.gpu,memory.used,memory.total,clocks.gr", "--format=csv,noheader,nounits"],
+            GPU_COMMAND_TIMEOUT_MS,
+        )?;
 
         if !output.status.success() {
             return None;
@@ -753,13 +790,14 @@ impl WmiMonitor {
         }
     }
 
-    /// Get AMD GPU metrics via rocm-smi or amd-smi
+    /// Get AMD GPU metrics via rocm-smi or amd-smi (with timeout)
     fn get_amd_gpu_metrics(&self) -> Option<GpuMetrics> {
         // Try rocm-smi first
-        if let Ok(output) = Command::new("rocm-smi")
-            .args(["--showuse", "--showpower", "--showtemp", "--showmemuse", "--json"])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout(
+            "rocm-smi",
+            &["--showuse", "--showpower", "--showtemp", "--showmemuse", "--json"],
+            GPU_COMMAND_TIMEOUT_MS,
+        ) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(metrics) = self.parse_rocm_smi_metrics(&stdout) {
@@ -769,10 +807,7 @@ impl WmiMonitor {
         }
 
         // Try amd-smi as fallback
-        if let Ok(output) = Command::new("amd-smi")
-            .args(["metric", "--json"])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout("amd-smi", &["metric", "--json"], GPU_COMMAND_TIMEOUT_MS) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(metrics) = self.parse_amd_smi_metrics(&stdout) {
@@ -843,13 +878,13 @@ impl WmiMonitor {
         None
     }
 
-    /// Get per-process GPU usage (cached for 1000ms - pmon is expensive)
+    /// Get per-process GPU usage (cached for 2000ms - pmon is expensive)
     fn get_gpu_process_usage(&self) -> HashMap<u32, f64> {
-        // Check cache first (1000ms TTL)
+        // Check cache first (2000ms TTL - GPU commands are slow)
         {
             let cache = self.gpu_process_cache.lock().unwrap();
             if let Some(ref cached) = *cache {
-                if let Some(value) = cached.get(1000) {
+                if let Some(value) = cached.get(2000) {
                     return value;
                 }
             }
@@ -881,14 +916,11 @@ impl WmiMonitor {
     fn fetch_nvidia_gpu_processes(&self) -> HashMap<u32, f64> {
         let mut result = HashMap::new();
 
-        // Use nvidia-smi pmon for per-process GPU utilization
+        // Use nvidia-smi pmon for per-process GPU utilization (with timeout)
         // -c 1 means capture one sample
-        let output = match Command::new("nvidia-smi")
-            .args(["pmon", "-c", "1", "-s", "u"])
-            .output()
-        {
-            Ok(o) => o,
-            Err(_) => return result,
+        let output = match run_command_with_timeout("nvidia-smi", &["pmon", "-c", "1", "-s", "u"], GPU_COMMAND_TIMEOUT_MS) {
+            Some(o) => o,
+            None => return result,
         };
 
         if !output.status.success() {
@@ -920,7 +952,7 @@ impl WmiMonitor {
         result
     }
 
-    /// Fetch per-process GPU usage from AMD tools
+    /// Fetch per-process GPU usage from AMD tools (with timeout)
     ///
     /// AMD provides limited per-process GPU data. We try amd-smi process command
     /// which may show active processes, but exact utilization % is often unavailable.
@@ -928,10 +960,7 @@ impl WmiMonitor {
         let mut result = HashMap::new();
 
         // Try amd-smi process --json
-        if let Ok(output) = Command::new("amd-smi")
-            .args(["process", "--json"])
-            .output()
-        {
+        if let Some(output) = run_command_with_timeout("amd-smi", &["process", "--json"], GPU_COMMAND_TIMEOUT_MS) {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Ok(value) = serde_json::from_str::<serde_json::Value>(&stdout) {
@@ -957,10 +986,7 @@ impl WmiMonitor {
 
         // Fallback: try rocm-smi --showpidgpus
         if result.is_empty() {
-            if let Ok(output) = Command::new("rocm-smi")
-                .args(["--showpidgpus"])
-                .output()
-            {
+            if let Some(output) = run_command_with_timeout("rocm-smi", &["--showpidgpus"], GPU_COMMAND_TIMEOUT_MS) {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     // Parse text output - format varies by rocm version
