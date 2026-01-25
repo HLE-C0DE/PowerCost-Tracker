@@ -11,7 +11,16 @@
             --text-secondary: #a0a0b0;
             --accent-primary: #6366f1;
             --accent-green: #22c55e;
+            --accent-yellow: #eab308;
             --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-widget-theme="minimal"] {
+            --bg-widget: rgba(0, 0, 0, 0.8);
+        }
+
+        [data-widget-theme="detailed"] {
+            --bg-widget: rgba(30, 30, 42, 0.95);
         }
 
         * {
@@ -22,27 +31,60 @@
 
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-widget);
+            background: transparent;
             color: var(--text-primary);
             overflow: hidden;
             user-select: none;
-            cursor: move;
         }
 
         .widget {
             position: relative;
+            background: var(--bg-widget);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            cursor: move;
+            transition: opacity 0.2s;
+        }
+
+        /* Widget Sizes */
+        .widget.size-compact {
+            padding: 8px 12px;
+        }
+
+        .widget.size-normal {
             padding: 12px 16px;
+        }
+
+        .widget.size-large {
+            padding: 16px 20px;
+        }
+
+        .widget-content {
             display: flex;
             align-items: center;
             gap: 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
+        }
+
+        .widget.size-large .widget-content {
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         .widget-icon {
             width: 24px;
             height: 24px;
             color: var(--accent-primary);
+            flex-shrink: 0;
+        }
+
+        .widget.size-compact .widget-icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        .widget.size-large .widget-icon {
+            width: 28px;
+            height: 28px;
         }
 
         .widget-data {
@@ -51,10 +93,38 @@
             gap: 2px;
         }
 
+        .widget.size-large .widget-data {
+            gap: 4px;
+        }
+
+        .widget-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .widget-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .widget.size-compact .widget-label {
+            display: none;
+        }
+
         .widget-power {
             font-size: 1.1rem;
             font-weight: 600;
             color: var(--accent-primary);
+        }
+
+        .widget.size-compact .widget-power {
+            font-size: 0.95rem;
+        }
+
+        .widget.size-large .widget-power {
+            font-size: 1.5rem;
         }
 
         .widget-power .unit {
@@ -69,8 +139,25 @@
             color: var(--accent-green);
         }
 
-        .widget-cost.hidden {
-            display: none;
+        .widget.size-compact .widget-cost {
+            font-size: 0.75rem;
+        }
+
+        .widget-metric {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .widget.size-compact .widget-metric {
+            font-size: 0.7rem;
+        }
+
+        .widget-temp {
+            color: var(--accent-yellow);
+        }
+
+        .hidden {
+            display: none !important;
         }
 
         .close-btn {
@@ -103,22 +190,52 @@
             height: 10px;
             color: white;
         }
+
+        .settings-btn {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 16px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .widget:hover .settings-btn {
+            opacity: 1;
+        }
+
+        .settings-btn:hover {
+            background: rgba(99, 102, 241, 0.5);
+        }
+
+        .settings-btn svg {
+            width: 10px;
+            height: 10px;
+            color: white;
+        }
     </style>
 </head>
 <body>
-    <div class="widget" data-tauri-drag-region>
-        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-        </svg>
-        <div class="widget-data">
-            <div class="widget-power">
-                <span id="power-value">--</span>
-                <span class="unit">W</span>
-            </div>
-            <div class="widget-cost" id="cost-display">
-                <span id="currency-symbol"></span><span id="cost-value">--</span>
-            </div>
+    <div class="widget size-normal" id="widget" data-tauri-drag-region>
+        <div class="widget-content" id="widget-content">
+            <!-- Dynamic content will be rendered here -->
         </div>
+
+        <button class="settings-btn" id="open-app-btn" title="Open App">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+            </svg>
+        </button>
+
         <button class="close-btn" id="close-widget">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -128,7 +245,6 @@
     </div>
 
     <script type="module">
-        // Wait for Tauri APIs to be available
         async function waitForTauri() {
             let attempts = 0;
             while (!window.__TAURI__ && attempts < 50) {
@@ -138,12 +254,14 @@
             return window.__TAURI__;
         }
 
-        let showCost = true;
+        let config = null;
         let currencySymbol = '\u20AC';
         let currentWindow = null;
+        let displayItems = ['power', 'cost'];
+        let widgetSize = 'normal';
+        let widgetTheme = 'default';
 
         async function init() {
-            // Wait for Tauri to be available
             const tauri = await waitForTauri();
             if (!tauri) {
                 console.error('Tauri APIs not available');
@@ -154,14 +272,12 @@
             const { listen } = tauri.event;
             const { getCurrentWindow } = tauri.window;
 
-            // Get current window reference
             currentWindow = getCurrentWindow();
 
-            // Setup drag region - enable dragging on the widget element
-            const widgetEl = document.querySelector('.widget');
+            // Setup drag
+            const widgetEl = document.getElementById('widget');
             widgetEl.addEventListener('mousedown', async (e) => {
-                // Don't drag if clicking on the close button
-                if (e.target.closest('.close-btn')) return;
+                if (e.target.closest('.close-btn') || e.target.closest('.settings-btn')) return;
                 try {
                     await currentWindow.startDragging();
                 } catch (err) {
@@ -171,29 +287,27 @@
 
             // Load config
             try {
-                const config = await invoke('get_config');
-                showCost = config.widget.show_cost;
+                config = await invoke('get_config');
                 currencySymbol = config.pricing.currency_symbol || '\u20AC';
+                displayItems = config.widget.display_items || ['power', 'cost'];
+                widgetSize = config.widget.size || 'normal';
+                widgetTheme = config.widget.theme || 'default';
 
-                document.getElementById('currency-symbol').textContent = currencySymbol;
-
-                if (!showCost) {
-                    document.getElementById('cost-display').classList.add('hidden');
-                }
+                applyWidgetSettings();
             } catch (e) {
                 console.error('Widget init error:', e);
             }
 
-            // Get initial data immediately
-            await updateCost(invoke);
+            // Get initial data
+            await updateWidget(invoke);
 
             // Listen for power updates
             await listen('power-update', (event) => {
-                document.getElementById('power-value').textContent = event.payload.toFixed(1);
+                document.getElementById('power-value')?.textContent.replace(/[\d.]+/, event.payload.toFixed(1));
             });
 
-            // Update cost periodically
-            setInterval(() => updateCost(invoke), 1000);
+            // Update periodically
+            setInterval(() => updateWidget(invoke), 1000);
 
             // Close button
             document.getElementById('close-widget').addEventListener('click', async () => {
@@ -203,19 +317,135 @@
                     console.error('Close error:', e);
                 }
             });
+
+            // Open main app button
+            document.getElementById('open-app-btn').addEventListener('click', async () => {
+                try {
+                    // Focus the main window
+                    const WebviewWindow = tauri.window.WebviewWindow;
+                    const mainWindow = WebviewWindow.getByLabel('main');
+                    if (mainWindow) {
+                        await mainWindow.setFocus();
+                    }
+                } catch (e) {
+                    console.error('Open app error:', e);
+                }
+            });
         }
 
-        async function updateCost(invoke) {
-            try {
-                const data = await invoke('get_dashboard_data');
-                document.getElementById('power-value').textContent = data.power_watts.toFixed(1);
+        function applyWidgetSettings() {
+            const widget = document.getElementById('widget');
 
-                if (showCost) {
-                    document.getElementById('cost-value').textContent = data.current_cost.toFixed(4);
-                }
+            // Apply size
+            widget.classList.remove('size-compact', 'size-normal', 'size-large');
+            widget.classList.add(`size-${widgetSize}`);
+
+            // Apply theme
+            document.body.setAttribute('data-widget-theme', widgetTheme);
+
+            // Apply opacity
+            if (config?.widget?.opacity) {
+                widget.style.opacity = config.widget.opacity;
+            }
+        }
+
+        async function updateWidget(invoke) {
+            try {
+                const [dashData, sysMetrics] = await Promise.all([
+                    invoke('get_dashboard_data'),
+                    invoke('get_system_metrics').catch(() => null),
+                ]);
+
+                renderWidgetContent(dashData, sysMetrics);
             } catch (e) {
                 console.error('Widget update error:', e);
             }
+        }
+
+        function renderWidgetContent(data, sysMetrics) {
+            const content = document.getElementById('widget-content');
+            let html = '';
+
+            // Power icon
+            html += `
+                <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+            `;
+
+            html += '<div class="widget-data">';
+
+            for (const item of displayItems) {
+                switch (item) {
+                    case 'power':
+                        html += `
+                            <div class="widget-item">
+                                <span class="widget-label">Power</span>
+                                <span class="widget-power">
+                                    <span id="power-value">${data.power_watts.toFixed(1)}</span>
+                                    <span class="unit">W</span>
+                                </span>
+                            </div>
+                        `;
+                        break;
+                    case 'cost':
+                        if (config?.widget?.show_cost !== false) {
+                            html += `
+                                <div class="widget-item">
+                                    <span class="widget-label">Cost</span>
+                                    <span class="widget-cost">${currencySymbol}${data.current_cost.toFixed(4)}</span>
+                                </div>
+                            `;
+                        }
+                        break;
+                    case 'cpu':
+                        if (sysMetrics?.cpu) {
+                            html += `
+                                <div class="widget-item">
+                                    <span class="widget-label">CPU</span>
+                                    <span class="widget-metric">${sysMetrics.cpu.usage_percent.toFixed(0)}%</span>
+                                </div>
+                            `;
+                        }
+                        break;
+                    case 'gpu':
+                        if (sysMetrics?.gpu?.usage_percent != null) {
+                            html += `
+                                <div class="widget-item">
+                                    <span class="widget-label">GPU</span>
+                                    <span class="widget-metric">${sysMetrics.gpu.usage_percent.toFixed(0)}%</span>
+                                </div>
+                            `;
+                        }
+                        break;
+                    case 'ram':
+                        if (sysMetrics?.memory) {
+                            html += `
+                                <div class="widget-item">
+                                    <span class="widget-label">RAM</span>
+                                    <span class="widget-metric">${sysMetrics.memory.usage_percent.toFixed(0)}%</span>
+                                </div>
+                            `;
+                        }
+                        break;
+                    case 'temp':
+                        const cpuTemp = sysMetrics?.cpu?.temperature_celsius;
+                        const gpuTemp = sysMetrics?.gpu?.temperature_celsius;
+                        if (cpuTemp != null || gpuTemp != null) {
+                            const temp = cpuTemp ?? gpuTemp;
+                            html += `
+                                <div class="widget-item">
+                                    <span class="widget-label">Temp</span>
+                                    <span class="widget-metric widget-temp">${temp.toFixed(0)}°C</span>
+                                </div>
+                            `;
+                        }
+                        break;
+                }
+            }
+
+            html += '</div>';
+            content.innerHTML = html;
         }
 
         document.addEventListener('DOMContentLoaded', init);

@@ -48,86 +48,45 @@
             <section id="dashboard" class="view active">
                 <header class="view-header">
                     <h1 data-i18n="nav.dashboard">Dashboard</h1>
-                    <div class="status-badge" id="source-badge">
-                        <span class="status-dot"></span>
-                        <span id="power-source">--</span>
+                    <div class="header-controls">
+                        <div class="status-badge" id="source-badge">
+                            <span class="status-dot"></span>
+                            <span id="power-source">--</span>
+                        </div>
+                        <button class="btn btn-icon" id="edit-dashboard-btn" title="Edit Dashboard">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
                     </div>
                 </header>
 
-                <div class="dashboard-grid">
-                    <!-- Current Power Card -->
-                    <div class="card power-card main-card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.current_power">Current Power</span>
-                        </div>
-                        <div class="card-value">
-                            <span id="current-power">--</span>
-                            <span class="unit" data-i18n="unit.watts">W</span>
-                        </div>
-                        <div class="power-graph" id="power-graph">
-                            <canvas id="power-chart"></canvas>
-                        </div>
-                    </div>
+                <!-- Dashboard Grid Container -->
+                <div class="dashboard-grid" id="dashboard-grid">
+                    <!-- Widgets will be dynamically rendered here -->
+                </div>
 
-                    <!-- Session Stats -->
-                    <div class="card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.session_energy">Session Energy</span>
-                        </div>
-                        <div class="card-value">
-                            <span id="session-energy">--</span>
-                            <span class="unit" data-i18n="unit.watt_hours">Wh</span>
-                        </div>
+                <!-- Session Control Bar -->
+                <div class="session-bar" id="session-bar">
+                    <div class="session-info">
+                        <span class="session-label" id="session-label">No active session</span>
+                        <span class="session-duration" id="session-duration-display">--:--:--</span>
                     </div>
-
-                    <div class="card cost-card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.session_cost">Session Cost</span>
-                        </div>
-                        <div class="card-value">
-                            <span id="currency-symbol"></span><span id="session-cost">--</span>
-                        </div>
-                    </div>
-
-                    <!-- Estimates -->
-                    <div class="card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.hourly_estimate">Hourly Estimate</span>
-                        </div>
-                        <div class="card-value small">
-                            <span id="currency-hourly"></span><span id="hourly-cost">--</span>
-                            <span class="unit" data-i18n="unit.per_hour">/hour</span>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.daily_estimate">Daily Estimate</span>
-                        </div>
-                        <div class="card-value small">
-                            <span id="currency-daily"></span><span id="daily-cost">--</span>
-                            <span class="unit" data-i18n="unit.per_day">/day</span>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.monthly_estimate">Monthly Estimate</span>
-                        </div>
-                        <div class="card-value small">
-                            <span id="currency-monthly"></span><span id="monthly-cost">--</span>
-                            <span class="unit" data-i18n="unit.per_month">/month</span>
-                        </div>
-                    </div>
-
-                    <!-- Session Duration -->
-                    <div class="card">
-                        <div class="card-header">
-                            <span data-i18n="dashboard.session_duration">Session Duration</span>
-                        </div>
-                        <div class="card-value small">
-                            <span id="session-duration">00:00:00</span>
-                        </div>
+                    <div class="session-controls">
+                        <button class="btn btn-primary" id="start-session-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Start Session
+                        </button>
+                        <button class="btn btn-secondary hidden" id="end-session-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <rect x="6" y="4" width="4" height="16"/>
+                                <rect x="14" y="4" width="4" height="16"/>
+                            </svg>
+                            End Session
+                        </button>
                     </div>
                 </div>
 
@@ -146,41 +105,63 @@
             <section id="history" class="view">
                 <header class="view-header">
                     <h1 data-i18n="nav.history">History</h1>
+                    <div class="view-tabs">
+                        <button class="tab-btn active" data-tab="power-history">Power</button>
+                        <button class="tab-btn" data-tab="session-history">Sessions</button>
+                    </div>
+                </header>
+
+                <!-- Power History Tab -->
+                <div class="tab-content active" id="power-history">
                     <div class="date-range-picker">
                         <button class="range-btn active" data-range="today" data-i18n="history.today">Today</button>
                         <button class="range-btn" data-range="week" data-i18n="history.this_week">This Week</button>
                         <button class="range-btn" data-range="month" data-i18n="history.this_month">This Month</button>
                     </div>
-                </header>
 
-                <div class="history-stats">
-                    <div class="stat-card">
-                        <span class="stat-label" data-i18n="history.total_consumption">Total Consumption</span>
-                        <span class="stat-value" id="history-total-wh">-- kWh</span>
+                    <div class="history-stats">
+                        <div class="stat-card">
+                            <span class="stat-label" data-i18n="history.total_consumption">Total Consumption</span>
+                            <span class="stat-value" id="history-total-wh">-- kWh</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label" data-i18n="history.total_cost">Total Cost</span>
+                            <span class="stat-value" id="history-total-cost">--</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label" data-i18n="history.average_power">Average Power</span>
+                            <span class="stat-value" id="history-avg-power">-- W</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label" data-i18n="history.peak_power">Peak Power</span>
+                            <span class="stat-value" id="history-peak-power">-- W</span>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-label" data-i18n="history.total_cost">Total Cost</span>
-                        <span class="stat-value" id="history-total-cost">--</span>
+
+                    <div class="history-chart-container">
+                        <canvas id="history-chart"></canvas>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-label" data-i18n="history.average_power">Average Power</span>
-                        <span class="stat-value" id="history-avg-power">-- W</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label" data-i18n="history.peak_power">Peak Power</span>
-                        <span class="stat-value" id="history-peak-power">-- W</span>
+
+                    <div id="no-history-data" class="empty-state hidden">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8"/>
+                        </svg>
+                        <p data-i18n="history.no_data">No data available for this period</p>
                     </div>
                 </div>
 
-                <div class="history-chart-container">
-                    <canvas id="history-chart"></canvas>
-                </div>
-
-                <div id="no-history-data" class="empty-state hidden">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8"/>
-                    </svg>
-                    <p data-i18n="history.no_data">No data available for this period</p>
+                <!-- Session History Tab -->
+                <div class="tab-content" id="session-history">
+                    <div class="session-list" id="session-list">
+                        <!-- Sessions will be dynamically rendered here -->
+                    </div>
+                    <div id="no-sessions" class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <p>No sessions recorded yet</p>
+                    </div>
                 </div>
             </section>
 
@@ -232,6 +213,31 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                    </div>
+
+                    <!-- Baseline Settings -->
+                    <div class="settings-section">
+                        <h2>Baseline Detection</h2>
+
+                        <div class="setting-row">
+                            <label>Auto-detect Baseline</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-baseline-auto" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row" id="manual-baseline-row">
+                            <label>Manual Baseline (W)</label>
+                            <input type="number" id="setting-baseline-watts" step="0.1" value="0" min="0">
+                        </div>
+
+                        <div class="setting-row">
+                            <label>Detected Baseline</label>
+                            <span class="info-text" id="detected-baseline">-- W</span>
+                        </div>
+
+                        <button class="btn btn-secondary" id="detect-baseline-btn">Detect Now</button>
                     </div>
 
                     <!-- Pricing Settings -->
@@ -372,6 +378,31 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Edit Dashboard Modal -->
+    <div class="modal hidden" id="edit-dashboard-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Dashboard</h2>
+                <button class="btn btn-icon modal-close" id="close-edit-modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-info">Toggle widgets visibility and drag to reorder</p>
+                <div class="widget-list" id="widget-toggle-list">
+                    <!-- Widget toggles will be rendered here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="reset-dashboard-btn">Reset to Default</button>
+                <button class="btn btn-primary" id="save-dashboard-btn">Save</button>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notifications -->

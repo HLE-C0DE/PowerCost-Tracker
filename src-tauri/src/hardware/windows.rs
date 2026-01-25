@@ -3,7 +3,7 @@
 //! Uses sysinfo for CPU monitoring and nvidia-smi/rocm-smi for GPU power.
 //! WMI is complex and has version-specific API changes, so we avoid it for simplicity.
 
-use crate::core::{PowerReading, Result};
+use crate::core::{CpuMetrics, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
 use crate::hardware::PowerSource;
 use std::collections::HashMap;
 use std::process::Command;
@@ -415,6 +415,266 @@ impl PowerSource for WmiMonitor {
 
     fn is_estimated(&self) -> bool {
         self.gpu_source == GpuSource::None
+    }
+}
+
+// ===== System Metrics Implementation =====
+
+impl WmiMonitor {
+    /// Get comprehensive system metrics including CPU, GPU, and memory
+    pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
+        let mut sys = self.sys.lock().unwrap();
+        sys.refresh_cpu_usage();
+        sys.refresh_memory();
+
+        // CPU metrics
+        let cpu_usage: f64 = sys.cpus().iter().map(|c| c.cpu_usage() as f64).sum::<f64>() / sys.cpus().len() as f64;
+        let per_core_usage: Vec<f64> = sys.cpus().iter().map(|c| c.cpu_usage() as f64).collect();
+
+        let cpu_name = if sys.cpus().is_empty() {
+            "Unknown CPU".to_string()
+        } else {
+            sys.cpus()[0].brand().to_string()
+        };
+
+        let cpu_freq = sys.cpus().first().map(|c| c.frequency());
+
+        // Get CPU temperature via WMI (if available)
+        let cpu_temp = self.get_cpu_temperature();
+
+        let cpu = CpuMetrics {
+            name: cpu_name,
+            usage_percent: cpu_usage,
+            per_core_usage,
+            frequency_mhz: cpu_freq,
+            temperature_celsius: cpu_temp,
+            core_count: sys.physical_core_count().unwrap_or(0),
+            thread_count: sys.cpus().len(),
+        };
+
+        // GPU metrics
+        let gpu = self.get_gpu_metrics();
+
+        // Memory metrics
+        let memory = MemoryMetrics {
+            used_bytes: sys.used_memory(),
+            total_bytes: sys.total_memory(),
+            usage_percent: (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0,
+        };
+
+        Ok(SystemMetrics {
+            cpu,
+            gpu,
+            memory,
+            timestamp: chrono::Utc::now().timestamp(),
+        })
+    }
+
+    /// Get top N processes by CPU usage
+    pub fn get_top_processes(&self, limit: usize) -> Result<Vec<ProcessMetrics>> {
+        let mut sys = self.sys.lock().unwrap();
+        sys.refresh_processes();
+
+        let total_memory = sys.total_memory();
+
+        let mut processes: Vec<ProcessMetrics> = sys
+            .processes()
+            .iter()
+            .map(|(pid, process)| {
+                let memory_bytes = process.memory();
+                ProcessMetrics {
+                    pid: pid.as_u32(),
+                    name: process.name().to_string(),
+                    cpu_percent: process.cpu_usage() as f64,
+                    memory_bytes,
+                    memory_percent: (memory_bytes as f64 / total_memory as f64) * 100.0,
+                }
+            })
+            .collect();
+
+        // Sort by CPU usage descending
+        processes.sort_by(|a, b| b.cpu_percent.partial_cmp(&a.cpu_percent).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Filter out processes with 0 CPU usage and take top N
+        processes.truncate(limit);
+
+        Ok(processes)
+    }
+
+    /// Get CPU temperature via WMI (MSAcpi_ThermalZoneTemperature)
+    fn get_cpu_temperature(&self) -> Option<f64> {
+        // Try WMI query for thermal zone temperature
+        // Temperature is in tenths of Kelvin, convert: (value / 10) - 273.15
+        if let Ok(output) = Command::new("powershell")
+            .args([
+                "-Command",
+                "Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi 2>$null | Select-Object -First 1 -ExpandProperty CurrentTemperature"
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Ok(temp_decikelvin) = stdout.trim().parse::<f64>() {
+                    let temp_celsius = (temp_decikelvin / 10.0) - 273.15;
+                    if temp_celsius > 0.0 && temp_celsius < 150.0 {
+                        return Some(temp_celsius);
+                    }
+                }
+            }
+        }
+
+        // Try Open Hardware Monitor WMI if available
+        if let Ok(output) = Command::new("powershell")
+            .args([
+                "-Command",
+                "Get-WmiObject Sensor -Namespace root/OpenHardwareMonitor 2>$null | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1 -ExpandProperty Value"
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Ok(temp) = stdout.trim().parse::<f64>() {
+                    if temp > 0.0 && temp < 150.0 {
+                        return Some(temp);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Get GPU metrics including usage, power, temperature, and VRAM
+    fn get_gpu_metrics(&self) -> Option<GpuMetrics> {
+        match self.gpu_source {
+            GpuSource::Nvidia => self.get_nvidia_gpu_metrics(),
+            GpuSource::Amd => self.get_amd_gpu_metrics(),
+            GpuSource::None => None,
+        }
+    }
+
+    /// Get NVIDIA GPU metrics via nvidia-smi
+    fn get_nvidia_gpu_metrics(&self) -> Option<GpuMetrics> {
+        let output = Command::new("nvidia-smi")
+            .args([
+                "--query-gpu=name,utilization.gpu,power.draw,temperature.gpu,memory.used,memory.total,clocks.gr",
+                "--format=csv,noheader,nounits",
+            ])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let line = stdout.lines().next()?;
+        let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+
+        if parts.len() >= 7 {
+            Some(GpuMetrics {
+                name: parts[0].to_string(),
+                usage_percent: parts[1].parse().ok(),
+                power_watts: parts[2].parse().ok(),
+                temperature_celsius: parts[3].parse().ok(),
+                vram_used_mb: parts[4].parse().ok(),
+                vram_total_mb: parts[5].parse().ok(),
+                clock_mhz: parts[6].parse().ok(),
+                source: "nvidia-smi".to_string(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Get AMD GPU metrics via rocm-smi or amd-smi
+    fn get_amd_gpu_metrics(&self) -> Option<GpuMetrics> {
+        // Try rocm-smi first
+        if let Ok(output) = Command::new("rocm-smi")
+            .args(["--showuse", "--showpower", "--showtemp", "--showmemuse", "--json"])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(metrics) = self.parse_rocm_smi_metrics(&stdout) {
+                    return Some(metrics);
+                }
+            }
+        }
+
+        // Try amd-smi as fallback
+        if let Ok(output) = Command::new("amd-smi")
+            .args(["metric", "--json"])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(metrics) = self.parse_amd_smi_metrics(&stdout) {
+                    return Some(metrics);
+                }
+            }
+        }
+
+        // Fallback: just get power info
+        if let Some(gpu_info) = self.get_amd_gpu_power() {
+            return Some(GpuMetrics {
+                name: gpu_info.name,
+                usage_percent: None,
+                power_watts: Some(gpu_info.power_watts),
+                temperature_celsius: None,
+                vram_used_mb: None,
+                vram_total_mb: None,
+                clock_mhz: None,
+                source: "rocm-smi".to_string(),
+            });
+        }
+
+        None
+    }
+
+    /// Parse rocm-smi JSON output to extract GPU metrics
+    fn parse_rocm_smi_metrics(&self, json_str: &str) -> Option<GpuMetrics> {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str) {
+            // rocm-smi JSON structure varies, try common paths
+            let card = value.get("card0").or_else(|| value.as_object()?.values().next())?;
+
+            Some(GpuMetrics {
+                name: "AMD GPU".to_string(),
+                usage_percent: card.get("GPU use (%)").and_then(|v| v.as_f64())
+                    .or_else(|| card.get("GPU Usage").and_then(|v| v.as_f64())),
+                power_watts: card.get("Average Graphics Package Power (W)").and_then(|v| v.as_f64())
+                    .or_else(|| card.get("power").and_then(|v| v.as_f64())),
+                temperature_celsius: card.get("Temperature (Sensor edge) (C)").and_then(|v| v.as_f64())
+                    .or_else(|| card.get("temperature").and_then(|v| v.as_f64())),
+                vram_used_mb: card.get("VRAM Total Used Memory (B)").and_then(|v| v.as_u64()).map(|v| v / 1_000_000),
+                vram_total_mb: card.get("VRAM Total Memory (B)").and_then(|v| v.as_u64()).map(|v| v / 1_000_000),
+                clock_mhz: card.get("sclk clock speed (MHz)").and_then(|v| v.as_u64()),
+                source: "rocm-smi".to_string(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Parse amd-smi JSON output to extract GPU metrics
+    fn parse_amd_smi_metrics(&self, json_str: &str) -> Option<GpuMetrics> {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str) {
+            if let Some(arr) = value.as_array() {
+                if let Some(first) = arr.first() {
+                    return Some(GpuMetrics {
+                        name: first.get("asic").and_then(|a| a.get("name")).and_then(|n| n.as_str()).unwrap_or("AMD GPU").to_string(),
+                        usage_percent: first.get("usage").and_then(|u| u.get("gfx_activity")).and_then(|v| v.as_f64()),
+                        power_watts: first.get("power").and_then(|p| p.get("socket_power")).and_then(|v| v.as_f64()),
+                        temperature_celsius: first.get("temperature").and_then(|t| t.get("edge")).and_then(|v| v.as_f64()),
+                        vram_used_mb: first.get("vram").and_then(|v| v.get("used")).and_then(|v| v.as_u64()),
+                        vram_total_mb: first.get("vram").and_then(|v| v.get("total")).and_then(|v| v.as_u64()),
+                        clock_mhz: first.get("clock").and_then(|c| c.get("gfx")).and_then(|v| v.as_u64()),
+                        source: "amd-smi".to_string(),
+                    });
+                }
+            }
+        }
+        None
     }
 }
 

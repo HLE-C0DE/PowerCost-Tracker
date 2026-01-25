@@ -87,3 +87,91 @@ impl Default for AppState {
         Self::new()
     }
 }
+
+/// System-wide hardware metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemMetrics {
+    pub cpu: CpuMetrics,
+    pub gpu: Option<GpuMetrics>,
+    pub memory: MemoryMetrics,
+    pub timestamp: i64,
+}
+
+/// CPU metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CpuMetrics {
+    pub name: String,
+    pub usage_percent: f64,
+    pub per_core_usage: Vec<f64>,
+    pub frequency_mhz: Option<u64>,
+    pub temperature_celsius: Option<f64>,
+    pub core_count: usize,
+    pub thread_count: usize,
+}
+
+/// GPU metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuMetrics {
+    pub name: String,
+    pub usage_percent: Option<f64>,
+    pub power_watts: Option<f64>,
+    pub temperature_celsius: Option<f64>,
+    pub vram_used_mb: Option<u64>,
+    pub vram_total_mb: Option<u64>,
+    pub clock_mhz: Option<u64>,
+    pub source: String,
+}
+
+/// Memory (RAM) metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryMetrics {
+    pub used_bytes: u64,
+    pub total_bytes: u64,
+    pub usage_percent: f64,
+}
+
+/// Process metrics for top processes display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessMetrics {
+    pub pid: u32,
+    pub name: String,
+    pub cpu_percent: f64,
+    pub memory_bytes: u64,
+    pub memory_percent: f64,
+}
+
+/// Tracking session for baseline/surplus calculation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Session {
+    pub id: Option<i64>,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub baseline_watts: f64,
+    pub total_wh: f64,
+    pub surplus_wh: f64,
+    pub surplus_cost: f64,
+    pub label: Option<String>,
+}
+
+impl Session {
+    pub fn new(baseline_watts: f64, label: Option<String>) -> Self {
+        Self {
+            id: None,
+            start_time: chrono::Utc::now().timestamp(),
+            end_time: None,
+            baseline_watts,
+            total_wh: 0.0,
+            surplus_wh: 0.0,
+            surplus_cost: 0.0,
+            label,
+        }
+    }
+}
+
+/// Baseline detection result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaselineDetection {
+    pub detected_watts: f64,
+    pub sample_count: usize,
+    pub confidence: f64,
+}

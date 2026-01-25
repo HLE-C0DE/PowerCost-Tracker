@@ -5,7 +5,7 @@
 //! - Daily aggregated statistics
 //! - Session tracking
 
-use crate::core::{Error, PowerReading, Result};
+use crate::core::{Error, PowerReading, Result, Session};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -294,6 +294,129 @@ impl Database {
         }
 
         Ok(count)
+    }
+
+    // ===== Session Management =====
+
+    /// Start a new tracking session
+    pub fn start_session(&self, baseline_watts: f64, label: Option<&str>) -> Result<i64> {
+        let now = chrono::Utc::now().timestamp();
+
+        self.conn.execute(
+            "INSERT INTO sessions (start_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label)
+             VALUES (?1, ?2, 0.0, 0.0, 0.0, ?3)",
+            params![now, baseline_watts, label],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// End a tracking session
+    pub fn end_session(&self, session_id: i64, total_wh: f64, surplus_wh: f64, surplus_cost: f64) -> Result<Option<Session>> {
+        let now = chrono::Utc::now().timestamp();
+
+        self.conn.execute(
+            "UPDATE sessions SET end_time = ?1, total_wh = ?2, surplus_wh = ?3, surplus_cost = ?4
+             WHERE id = ?5",
+            params![now, total_wh, surplus_wh, surplus_cost, session_id],
+        )?;
+
+        self.get_session(session_id)
+    }
+
+    /// Get a specific session by ID
+    pub fn get_session(&self, session_id: i64) -> Result<Option<Session>> {
+        let result = self.conn.query_row(
+            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+             FROM sessions WHERE id = ?1",
+            params![session_id],
+            |row| {
+                Ok(Session {
+                    id: Some(row.get(0)?),
+                    start_time: row.get(1)?,
+                    end_time: row.get(2)?,
+                    baseline_watts: row.get(3)?,
+                    total_wh: row.get(4)?,
+                    surplus_wh: row.get(5)?,
+                    surplus_cost: row.get(6)?,
+                    label: row.get(7)?,
+                })
+            },
+        );
+
+        match result {
+            Ok(session) => Ok(Some(session)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(Error::Database(e)),
+        }
+    }
+
+    /// Get all sessions, optionally limited
+    pub fn get_sessions(&self, limit: Option<u32>) -> Result<Vec<Session>> {
+        let query = match limit {
+            Some(n) => format!(
+                "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+                 FROM sessions ORDER BY start_time DESC LIMIT {}", n
+            ),
+            None => "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+                     FROM sessions ORDER BY start_time DESC".to_string(),
+        };
+
+        let mut stmt = self.conn.prepare(&query)?;
+
+        let sessions = stmt
+            .query_map([], |row| {
+                Ok(Session {
+                    id: Some(row.get(0)?),
+                    start_time: row.get(1)?,
+                    end_time: row.get(2)?,
+                    baseline_watts: row.get(3)?,
+                    total_wh: row.get(4)?,
+                    surplus_wh: row.get(5)?,
+                    surplus_cost: row.get(6)?,
+                    label: row.get(7)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(sessions)
+    }
+
+    /// Update session statistics (called during active session)
+    pub fn update_session_stats(&self, session_id: i64, total_wh: f64, surplus_wh: f64, surplus_cost: f64) -> Result<()> {
+        self.conn.execute(
+            "UPDATE sessions SET total_wh = ?1, surplus_wh = ?2, surplus_cost = ?3 WHERE id = ?4",
+            params![total_wh, surplus_wh, surplus_cost, session_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get the most recent active (unended) session
+    pub fn get_active_session(&self) -> Result<Option<Session>> {
+        let result = self.conn.query_row(
+            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+             FROM sessions WHERE end_time IS NULL ORDER BY start_time DESC LIMIT 1",
+            [],
+            |row| {
+                Ok(Session {
+                    id: Some(row.get(0)?),
+                    start_time: row.get(1)?,
+                    end_time: row.get(2)?,
+                    baseline_watts: row.get(3)?,
+                    total_wh: row.get(4)?,
+                    surplus_wh: row.get(5)?,
+                    surplus_cost: row.get(6)?,
+                    label: row.get(7)?,
+                })
+            },
+        );
+
+        match result {
+            Ok(session) => Ok(Some(session)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(Error::Database(e)),
+        }
     }
 }
 

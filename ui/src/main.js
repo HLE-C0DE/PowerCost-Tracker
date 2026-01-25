@@ -9,37 +9,203 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
+// ===== Widget Registry =====
+const WIDGET_REGISTRY = {
+    power: {
+        id: 'power',
+        title: 'Current Power',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+        defaultSize: 'large',
+        render: (data) => `
+            <div class="widget-value power-value">${formatNumber(data.power_watts, 1)}<span class="unit">W</span></div>
+            <div class="power-graph"><canvas id="power-chart"></canvas></div>
+        `,
+    },
+    session_energy: {
+        id: 'session_energy',
+        title: 'Session Energy',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => {
+            const energyWh = data.cumulative_wh;
+            const display = energyWh >= 1000 ? `${formatNumber(energyWh / 1000, 2)} kWh` : `${formatNumber(energyWh, 1)} Wh`;
+            return `<div class="widget-value">${display}</div>`;
+        },
+    },
+    session_cost: {
+        id: 'session_cost',
+        title: 'Session Cost',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => `<div class="widget-value cost-value">${state.currencySymbol}${formatNumber(data.current_cost, 4)}</div>`,
+    },
+    hourly_estimate: {
+        id: 'hourly_estimate',
+        title: 'Hourly Estimate',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.hourly_cost_estimate, 4)}<span class="unit">/h</span></div>`,
+    },
+    daily_estimate: {
+        id: 'daily_estimate',
+        title: 'Daily Estimate',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.daily_cost_estimate, 2)}<span class="unit">/day</span></div>`,
+    },
+    monthly_estimate: {
+        id: 'monthly_estimate',
+        title: 'Monthly Estimate',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.monthly_cost_estimate, 2)}<span class="unit">/mo</span></div>`,
+    },
+    session_duration: {
+        id: 'session_duration',
+        title: 'Session Duration',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => `<div class="widget-value small">${formatDuration(data.session_duration_secs)}</div>`,
+    },
+    cpu: {
+        id: 'cpu',
+        title: 'CPU',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
+        defaultSize: 'medium',
+        render: (data) => {
+            const cpu = data.systemMetrics?.cpu;
+            if (!cpu) return `<div class="widget-loading">Loading...</div>`;
+            const temp = cpu.temperature_celsius ? `${formatNumber(cpu.temperature_celsius, 0)}°C` : '--';
+            return `
+                <div class="metric-row">
+                    <span class="metric-label">Usage</span>
+                    <div class="progress-bar"><div class="progress-fill" style="width: ${cpu.usage_percent}%"></div></div>
+                    <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Temp</span>
+                    <span class="metric-value">${temp}</span>
+                </div>
+                <div class="metric-info">${cpu.name.slice(0, 30)}</div>
+            `;
+        },
+    },
+    gpu: {
+        id: 'gpu',
+        title: 'GPU',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>`,
+        defaultSize: 'medium',
+        render: (data) => {
+            const gpu = data.systemMetrics?.gpu;
+            if (!gpu) return `<div class="widget-na">No GPU detected</div>`;
+            const usage = gpu.usage_percent != null ? `${formatNumber(gpu.usage_percent, 0)}%` : '--';
+            const temp = gpu.temperature_celsius != null ? `${formatNumber(gpu.temperature_celsius, 0)}°C` : '--';
+            const power = gpu.power_watts != null ? `${formatNumber(gpu.power_watts, 0)}W` : '--';
+            const vram = gpu.vram_used_mb != null && gpu.vram_total_mb != null
+                ? `${formatNumber(gpu.vram_used_mb / 1024, 1)}/${formatNumber(gpu.vram_total_mb / 1024, 1)} GB`
+                : '--';
+            return `
+                <div class="metric-row">
+                    <span class="metric-label">Usage</span>
+                    <span class="metric-value">${usage}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Temp</span>
+                    <span class="metric-value">${temp}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Power</span>
+                    <span class="metric-value">${power}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">VRAM</span>
+                    <span class="metric-value">${vram}</span>
+                </div>
+                <div class="metric-info">${gpu.name.slice(0, 25)}</div>
+            `;
+        },
+    },
+    ram: {
+        id: 'ram',
+        title: 'RAM',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="10" y1="2" x2="10" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="18" y1="2" x2="18" y2="6"/></svg>`,
+        defaultSize: 'small',
+        render: (data) => {
+            const mem = data.systemMetrics?.memory;
+            if (!mem) return `<div class="widget-loading">Loading...</div>`;
+            const usedGB = mem.used_bytes / (1024 * 1024 * 1024);
+            const totalGB = mem.total_bytes / (1024 * 1024 * 1024);
+            return `
+                <div class="metric-row">
+                    <div class="progress-bar"><div class="progress-fill" style="width: ${mem.usage_percent}%"></div></div>
+                    <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
+                </div>
+                <div class="metric-info">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+            `;
+        },
+    },
+    surplus: {
+        id: 'surplus',
+        title: 'Surplus',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+        defaultSize: 'medium',
+        render: (data) => {
+            const session = data.activeSession;
+            if (!session) return `<div class="widget-na">Start a session to track surplus</div>`;
+            return `
+                <div class="metric-row">
+                    <span class="metric-label">Baseline</span>
+                    <span class="metric-value">${formatNumber(session.baseline_watts, 1)} W</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Current</span>
+                    <span class="metric-value">${formatNumber(data.power_watts, 1)} W</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Surplus</span>
+                    <span class="metric-value surplus-value">${formatNumber(session.surplus_wh, 2)} Wh</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Cost</span>
+                    <span class="metric-value">${state.currencySymbol}${formatNumber(session.surplus_cost || 0, 4)}</span>
+                </div>
+            `;
+        },
+    },
+};
+
 // ===== State Management =====
 const state = {
     translations: {},
     config: null,
+    dashboardConfig: null,
     powerHistory: [],
-    maxHistoryPoints: 60, // 1 minute of data at 1s refresh
+    maxHistoryPoints: 60,
     currencySymbol: '\u20AC',
-    historyData: [], // Historical data for the history view
-    dashboardIntervalId: null, // Track interval for refresh rate changes
+    historyData: [],
+    dashboardIntervalId: null,
+    systemMetrics: null,
+    activeSession: null,
+    isEditMode: false,
+    draggedWidget: null,
 };
 
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Load translations
         await loadTranslations();
-
-        // Load config
         state.config = await invoke('get_config');
+        state.dashboardConfig = await invoke('get_dashboard_config');
         applyConfig(state.config);
 
-        // Setup navigation
         setupNavigation();
-
-        // Setup settings handlers
         setupSettings();
+        setupDashboard();
+        setupSessionControls();
+        setupHistoryTabs();
 
-        // Start data updates
         startDashboardUpdates();
 
-        // Listen for power updates from backend
         await listen('power-update', (event) => {
             updatePowerDisplay(event.payload);
         });
@@ -80,17 +246,12 @@ function setupNavigation() {
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-
             const targetView = link.getAttribute('data-view');
-
-            // Update active states
             navLinks.forEach(l => l.classList.remove('active'));
             link.classList.add('active');
-
             views.forEach(v => v.classList.remove('active'));
             document.getElementById(targetView).classList.add('active');
 
-            // Load view-specific data
             if (targetView === 'history') {
                 loadHistoryData('today');
             }
@@ -98,16 +259,225 @@ function setupNavigation() {
     });
 }
 
+// ===== Dashboard =====
+function setupDashboard() {
+    renderDashboard();
+
+    // Edit dashboard button
+    document.getElementById('edit-dashboard-btn').addEventListener('click', openEditModal);
+    document.getElementById('close-edit-modal').addEventListener('click', closeEditModal);
+    document.getElementById('save-dashboard-btn').addEventListener('click', saveDashboardConfig);
+    document.getElementById('reset-dashboard-btn').addEventListener('click', resetDashboard);
+
+    // Close modal on backdrop click
+    document.getElementById('edit-dashboard-modal').addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) closeEditModal();
+    });
+}
+
+function renderDashboard() {
+    const grid = document.getElementById('dashboard-grid');
+    grid.innerHTML = '';
+
+    const widgets = state.dashboardConfig?.widgets || [];
+    const sortedWidgets = [...widgets].sort((a, b) => a.position - b.position);
+
+    for (const widgetConfig of sortedWidgets) {
+        if (!widgetConfig.visible) continue;
+
+        const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
+        if (!widgetDef) continue;
+
+        const card = document.createElement('div');
+        card.className = `card widget-card widget-${widgetConfig.size || widgetDef.defaultSize}`;
+        card.dataset.widgetId = widgetConfig.id;
+        card.draggable = true;
+
+        card.innerHTML = `
+            <div class="card-header">
+                ${widgetDef.icon}
+                <span>${widgetDef.title}</span>
+            </div>
+            <div class="card-body" id="widget-body-${widgetConfig.id}">
+                <div class="widget-loading">Loading...</div>
+            </div>
+        `;
+
+        // Drag and drop
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('drop', handleDrop);
+        card.addEventListener('dragend', handleDragEnd);
+
+        grid.appendChild(card);
+    }
+}
+
+function handleDragStart(e) {
+    state.draggedWidget = e.target.closest('.widget-card');
+    state.draggedWidget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const target = e.target.closest('.widget-card');
+    if (target && target !== state.draggedWidget) {
+        const grid = document.getElementById('dashboard-grid');
+        const cards = [...grid.querySelectorAll('.widget-card')];
+        const draggedIndex = cards.indexOf(state.draggedWidget);
+        const targetIndex = cards.indexOf(target);
+
+        if (draggedIndex < targetIndex) {
+            target.parentNode.insertBefore(state.draggedWidget, target.nextSibling);
+        } else {
+            target.parentNode.insertBefore(state.draggedWidget, target);
+        }
+    }
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    updateWidgetPositions();
+}
+
+function handleDragEnd(e) {
+    if (state.draggedWidget) {
+        state.draggedWidget.classList.remove('dragging');
+        state.draggedWidget = null;
+    }
+}
+
+function updateWidgetPositions() {
+    const grid = document.getElementById('dashboard-grid');
+    const cards = [...grid.querySelectorAll('.widget-card')];
+
+    cards.forEach((card, index) => {
+        const widgetId = card.dataset.widgetId;
+        const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
+        if (widget) {
+            widget.position = index;
+        }
+    });
+
+    // Auto-save positions
+    saveDashboardConfigQuiet();
+}
+
+async function saveDashboardConfigQuiet() {
+    try {
+        await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
+    } catch (error) {
+        console.error('Failed to save dashboard config:', error);
+    }
+}
+
+function openEditModal() {
+    const modal = document.getElementById('edit-dashboard-modal');
+    const list = document.getElementById('widget-toggle-list');
+    list.innerHTML = '';
+
+    const sortedWidgets = [...state.dashboardConfig.widgets].sort((a, b) => a.position - b.position);
+
+    for (const widgetConfig of sortedWidgets) {
+        const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
+        if (!widgetDef) continue;
+
+        const item = document.createElement('div');
+        item.className = 'widget-toggle-item';
+        item.draggable = true;
+        item.dataset.widgetId = widgetConfig.id;
+        item.innerHTML = `
+            <span class="drag-handle">&#x2630;</span>
+            <span class="widget-toggle-title">${widgetDef.title}</span>
+            <select class="widget-size-select" data-widget-id="${widgetConfig.id}">
+                <option value="small" ${widgetConfig.size === 'small' ? 'selected' : ''}>Small</option>
+                <option value="medium" ${widgetConfig.size === 'medium' ? 'selected' : ''}>Medium</option>
+                <option value="large" ${widgetConfig.size === 'large' ? 'selected' : ''}>Large</option>
+            </select>
+            <label class="toggle">
+                <input type="checkbox" class="widget-toggle-checkbox" data-widget-id="${widgetConfig.id}" ${widgetConfig.visible ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+            </label>
+        `;
+
+        item.addEventListener('dragstart', (e) => {
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const dragging = list.querySelector('.dragging');
+            const target = e.target.closest('.widget-toggle-item');
+            if (target && target !== dragging) {
+                const items = [...list.querySelectorAll('.widget-toggle-item')];
+                const draggedIndex = items.indexOf(dragging);
+                const targetIndex = items.indexOf(target);
+                if (draggedIndex < targetIndex) {
+                    target.parentNode.insertBefore(dragging, target.nextSibling);
+                } else {
+                    target.parentNode.insertBefore(dragging, target);
+                }
+            }
+        });
+        item.addEventListener('dragend', (e) => e.target.classList.remove('dragging'));
+
+        list.appendChild(item);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('edit-dashboard-modal').classList.add('hidden');
+}
+
+async function saveDashboardConfig() {
+    const list = document.getElementById('widget-toggle-list');
+    const items = [...list.querySelectorAll('.widget-toggle-item')];
+
+    items.forEach((item, index) => {
+        const widgetId = item.dataset.widgetId;
+        const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
+        if (widget) {
+            widget.position = index;
+            widget.visible = item.querySelector('.widget-toggle-checkbox').checked;
+            widget.size = item.querySelector('.widget-size-select').value;
+        }
+    });
+
+    try {
+        await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
+        renderDashboard();
+        closeEditModal();
+        showToast('Dashboard saved', 'success');
+    } catch (error) {
+        console.error('Failed to save dashboard:', error);
+        showToast('Failed to save dashboard', 'error');
+    }
+}
+
+async function resetDashboard() {
+    try {
+        state.dashboardConfig = await invoke('get_config').then(c => c.dashboard);
+        await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
+        renderDashboard();
+        closeEditModal();
+        showToast('Dashboard reset to default', 'success');
+    } catch (error) {
+        console.error('Failed to reset dashboard:', error);
+    }
+}
+
 // ===== Dashboard Updates =====
 async function startDashboardUpdates() {
-    updateDashboard();
-    // Use refresh rate from config (default to 1000ms if not set)
+    await updateDashboard();
     const refreshRate = state.config?.general?.refresh_rate_ms || 1000;
     state.dashboardIntervalId = setInterval(updateDashboard, refreshRate);
 }
 
 function restartDashboardUpdates() {
-    // Clear existing interval and start new one with updated refresh rate
     if (state.dashboardIntervalId) {
         clearInterval(state.dashboardIntervalId);
     }
@@ -117,56 +487,40 @@ function restartDashboardUpdates() {
 
 async function updateDashboard() {
     try {
-        const data = await invoke('get_dashboard_data');
+        const [dashboardData, systemMetrics, sessionStats] = await Promise.all([
+            invoke('get_dashboard_data'),
+            invoke('get_system_metrics').catch(() => null),
+            invoke('get_session_stats').catch(() => null),
+        ]);
 
-        // Debug logging for development
-        if (typeof data.power_watts !== 'number' || isNaN(data.power_watts)) {
-            console.warn('Invalid power_watts received:', data.power_watts, 'Full data:', data);
+        state.systemMetrics = systemMetrics;
+        state.activeSession = sessionStats;
+
+        const data = {
+            ...dashboardData,
+            systemMetrics,
+            activeSession: sessionStats,
+        };
+
+        // Update each visible widget
+        for (const widgetConfig of state.dashboardConfig?.widgets || []) {
+            if (!widgetConfig.visible) continue;
+            const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
+            if (!widgetDef) continue;
+
+            const body = document.getElementById(`widget-body-${widgetConfig.id}`);
+            if (body) {
+                body.innerHTML = widgetDef.render(data);
+            }
         }
 
-        // Update current power
-        document.getElementById('current-power').textContent =
-            formatNumber(data.power_watts, 1);
-
-        // Update session energy
-        const energyWh = data.cumulative_wh;
-        if (energyWh >= 1000) {
-            document.getElementById('session-energy').textContent =
-                formatNumber(energyWh / 1000, 2);
-            document.querySelector('#session-energy + .unit').textContent = 'kWh';
-        } else {
-            document.getElementById('session-energy').textContent =
-                formatNumber(energyWh, 1);
-        }
-
-        // Update costs
-        document.getElementById('session-cost').textContent =
-            formatNumber(data.current_cost, 4);
-        document.getElementById('hourly-cost').textContent =
-            formatNumber(data.hourly_cost_estimate, 4);
-        document.getElementById('daily-cost').textContent =
-            formatNumber(data.daily_cost_estimate, 2);
-        document.getElementById('monthly-cost').textContent =
-            formatNumber(data.monthly_cost_estimate, 2);
-
-        // Update currency symbols
-        document.getElementById('currency-symbol').textContent = state.currencySymbol;
-        document.getElementById('currency-hourly').textContent = state.currencySymbol;
-        document.getElementById('currency-daily').textContent = state.currencySymbol;
-        document.getElementById('currency-monthly').textContent = state.currencySymbol;
-
-        // Update session duration
-        document.getElementById('session-duration').textContent =
-            formatDuration(data.session_duration_secs);
-
-        // Update power source
-        document.getElementById('power-source').textContent = data.source;
+        // Update power source badge
+        document.getElementById('power-source').textContent = dashboardData.source;
 
         // Update estimation warning
         const warningBanner = document.getElementById('estimation-warning');
         const statusDot = document.querySelector('.status-dot');
-
-        if (data.is_estimated) {
+        if (dashboardData.is_estimated) {
             warningBanner.classList.remove('hidden');
             statusDot.classList.add('estimated');
         } else {
@@ -175,7 +529,10 @@ async function updateDashboard() {
         }
 
         // Update power history for graph
-        updatePowerHistory(data.power_watts);
+        updatePowerHistory(dashboardData.power_watts);
+
+        // Update session bar
+        updateSessionBar(sessionStats);
 
     } catch (error) {
         console.error('Dashboard update error:', error);
@@ -183,34 +540,23 @@ async function updateDashboard() {
 }
 
 function updatePowerDisplay(powerWatts) {
-    document.getElementById('current-power').textContent =
-        formatNumber(powerWatts, 1);
     updatePowerHistory(powerWatts);
 }
 
 function updatePowerHistory(power) {
-    state.powerHistory.push({
-        time: Date.now(),
-        power: power
-    });
-
-    // Keep only last N points
+    state.powerHistory.push({ time: Date.now(), power });
     if (state.powerHistory.length > state.maxHistoryPoints) {
         state.powerHistory.shift();
     }
-
     drawPowerGraph();
 }
 
-// ===== Power Graph =====
 function drawPowerGraph() {
     const canvas = document.getElementById('power-chart');
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     const rect = canvas.parentElement.getBoundingClientRect();
-
-    // Set canvas size
     canvas.width = rect.width;
     canvas.height = rect.height;
 
@@ -220,58 +566,43 @@ function drawPowerGraph() {
     const padding = 10;
     const width = canvas.width - padding * 2;
     const height = canvas.height - padding * 2;
-
-    // Find min/max
     const powers = data.map(d => d.power);
     const maxPower = Math.max(...powers) * 1.1 || 100;
     const minPower = Math.min(...powers) * 0.9 || 0;
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw gradient background
     const gradient = ctx.createLinearGradient(0, padding, 0, height + padding);
     gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
     gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
 
-    // Draw filled area
     ctx.beginPath();
     ctx.moveTo(padding, height + padding);
-
     data.forEach((point, i) => {
         const x = padding + (i / (data.length - 1)) * width;
         const y = padding + height - ((point.power - minPower) / (maxPower - minPower)) * height;
         ctx.lineTo(x, y);
     });
-
     ctx.lineTo(padding + width, height + padding);
     ctx.closePath();
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    // Draw line
     ctx.beginPath();
     data.forEach((point, i) => {
         const x = padding + (i / (data.length - 1)) * width;
         const y = padding + height - ((point.power - minPower) / (maxPower - minPower)) * height;
-
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
     });
-
     ctx.strokeStyle = '#6366f1';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw current value dot
     if (data.length > 0) {
         const lastPoint = data[data.length - 1];
         const x = padding + width;
         const y = padding + height - ((lastPoint.power - minPower) / (maxPower - minPower)) * height;
-
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fillStyle = '#6366f1';
@@ -279,7 +610,81 @@ function drawPowerGraph() {
     }
 }
 
+// ===== Session Controls =====
+function setupSessionControls() {
+    document.getElementById('start-session-btn').addEventListener('click', startSession);
+    document.getElementById('end-session-btn').addEventListener('click', endSession);
+}
+
+async function startSession() {
+    try {
+        const sessionId = await invoke('start_tracking_session', { label: null });
+        document.getElementById('start-session-btn').classList.add('hidden');
+        document.getElementById('end-session-btn').classList.remove('hidden');
+        document.getElementById('session-label').textContent = 'Session Active';
+        showToast('Session started', 'success');
+    } catch (error) {
+        console.error('Failed to start session:', error);
+        showToast('Failed to start session', 'error');
+    }
+}
+
+async function endSession() {
+    try {
+        const session = await invoke('end_tracking_session');
+        document.getElementById('start-session-btn').classList.remove('hidden');
+        document.getElementById('end-session-btn').classList.add('hidden');
+        document.getElementById('session-label').textContent = 'No active session';
+        document.getElementById('session-duration-display').textContent = '--:--:--';
+        state.activeSession = null;
+
+        if (session) {
+            showToast(`Session ended: ${formatNumber(session.surplus_wh, 2)} Wh surplus`, 'success');
+        }
+    } catch (error) {
+        console.error('Failed to end session:', error);
+        showToast('Failed to end session', 'error');
+    }
+}
+
+function updateSessionBar(session) {
+    if (session) {
+        document.getElementById('start-session-btn').classList.add('hidden');
+        document.getElementById('end-session-btn').classList.remove('hidden');
+        document.getElementById('session-label').textContent = 'Session Active';
+
+        const elapsed = Math.floor(Date.now() / 1000) - session.start_time;
+        document.getElementById('session-duration-display').textContent = formatDuration(elapsed);
+    } else {
+        document.getElementById('start-session-btn').classList.remove('hidden');
+        document.getElementById('end-session-btn').classList.add('hidden');
+    }
+}
+
 // ===== History =====
+function setupHistoryTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+
+            if (btn.dataset.tab === 'session-history') {
+                loadSessionHistory();
+            }
+        });
+    });
+
+    document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadHistoryData(btn.getAttribute('data-range'));
+        });
+    });
+}
+
 async function loadHistoryData(range) {
     try {
         const now = new Date();
@@ -313,35 +718,60 @@ async function loadHistoryData(range) {
         } else {
             document.getElementById('no-history-data').classList.add('hidden');
             document.querySelector('.history-chart-container').classList.remove('hidden');
-
-            // Store data for chart
             state.historyData = stats;
 
-            // Update stats
             const totalWh = stats.reduce((sum, s) => sum + s.total_wh, 0);
             const totalCost = stats.reduce((sum, s) => sum + (s.total_cost || 0), 0);
             const avgPower = stats.reduce((sum, s) => sum + s.avg_watts, 0) / stats.length;
             const maxPower = Math.max(...stats.map(s => s.max_watts));
 
-            document.getElementById('history-total-wh').textContent =
-                `${formatNumber(totalWh / 1000, 2)} kWh`;
-            document.getElementById('history-total-cost').textContent =
-                `${state.currencySymbol}${formatNumber(totalCost, 2)}`;
-            document.getElementById('history-avg-power').textContent =
-                `${formatNumber(avgPower, 0)} W`;
-            document.getElementById('history-peak-power').textContent =
-                `${formatNumber(maxPower, 0)} W`;
+            document.getElementById('history-total-wh').textContent = `${formatNumber(totalWh / 1000, 2)} kWh`;
+            document.getElementById('history-total-cost').textContent = `${state.currencySymbol}${formatNumber(totalCost, 2)}`;
+            document.getElementById('history-avg-power').textContent = `${formatNumber(avgPower, 0)} W`;
+            document.getElementById('history-peak-power').textContent = `${formatNumber(maxPower, 0)} W`;
 
-            // Draw the history chart
             drawHistoryChart();
         }
-
     } catch (error) {
         console.error('History load error:', error);
     }
 }
 
-// ===== History Chart =====
+async function loadSessionHistory() {
+    try {
+        const sessions = await invoke('get_sessions', { limit: 20 });
+        const list = document.getElementById('session-list');
+        const empty = document.getElementById('no-sessions');
+
+        if (sessions.length === 0) {
+            list.innerHTML = '';
+            empty.classList.remove('hidden');
+        } else {
+            empty.classList.add('hidden');
+            list.innerHTML = sessions.map(s => {
+                const startDate = new Date(s.start_time * 1000);
+                const duration = s.end_time ? s.end_time - s.start_time : 0;
+                return `
+                    <div class="session-item">
+                        <div class="session-item-header">
+                            <span class="session-date">${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()}</span>
+                            <span class="session-duration">${formatDuration(duration)}</span>
+                        </div>
+                        <div class="session-item-stats">
+                            <span>Baseline: ${formatNumber(s.baseline_watts, 1)} W</span>
+                            <span>Total: ${formatNumber(s.total_wh, 2)} Wh</span>
+                            <span>Surplus: ${formatNumber(s.surplus_wh, 2)} Wh</span>
+                            <span>Cost: ${state.currencySymbol}${formatNumber(s.surplus_cost, 4)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load sessions:', error);
+    }
+}
+
 function drawHistoryChart() {
     const canvas = document.getElementById('history-chart');
     if (!canvas) return;
@@ -350,8 +780,7 @@ function drawHistoryChart() {
     const container = canvas.parentElement;
     const rect = container.getBoundingClientRect();
 
-    // Set canvas size
-    canvas.width = rect.width - 32; // Account for padding
+    canvas.width = rect.width - 32;
     canvas.height = rect.height - 32;
 
     const data = state.historyData;
@@ -361,17 +790,13 @@ function drawHistoryChart() {
     const width = canvas.width - padding.left - padding.right;
     const height = canvas.height - padding.top - padding.bottom;
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Find max values
     const maxWh = Math.max(...data.map(d => d.total_wh)) * 1.1 || 100;
 
-    // Draw grid lines
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 1;
 
-    // Horizontal grid lines (5 lines)
     for (let i = 0; i <= 5; i++) {
         const y = padding.top + (height / 5) * i;
         ctx.beginPath();
@@ -379,7 +804,6 @@ function drawHistoryChart() {
         ctx.lineTo(padding.left + width, y);
         ctx.stroke();
 
-        // Y-axis labels
         const value = maxWh - (maxWh / 5) * i;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.font = '11px system-ui';
@@ -387,17 +811,14 @@ function drawHistoryChart() {
         ctx.fillText(formatNumber(value / 1000, 1) + ' kWh', padding.left - 8, y + 4);
     }
 
-    // Bar width
     const barWidth = Math.min(40, (width / data.length) * 0.7);
     const barGap = (width - barWidth * data.length) / (data.length + 1);
 
-    // Draw bars
     data.forEach((day, i) => {
         const x = padding.left + barGap + i * (barWidth + barGap);
         const barHeight = (day.total_wh / maxWh) * height;
         const y = padding.top + height - barHeight;
 
-        // Bar gradient
         const gradient = ctx.createLinearGradient(x, y, x, padding.top + height);
         gradient.addColorStop(0, '#6366f1');
         gradient.addColorStop(1, 'rgba(99, 102, 241, 0.3)');
@@ -407,15 +828,13 @@ function drawHistoryChart() {
         ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
         ctx.fill();
 
-        // X-axis labels (date)
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.font = '10px system-ui';
         ctx.textAlign = 'center';
-        const dateLabel = day.date ? day.date.slice(5) : `Day ${i + 1}`; // MM-DD format
+        const dateLabel = day.date ? day.date.slice(5) : `Day ${i + 1}`;
         ctx.fillText(dateLabel, x + barWidth / 2, padding.top + height + 20);
     });
 
-    // Draw average line
     const avgWh = data.reduce((sum, d) => sum + d.total_wh, 0) / data.length;
     const avgY = padding.top + height - (avgWh / maxWh) * height;
 
@@ -428,59 +847,66 @@ function drawHistoryChart() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Average label
     ctx.fillStyle = '#22c55e';
     ctx.font = '11px system-ui';
     ctx.textAlign = 'left';
     ctx.fillText(`Avg: ${formatNumber(avgWh / 1000, 2)} kWh`, padding.left + 5, avgY - 5);
 }
 
-// Setup history range buttons
-document.querySelectorAll('.range-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        loadHistoryData(btn.getAttribute('data-range'));
-    });
-});
-
 // ===== Settings =====
 function setupSettings() {
-    // Pricing mode toggle
     const pricingModeSelect = document.getElementById('setting-pricing-mode');
     pricingModeSelect.addEventListener('change', () => {
         updatePricingModeUI(pricingModeSelect.value);
     });
 
-    // Save button
     document.getElementById('save-settings').addEventListener('click', saveSettings);
-
-    // Reset button
     document.getElementById('reset-settings').addEventListener('click', async () => {
         state.config = await invoke('get_config');
         applyConfig(state.config);
     });
 
-    // Widget toggle button
     document.getElementById('toggle-widget-btn').addEventListener('click', async () => {
         try {
             const isOpen = await invoke('toggle_widget');
             const btn = document.getElementById('toggle-widget-btn');
-            btn.textContent = isOpen ? t('settings.widget.close') || 'Close Widget' : t('settings.widget.open') || 'Open Widget';
+            btn.textContent = isOpen ? 'Close Widget' : 'Open Widget';
         } catch (error) {
             console.error('Widget toggle error:', error);
         }
     });
+
+    document.getElementById('detect-baseline-btn').addEventListener('click', async () => {
+        try {
+            const detection = await invoke('detect_baseline');
+            if (detection) {
+                document.getElementById('detected-baseline').textContent =
+                    `${formatNumber(detection.detected_watts, 1)} W (${Math.round(detection.confidence * 100)}% confidence)`;
+                showToast(`Baseline detected: ${formatNumber(detection.detected_watts, 1)} W`, 'success');
+            } else {
+                showToast('Not enough data to detect baseline', 'info');
+            }
+        } catch (error) {
+            console.error('Baseline detection error:', error);
+            showToast('Failed to detect baseline', 'error');
+        }
+    });
+
+    document.getElementById('setting-baseline-auto').addEventListener('change', (e) => {
+        document.getElementById('manual-baseline-row').style.display = e.target.checked ? 'none' : 'flex';
+    });
 }
 
 function applyConfig(config) {
-    // General
     document.getElementById('setting-language').value = config.general.language;
     document.getElementById('setting-theme').value = config.general.theme;
     document.getElementById('setting-refresh-rate').value = config.general.refresh_rate_ms;
     document.getElementById('setting-eco-mode').checked = config.general.eco_mode;
 
-    // Pricing
+    document.getElementById('setting-baseline-auto').checked = config.advanced.baseline_auto;
+    document.getElementById('setting-baseline-watts').value = config.advanced.baseline_watts;
+    document.getElementById('manual-baseline-row').style.display = config.advanced.baseline_auto ? 'none' : 'flex';
+
     document.getElementById('setting-pricing-mode').value = config.pricing.mode;
     document.getElementById('setting-currency').value = config.pricing.currency;
     document.getElementById('setting-rate-kwh').value = config.pricing.simple.rate_per_kwh;
@@ -489,13 +915,11 @@ function applyConfig(config) {
     document.getElementById('setting-offpeak-start').value = config.pricing.peak_offpeak.offpeak_start;
     document.getElementById('setting-offpeak-end').value = config.pricing.peak_offpeak.offpeak_end;
 
-    // Seasonal
     if (config.pricing.seasonal) {
         document.getElementById('setting-summer-rate').value = config.pricing.seasonal.summer_rate;
         document.getElementById('setting-winter-rate').value = config.pricing.seasonal.winter_rate;
     }
 
-    // Tempo
     if (config.pricing.tempo) {
         document.getElementById('setting-tempo-blue-peak').value = config.pricing.tempo.blue_peak;
         document.getElementById('setting-tempo-blue-offpeak').value = config.pricing.tempo.blue_offpeak;
@@ -505,32 +929,22 @@ function applyConfig(config) {
         document.getElementById('setting-tempo-red-offpeak').value = config.pricing.tempo.red_offpeak;
     }
 
-    // Widget
     document.getElementById('setting-widget-show-cost').checked = config.widget.show_cost;
     document.getElementById('setting-widget-position').value = config.widget.position;
 
-    // Apply theme
     document.documentElement.setAttribute('data-theme', config.general.theme);
-
-    // Update currency symbol
     state.currencySymbol = config.pricing.currency_symbol;
-
-    // Show correct pricing mode config
     updatePricingModeUI(config.pricing.mode);
 }
 
 function updatePricingModeUI(mode) {
-    document.querySelectorAll('.pricing-mode-config').forEach(el => {
-        el.classList.add('hidden');
-    });
-
+    document.querySelectorAll('.pricing-mode-config').forEach(el => el.classList.add('hidden'));
     const modeMap = {
         'simple': 'pricing-simple',
         'peak_offpeak': 'pricing-peak-offpeak',
         'seasonal': 'pricing-seasonal',
         'tempo': 'pricing-tempo'
     };
-
     if (modeMap[mode]) {
         document.getElementById(modeMap[mode]).classList.remove('hidden');
     }
@@ -551,9 +965,7 @@ async function saveSettings() {
                 mode: document.getElementById('setting-pricing-mode').value,
                 currency: document.getElementById('setting-currency').value,
                 currency_symbol: getCurrencySymbol(document.getElementById('setting-currency').value),
-                simple: {
-                    rate_per_kwh: parseFloat(document.getElementById('setting-rate-kwh').value),
-                },
+                simple: { rate_per_kwh: parseFloat(document.getElementById('setting-rate-kwh').value) },
                 peak_offpeak: {
                     peak_rate: parseFloat(document.getElementById('setting-peak-rate').value),
                     offpeak_rate: parseFloat(document.getElementById('setting-offpeak-rate').value),
@@ -579,30 +991,25 @@ async function saveSettings() {
                 show_cost: document.getElementById('setting-widget-show-cost').checked,
                 position: document.getElementById('setting-widget-position').value,
                 opacity: state.config?.widget?.opacity || 0.9,
+                display_items: state.config?.widget?.display_items || ['power', 'cost'],
+                size: state.config?.widget?.size || 'normal',
+                theme: state.config?.widget?.theme || 'default',
             },
-            advanced: state.config?.advanced || {
-                baseline_watts: 0,
-                baseline_auto: true,
-                active_profile: 'default',
+            advanced: {
+                baseline_watts: parseFloat(document.getElementById('setting-baseline-watts').value) || 0,
+                baseline_auto: document.getElementById('setting-baseline-auto').checked,
+                active_profile: state.config?.advanced?.active_profile || 'default',
             },
+            dashboard: state.dashboardConfig || state.config?.dashboard,
         };
 
         await invoke('set_config', { config });
         state.config = config;
         state.currencySymbol = config.pricing.currency_symbol;
-
-        // Restart dashboard updates with new refresh rate
         restartDashboardUpdates();
-
-        // Apply theme immediately
         document.documentElement.setAttribute('data-theme', config.general.theme);
-
-        // Reload translations if language changed
         await loadTranslations();
-
-        // Show success toast
         showToast(t('settings.saved') || 'Settings saved successfully', 'success');
-
     } catch (error) {
         console.error('Save settings error:', error);
         showToast(t('error.save_failed') || 'Failed to save settings', 'error');
@@ -610,39 +1017,22 @@ async function saveSettings() {
 }
 
 function getCurrencySymbol(currency) {
-    const symbols = {
-        'EUR': '\u20AC',
-        'USD': '$',
-        'GBP': '\u00A3',
-        'CHF': 'CHF',
-    };
-    return symbols[currency] || currency;
+    return { 'EUR': '\u20AC', 'USD': '$', 'GBP': '\u00A3', 'CHF': 'CHF' }[currency] || currency;
 }
 
 // ===== Toast Notifications =====
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
-
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-
     const icons = {
         success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
         error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
         info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
     };
-
-    toast.innerHTML = `
-        ${icons[type] || icons.info}
-        <span class="toast-message">${message}</span>
-    `;
-
+    toast.innerHTML = `${icons[type] || icons.info}<span class="toast-message">${message}</span>`;
     container.appendChild(toast);
-
-    // Remove after animation
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
+    setTimeout(() => toast.remove(), 3000);
 }
 
 // ===== Utility Functions =====
@@ -652,10 +1042,10 @@ function formatNumber(num, decimals = 2) {
 }
 
 function formatDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return '--:--:--';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
+    const secs = Math.floor(seconds % 60);
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
@@ -663,7 +1053,7 @@ function formatDate(date) {
     return date.toISOString().split('T')[0];
 }
 
-// ===== Window resize handler for canvas =====
+// ===== Window resize handler =====
 window.addEventListener('resize', () => {
     drawPowerGraph();
     if (state.historyData.length > 0) {

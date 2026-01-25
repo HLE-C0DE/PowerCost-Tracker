@@ -11,9 +11,9 @@ mod hardware;
 mod i18n;
 mod pricing;
 
-use crate::core::{AppState, Config};
+use crate::core::{AppState, BaselineDetection, Config, ProcessMetrics, Session, SystemMetrics};
 use crate::db::Database;
-use crate::hardware::PowerMonitor;
+use crate::hardware::{BaselineDetector, PowerMonitor};
 use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
@@ -28,6 +28,17 @@ pub struct TauriState {
     pub pricing: Arc<Mutex<PricingEngine>>,
     pub i18n: Arc<Mutex<I18n>>,
     pub app_state: Arc<Mutex<AppState>>,
+    pub baseline_detector: Arc<Mutex<BaselineDetector>>,
+    pub active_session: Arc<Mutex<Option<SessionState>>>,
+}
+
+/// State for an active tracking session
+pub struct SessionState {
+    pub id: i64,
+    pub baseline_watts: f64,
+    pub total_wh: f64,
+    pub surplus_wh: f64,
+    pub start_time: std::time::Instant,
 }
 
 // Tauri commands exposed to the frontend
@@ -219,6 +230,187 @@ async fn toggle_widget(app: tauri::AppHandle, state: tauri::State<'_, TauriState
     }
 }
 
+// ===== New System Metrics Commands =====
+
+/// Get system metrics (CPU, GPU, RAM)
+#[tauri::command]
+async fn get_system_metrics(state: tauri::State<'_, TauriState>) -> Result<SystemMetrics, String> {
+    let monitor = state.monitor.lock().await;
+    monitor.get_system_metrics().map_err(|e| e.to_string())
+}
+
+/// Get top processes by CPU usage
+#[tauri::command]
+async fn get_top_processes(state: tauri::State<'_, TauriState>, limit: Option<usize>) -> Result<Vec<ProcessMetrics>, String> {
+    let monitor = state.monitor.lock().await;
+    let limit = limit.unwrap_or(10);
+    monitor.get_top_processes(limit).map_err(|e| e.to_string())
+}
+
+// ===== Session Tracking Commands =====
+
+/// Start a new tracking session
+#[tauri::command]
+async fn start_tracking_session(
+    state: tauri::State<'_, TauriState>,
+    label: Option<String>,
+) -> Result<i64, String> {
+    // Get baseline
+    let baseline_watts = {
+        let config = state.config.lock().await;
+        if config.advanced.baseline_auto {
+            let detector = state.baseline_detector.lock().await;
+            detector.get_baseline().unwrap_or(0.0)
+        } else {
+            config.advanced.baseline_watts
+        }
+    };
+
+    // Create session in database
+    let session_id = {
+        let db = state.db.lock().await;
+        db.start_session(baseline_watts, label.as_deref())
+            .map_err(|e| e.to_string())?
+    };
+
+    // Set active session
+    {
+        let mut active = state.active_session.lock().await;
+        *active = Some(SessionState {
+            id: session_id,
+            baseline_watts,
+            total_wh: 0.0,
+            surplus_wh: 0.0,
+            start_time: std::time::Instant::now(),
+        });
+    }
+
+    Ok(session_id)
+}
+
+/// End the current tracking session
+#[tauri::command]
+async fn end_tracking_session(state: tauri::State<'_, TauriState>) -> Result<Option<Session>, String> {
+    let session_state = {
+        let mut active = state.active_session.lock().await;
+        active.take()
+    };
+
+    match session_state {
+        Some(session) => {
+            // Calculate final surplus cost
+            let surplus_cost = {
+                let pricing = state.pricing.lock().await;
+                pricing.calculate_cost(session.surplus_wh / 1000.0)
+            };
+
+            // End session in database
+            let db = state.db.lock().await;
+            db.end_session(session.id, session.total_wh, session.surplus_wh, surplus_cost)
+                .map_err(|e| e.to_string())
+        }
+        None => Ok(None),
+    }
+}
+
+/// Get current session statistics
+#[tauri::command]
+async fn get_session_stats(state: tauri::State<'_, TauriState>) -> Result<Option<Session>, String> {
+    let active = state.active_session.lock().await;
+
+    match active.as_ref() {
+        Some(session) => {
+            let pricing = state.pricing.lock().await;
+            let surplus_cost = pricing.calculate_cost(session.surplus_wh / 1000.0);
+
+            Ok(Some(Session {
+                id: Some(session.id),
+                start_time: chrono::Utc::now().timestamp() - session.start_time.elapsed().as_secs() as i64,
+                end_time: None,
+                baseline_watts: session.baseline_watts,
+                total_wh: session.total_wh,
+                surplus_wh: session.surplus_wh,
+                surplus_cost,
+                label: None, // Would need to fetch from DB for label
+            }))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Get session history
+#[tauri::command]
+async fn get_sessions(state: tauri::State<'_, TauriState>, limit: Option<u32>) -> Result<Vec<Session>, String> {
+    let db = state.db.lock().await;
+    db.get_sessions(limit).map_err(|e| e.to_string())
+}
+
+// ===== Baseline Detection Commands =====
+
+/// Detect baseline power consumption
+#[tauri::command]
+async fn detect_baseline(state: tauri::State<'_, TauriState>) -> Result<Option<BaselineDetection>, String> {
+    let mut detector = state.baseline_detector.lock().await;
+    Ok(detector.detect_baseline())
+}
+
+/// Set manual baseline
+#[tauri::command]
+async fn set_manual_baseline(state: tauri::State<'_, TauriState>, watts: f64) -> Result<(), String> {
+    // Update detector
+    {
+        let mut detector = state.baseline_detector.lock().await;
+        detector.set_manual_baseline(watts);
+    }
+
+    // Update config
+    {
+        let mut config = state.config.lock().await;
+        config.advanced.baseline_watts = watts;
+        config.advanced.baseline_auto = false;
+        config.save().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Enable auto baseline detection
+#[tauri::command]
+async fn enable_auto_baseline(state: tauri::State<'_, TauriState>) -> Result<(), String> {
+    // Clear manual baseline
+    {
+        let mut detector = state.baseline_detector.lock().await;
+        detector.clear_manual_baseline();
+    }
+
+    // Update config
+    {
+        let mut config = state.config.lock().await;
+        config.advanced.baseline_auto = true;
+        config.save().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Get dashboard config for UI
+#[tauri::command]
+async fn get_dashboard_config(state: tauri::State<'_, TauriState>) -> Result<crate::core::DashboardConfig, String> {
+    let config = state.config.lock().await;
+    Ok(config.dashboard.clone())
+}
+
+/// Save dashboard config
+#[tauri::command]
+async fn save_dashboard_config(
+    state: tauri::State<'_, TauriState>,
+    dashboard: crate::core::DashboardConfig,
+) -> Result<(), String> {
+    let mut config = state.config.lock().await;
+    config.dashboard = dashboard;
+    config.save().map_err(|e| e.to_string())
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -252,6 +444,12 @@ fn main() {
     // Create application state
     let app_state = AppState::new();
 
+    // Initialize baseline detector with config
+    let mut baseline_detector = BaselineDetector::new();
+    if !config.advanced.baseline_auto && config.advanced.baseline_watts > 0.0 {
+        baseline_detector.set_manual_baseline(config.advanced.baseline_watts);
+    }
+
     // Wrap in Arc<Mutex> for thread-safe sharing
     let state = TauriState {
         config: Arc::new(Mutex::new(config)),
@@ -260,6 +458,8 @@ fn main() {
         pricing: Arc::new(Mutex::new(pricing)),
         i18n: Arc::new(Mutex::new(i18n)),
         app_state: Arc::new(Mutex::new(app_state)),
+        baseline_detector: Arc::new(Mutex::new(baseline_detector)),
+        active_session: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -280,6 +480,21 @@ fn main() {
             open_widget,
             close_widget,
             toggle_widget,
+            // New system metrics commands
+            get_system_metrics,
+            get_top_processes,
+            // Session tracking commands
+            start_tracking_session,
+            end_tracking_session,
+            get_session_stats,
+            get_sessions,
+            // Baseline detection commands
+            detect_baseline,
+            set_manual_baseline,
+            enable_auto_baseline,
+            // Dashboard config commands
+            get_dashboard_config,
+            save_dashboard_config,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -342,10 +557,31 @@ async fn monitoring_loop(app: tauri::AppHandle) {
         {
             let mut app_state = state.app_state.lock().await;
             app_state.cumulative_wh += energy_wh;
+            app_state.last_power_watts = power_watts;
 
             // Update cost
             let pricing = state.pricing.lock().await;
             app_state.current_cost = pricing.calculate_cost(app_state.cumulative_wh / 1000.0);
+        }
+
+        // Update baseline detector with new sample
+        {
+            let mut detector = state.baseline_detector.lock().await;
+            detector.add_sample(power_watts);
+        }
+
+        // Update active session if one exists
+        {
+            let mut active = state.active_session.lock().await;
+
+            if let Some(ref mut session) = *active {
+                session.total_wh += energy_wh;
+
+                // Calculate surplus (power above baseline)
+                let surplus_watts = (power_watts - session.baseline_watts).max(0.0);
+                let surplus_energy = surplus_watts * elapsed_hours;
+                session.surplus_wh += surplus_energy;
+            }
         }
 
         // Store reading in database (every 10 readings to reduce writes)

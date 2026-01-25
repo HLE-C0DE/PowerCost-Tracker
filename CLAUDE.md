@@ -1,176 +1,147 @@
-# CLAUDE.md - Contexte du projet PowerCost Tracker
+# CLAUDE.md
 
-## Apercu du projet
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-PowerCost Tracker est une application desktop cross-platform (Windows/Linux) pour mesurer la consommation electrique du PC en temps reel et calculer le cout selon des tarifs personnalises.
+## Project Overview
 
-**Stack technique**:
-- **Backend**: Rust + Tauri v2
-- **Frontend**: Vanilla JS/CSS (pas de framework)
-- **Database**: SQLite (rusqlite)
-- **Config**: TOML
+PowerCost Tracker is a lightweight cross-platform desktop application (Windows/Linux) for monitoring PC power consumption in real-time and calculating electricity costs based on customizable pricing plans.
 
-## Structure du projet
+**Tech Stack**: Rust + Tauri v2 backend, Vanilla JS/CSS frontend, SQLite database, TOML configuration
 
-```
-PowerCost-Tracker/
-├── src-tauri/                  # Backend Rust
-│   ├── src/
-│   │   ├── main.rs             # Point d'entree Tauri, commandes IPC
-│   │   ├── lib.rs              # Export des modules
-│   │   ├── core/               # Types, config, erreurs
-│   │   │   ├── mod.rs
-│   │   │   ├── config.rs       # Gestion config TOML
-│   │   │   ├── error.rs        # Types d'erreurs
-│   │   │   └── types.rs        # PowerReading, DashboardData, AppState
-│   │   ├── hardware/           # Monitoring puissance
-│   │   │   ├── mod.rs          # Trait PowerSource, PowerMonitor
-│   │   │   ├── linux.rs        # RAPL, hwmon, battery
-│   │   │   ├── windows.rs      # WMI (estimation)
-│   │   │   └── estimator.rs    # Fallback estimation TDP
-│   │   ├── pricing/            # Calcul des couts
-│   │   │   └── mod.rs          # PricingEngine (simple, HP/HC, seasonal, tempo)
-│   │   ├── db/                 # Persistence SQLite
-│   │   │   └── mod.rs          # Database, DailyStats, PowerReadingRecord
-│   │   └── i18n/               # Internationalisation
-│   │       ├── mod.rs
-│   │       ├── en.rs
-│   │       └── fr.rs
-│   ├── Cargo.toml              # Dependances Rust
-│   ├── tauri.conf.json
-│   └── build.rs
-├── ui/                         # Frontend
-│   ├── src/
-│   │   ├── main.js
-│   │   └── styles/main.css
-│   ├── index.html
-│   └── package.json
-├── config/
-│   └── example.config.toml
-├── scripts/                    # Scripts de build/setup
-├── assets/                     # Icones, images
-├── ARCHITECTURE.md             # Documentation technique detaillee
-├── TODO.md                     # Suivi des phases
-├── README.md / README.fr.md
-└── LICENSE
-```
-
-## Dependances principales (Cargo.toml)
-
-- `tauri` v2 avec `tray-icon`
-- `rusqlite` v0.31 (bundled)
-- `serde`, `serde_json`, `toml`
-- `chrono` pour les timestamps
-- `tokio` pour l'async (monitoring loop)
-- `sysinfo` pour detection CPU/load
-- `windows` crate (Windows uniquement) pour WMI
-
-## Commandes Tauri exposees au frontend
-
-- `get_power_watts()` - Puissance instantanee
-- `get_power_reading()` - Lecture complete avec metadonnees
-- `get_energy_wh()` - Energie cumulee session
-- `get_current_cost()` - Cout session
-- `get_dashboard_data()` - Toutes les donnees dashboard
-- `get_config()` / `set_config()` - Configuration
-- `translate()` / `get_translations()` - i18n
-- `get_history()` / `get_readings()` - Historique
-
-## Sources de monitoring puissance
-
-| OS | Source | Fichier | Precision |
-|----|--------|---------|-----------|
-| Linux | Intel RAPL | `/sys/class/powercap/intel-rapl` | Haute |
-| Linux | hwmon | `/sys/class/hwmon/*/power*_input` | Haute |
-| Linux | Battery | `/sys/class/power_supply/BAT*/power_now` | Moyenne |
-| Windows | WMI + sysinfo | N/A | Basse (estimation) |
-| Fallback | TDP estimation | N/A | Basse |
-
-## Progression des phases
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 1 | COMPLETE | Setup & Architecture |
-| Phase 2 | COMPLETE | Core Engine |
-| Phase 3 | En attente | Interface utilisateur |
-| Phase 4 | En attente | Cross-platform |
-| Phase 5 | En attente | Bonus features |
-
-## Phase 2: Core Engine (COMPLETE)
-
-### Objectifs
-1. **Recuperation consommation** - Priorite Windows (WMI/estimation)
-2. **Systeme de calcul de cout** - Deja implemente dans `pricing/mod.rs`
-3. **Persistence SQLite** - Schema en place dans `db/mod.rs`
-4. **CHECKPOINT**: Demo CLI fonctionnelle
-
-### Etat actuel (Phase 2 Complete)
-
-**Windows (`windows.rs`)** - COMPLETE:
-- WmiMonitor avec vrais appels WMI (COM + IWbemLocator)
-- Queries Win32_Battery (laptops) et Win32_Processor
-- Support GPU NVIDIA via `nvidia-smi --query-gpu=power.draw`
-- Support GPU AMD via `rocm-smi` ou `amd-smi`
-- Fallback `sysinfo` si WMI echoue
-- Combinaison CPU + GPU pour puissance totale
-
-**Linux (`linux.rs`)** - COMPLETE:
-- RaplMonitor: Lit `/sys/class/powercap/intel-rapl` avec gestion wraparound
-- HwmonMonitor: Lit `/sys/class/hwmon/*/power*_input`
-- BatteryMonitor: Lit `/sys/class/power_supply/BAT*`
-
-**Estimator (`estimator.rs`)** - COMPLETE:
-- Detection automatique CPU via sysinfo (nom, coeurs)
-- Table TDP complete: Intel (desktop/laptop), AMD (desktop/laptop), Apple Silicon
-- Formule power = idle + load_factor * (max - idle)
-- Prise en compte des coeurs actifs
-
-**Pricing (`pricing/mod.rs`)** - COMPLETE:
-- Simple (flat rate) avec tests
-- Peak/Offpeak (HP/HC) avec gestion overnight
-- Seasonal (ete/hiver)
-- Tempo (EDF) avec couleurs de jour
-
-**Database (`db/mod.rs`)** - COMPLETE:
-- Schema: `power_readings`, `daily_stats`, `sessions`
-- CRUD operations implementees
-- Tests unitaires (2 tests passes)
-
-**Demo CLI (`bin/demo.rs`)** - COMPLETE:
-- `cargo run --bin powercost-demo`
-- Affiche puissance, energie, cout en temps reel
-- Persiste dans SQLite
-
-## Commandes de build
+## Build Commands
 
 ```bash
-# Dev
-cd src-tauri && cargo build
-
-# Dev avec Tauri
+# Development (Tauri + hot reload)
 cargo tauri dev
 
-# Production
+# Build Rust backend only
+cd src-tauri && cargo build
+
+# Production build (creates installers)
 cargo tauri build
 
-# Tests
+# Run tests
 cd src-tauri && cargo test
+
+# Run CLI demo (no UI)
+cd src-tauri && cargo run --bin powercost-demo
+
+# Install frontend dependencies (required once)
+cd ui && npm install
 ```
 
-## Notes importantes
+## Architecture
 
-### Ce qu'on evite
-- Frameworks JS lourds
-- Dependencies inutiles
-- App qui consomme plus qu'elle mesure
+### Backend Modules (`src-tauri/src/`)
 
-### Ce qu'on vise
-- < 50 MB RAM (cible: 30-40 MB)
-- < 1% CPU en idle
-- Interface bilingue FR/EN
+- **`main.rs`**: Tauri entry point, defines `TauriState` (shared app state), IPC commands, and the background `monitoring_loop` that periodically reads power and emits events
+- **`core/`**: Configuration (`Config` struct, TOML load/save), error types, shared types (`PowerReading`, `DashboardData`, `AppState`, `SystemMetrics`, `Session`)
+- **`hardware/`**: Power monitoring abstraction
+  - `PowerSource` trait for platform-specific implementations
+  - `linux.rs`: RAPL (`/sys/class/powercap`), hwmon, battery sources
+  - `windows.rs`: WMI queries + GPU support (nvidia-smi, rocm-smi), system metrics (CPU/GPU/RAM), top processes
+  - `estimator.rs`: TDP-based fallback with CPU detection
+  - `baseline.rs`: Baseline power detection for surplus tracking
+- **`pricing/`**: Cost calculation engine supporting 4 modes: simple (flat rate), peak/offpeak (HP/HC), seasonal, and tempo (EDF-style)
+- **`db/`**: SQLite persistence with tables `power_readings`, `daily_stats`, `sessions`
+- **`i18n/`**: Bilingual support (FR/EN) with translation strings in `en.rs`/`fr.rs`
 
-### Gestion permissions Linux
-RAPL necessite `CAP_SYS_RAWIO` ou root. Scripts dans `scripts/` pour setup.
+### Frontend (`ui/`)
 
-### Windows specifique
-Pas d'acces direct aux capteurs de puissance sans outils tiers (LibreHardwareMonitor, HWiNFO). L'estimation basee sur le load CPU est utilisee par defaut.
+- **`index.html`**: Main app with Dashboard, History, Settings views
+- **`src/main.js`**: Vanilla JS with reactive store pattern, communicates with backend via Tauri IPC (`invoke()`)
+- **`src/styles/main.css`**: Dark/light theme support
+
+### Data Flow
+
+1. `monitoring_loop` (async background task) reads power via `PowerMonitor` at configurable intervals
+2. Updates `AppState` with cumulative energy and cost
+3. Emits `power-update` event to frontend
+4. Stores readings in SQLite every 10 cycles
+
+### Tauri Commands (IPC API)
+
+| Command | Returns | Purpose |
+|---------|---------|---------|
+| `get_dashboard_data()` | `DashboardData` | All dashboard metrics in one call |
+| `get_power_watts()` | `f64` | Instantaneous power |
+| `get_config()` / `set_config()` | `Config` | Read/write TOML config |
+| `get_translations()` | `HashMap` | All i18n strings |
+| `get_history()` / `get_readings()` | Stats/Records | Historical data |
+| `toggle_widget()` | `bool` | Show/hide floating widget |
+| `get_system_metrics()` | `SystemMetrics` | CPU, GPU, RAM metrics |
+| `get_top_processes()` | `Vec<ProcessMetrics>` | Top N processes by CPU |
+| `start_tracking_session()` | `i64` | Start a surplus tracking session |
+| `end_tracking_session()` | `Session` | End session with stats |
+| `get_session_stats()` | `Session` | Current session data |
+| `detect_baseline()` | `BaselineDetection` | Auto-detect idle power |
+| `get_dashboard_config()` / `save_dashboard_config()` | `DashboardConfig` | Widget layout config |
+
+## Power Monitoring Sources
+
+| Platform | Source | Location | Accuracy |
+|----------|--------|----------|----------|
+| Linux | Intel RAPL | `/sys/class/powercap/intel-rapl` | High |
+| Linux | hwmon | `/sys/class/hwmon/*/power*_input` | High |
+| Linux | Battery | `/sys/class/power_supply/BAT*/power_now` | Medium |
+| Windows | WMI + sysinfo | COM/WMI APIs | Low (estimation) |
+| Windows | NVIDIA GPU | `nvidia-smi` | High |
+| Windows | AMD GPU | `rocm-smi` / `amd-smi` | High |
+| Fallback | TDP estimation | CPU detection via sysinfo | Low |
+
+## Configuration
+
+Files stored at:
+- Linux: `~/.config/powercost-tracker/config.toml`
+- Windows: `%APPDATA%/PowerCost-Tracker/config.toml`
+
+## Development Notes
+
+### Performance Targets
+- < 50 MB RAM (target: 30-40 MB)
+- < 1% CPU idle
+- No heavy JS frameworks
+
+### Linux Permissions
+RAPL requires elevated access. Solutions:
+- `sudo setcap cap_sys_rawio+ep /path/to/binary`
+- udev rule for `/sys/class/powercap/`
+
+### Windows Limitations
+No direct power sensor API; relies on WMI estimation + external GPU tools when available.
+
+## Project Phase Status
+
+| Phase | Status |
+|-------|--------|
+| Phase 1: Setup & Architecture | Complete |
+| Phase 2: Core Engine | Complete |
+| Phase 3: User Interface | Complete |
+| Phase 4: Cross-platform packaging | Pending |
+| Phase 5: Bonus features | Complete |
+
+## New Features (Major Improvements)
+
+### Enhanced Hardware Monitoring
+- Real-time CPU metrics (usage, frequency, temperature via WMI)
+- GPU metrics (usage, power, temp, VRAM) for NVIDIA and AMD
+- RAM usage monitoring
+- Top 10 processes by CPU usage
+
+### Baseline/Surplus Tracking
+- Auto-detect idle power baseline (5th percentile method)
+- Manual baseline setting
+- Session-based surplus calculation
+- Surplus energy and cost tracking
+
+### Customizable Dashboard
+- Drag-and-drop widget reordering
+- Widget visibility toggles
+- Resizable widgets (small/medium/large)
+- Persistent layout configuration
+
+### Customizable Floating Widget
+- Configurable display items (power, cost, CPU, GPU, RAM, temp)
+- Multiple size options (compact/normal/large)
+- Theme selection (default/minimal/detailed)
+- Opacity control

@@ -16,6 +16,8 @@ pub struct Config {
     pub widget: WidgetConfig,
     #[serde(default)]
     pub advanced: AdvancedConfig,
+    #[serde(default)]
+    pub dashboard: DashboardConfig,
 }
 
 impl Default for Config {
@@ -25,6 +27,7 @@ impl Default for Config {
             pricing: PricingConfig::default(),
             widget: WidgetConfig::default(),
             advanced: AdvancedConfig::default(),
+            dashboard: DashboardConfig::default(),
         }
     }
 }
@@ -284,17 +287,29 @@ pub struct WidgetConfig {
     /// Show cost (true) or consumption only (false)
     #[serde(default = "default_true")]
     pub show_cost: bool,
-    /// Position: "top_left", "top_right", "bottom_left", "bottom_right"
+    /// Position: "top_left", "top_right", "bottom_left", "bottom_right", or "custom"
     #[serde(default = "default_position")]
     pub position: String,
     /// Widget opacity (0.0 - 1.0)
     #[serde(default = "default_opacity")]
     pub opacity: f64,
+    /// Items to display in widget: "power", "cost", "cpu", "gpu", "ram", "temp"
+    #[serde(default = "default_display_items")]
+    pub display_items: Vec<String>,
+    /// Widget size: "compact", "normal", "large"
+    #[serde(default = "default_widget_size")]
+    pub size: String,
+    /// Widget theme: "default", "minimal", "detailed"
+    #[serde(default = "default_widget_theme")]
+    pub theme: String,
 }
 
 fn default_true() -> bool { true }
 fn default_position() -> String { "bottom_right".to_string() }
 fn default_opacity() -> f64 { 0.9 }
+fn default_display_items() -> Vec<String> { vec!["power".to_string(), "cost".to_string()] }
+fn default_widget_size() -> String { "normal".to_string() }
+fn default_widget_theme() -> String { "default".to_string() }
 
 impl Default for WidgetConfig {
     fn default() -> Self {
@@ -303,6 +318,9 @@ impl Default for WidgetConfig {
             show_cost: true,
             position: default_position(),
             opacity: default_opacity(),
+            display_items: default_display_items(),
+            size: default_widget_size(),
+            theme: default_widget_theme(),
         }
     }
 }
@@ -331,4 +349,55 @@ impl Default for AdvancedConfig {
             active_profile: default_profile(),
         }
     }
+}
+
+/// Dashboard layout configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardConfig {
+    /// Layout type: "default" or "custom"
+    #[serde(default = "default_layout")]
+    pub layout: String,
+    /// Widget configurations
+    #[serde(default = "default_dashboard_widgets")]
+    pub widgets: Vec<DashboardWidget>,
+}
+
+fn default_layout() -> String { "default".to_string() }
+
+fn default_dashboard_widgets() -> Vec<DashboardWidget> {
+    vec![
+        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0 },
+        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1 },
+        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2 },
+        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3 },
+        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4 },
+        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5 },
+        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6 },
+        DashboardWidget { id: "cpu".to_string(), visible: true, size: "medium".to_string(), position: 7 },
+        DashboardWidget { id: "gpu".to_string(), visible: true, size: "medium".to_string(), position: 8 },
+        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9 },
+        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 10 },
+    ]
+}
+
+impl Default for DashboardConfig {
+    fn default() -> Self {
+        Self {
+            layout: default_layout(),
+            widgets: default_dashboard_widgets(),
+        }
+    }
+}
+
+/// Individual dashboard widget configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardWidget {
+    /// Widget identifier
+    pub id: String,
+    /// Whether widget is visible
+    pub visible: bool,
+    /// Widget size: "small" (1x1), "medium" (2x1), "large" (2x2)
+    pub size: String,
+    /// Position in the grid (lower = earlier)
+    pub position: u32,
 }

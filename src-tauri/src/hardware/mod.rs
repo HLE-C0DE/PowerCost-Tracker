@@ -10,8 +10,11 @@ mod linux;
 #[cfg(target_os = "windows")]
 mod windows;
 mod estimator;
+pub mod baseline;
 
-use crate::core::{Error, PowerReading, Result};
+pub use baseline::BaselineDetector;
+
+use crate::core::{Error, PowerReading, ProcessMetrics, Result, SystemMetrics};
 
 /// Power monitor that abstracts over different hardware sources
 pub struct PowerMonitor {
@@ -91,6 +94,37 @@ impl PowerMonitor {
     /// Check if readings are estimated (not real measurements)
     pub fn is_estimated(&self) -> bool {
         self.source.is_estimated()
+    }
+
+    /// Get system metrics (CPU, GPU, RAM)
+    #[cfg(target_os = "windows")]
+    pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
+        // Downcast to WmiMonitor to access system metrics
+        // For now, we'll create a new instance for the call
+        // TODO: Improve this with trait method or stored reference
+        let monitor = windows::WmiMonitor::new()?;
+        monitor.get_system_metrics()
+    }
+
+    /// Get system metrics (Linux stub)
+    #[cfg(target_os = "linux")]
+    pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
+        // TODO: Implement Linux system metrics
+        Err(Error::HardwareNotSupported("System metrics not yet implemented for Linux".to_string()))
+    }
+
+    /// Get top processes by CPU usage
+    #[cfg(target_os = "windows")]
+    pub fn get_top_processes(&self, limit: usize) -> Result<Vec<ProcessMetrics>> {
+        let monitor = windows::WmiMonitor::new()?;
+        monitor.get_top_processes(limit)
+    }
+
+    /// Get top processes (Linux stub)
+    #[cfg(target_os = "linux")]
+    pub fn get_top_processes(&self, _limit: usize) -> Result<Vec<ProcessMetrics>> {
+        // TODO: Implement Linux process metrics
+        Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
     }
 }
 
