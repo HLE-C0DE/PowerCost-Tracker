@@ -411,7 +411,7 @@ const state = {
     draggedWidgetId: null,
     dragOffset: { x: 0, y: 0 },
     gridCols: 6,
-    cellHeight: 80,  // Match CSS grid-auto-rows: minmax(80px, auto)
+    cellHeight: 100,  // Match CSS grid-auto-rows: 100px
     gridGap: 16,     // Match CSS gap: var(--spacing-md) = 1rem = 16px
     resizing: false,
     resizeWidgetId: null,
@@ -1113,7 +1113,7 @@ function getActualGridCols() {
     return 6;
 }
 
-// Calculate cell dimensions accounting for CSS grid gaps
+// Calculate cell dimensions accounting for CSS grid gaps and scroll position
 function getGridCellDimensions(grid) {
     const gridRect = grid.getBoundingClientRect();
     const cols = getActualGridCols();
@@ -1124,7 +1124,12 @@ function getGridCellDimensions(grid) {
     const cellWidth = (gridRect.width - gap * (cols - 1)) / cols;
     const cellHeight = state.cellHeight;
 
-    return { cellWidth, cellHeight, cols, gap, gridRect };
+    // Get scroll offset from the main content area
+    const mainContent = document.querySelector('.main-content') || document.documentElement;
+    const scrollTop = mainContent.scrollTop || 0;
+    const scrollLeft = mainContent.scrollLeft || 0;
+
+    return { cellWidth, cellHeight, cols, gap, gridRect, scrollTop, scrollLeft };
 }
 
 function handleWidgetMouseDown(e) {
@@ -1137,6 +1142,9 @@ function handleWidgetMouseDown(e) {
     state.draggedWidget = card;
     state.draggedWidgetId = card.dataset.widgetId;
     card.classList.add('dragging');
+
+    // Save original position for swap functionality
+    saveDragOriginalPosition(state.draggedWidgetId);
 
     // Calculate offset from card top-left
     const rect = card.getBoundingClientRect();
@@ -1163,11 +1171,11 @@ function handleGlobalMouseMove(e) {
     if (!state.draggedWidget || !state.isEditMode) return;
 
     const grid = document.getElementById('dashboard-grid');
-    const { cellWidth, cellHeight, cols, gap, gridRect } = getGridCellDimensions(grid);
+    const { cellWidth, cellHeight, cols, gap, gridRect, scrollTop, scrollLeft } = getGridCellDimensions(grid);
 
-    // Calculate relative position from grid top-left, accounting for where user clicked on the widget
-    const relX = e.clientX - gridRect.left - state.dragOffset.x;
-    const relY = e.clientY - gridRect.top - state.dragOffset.y;
+    // Calculate relative position from grid top-left, accounting for scroll and click offset
+    const relX = e.clientX - gridRect.left + scrollLeft - state.dragOffset.x;
+    const relY = e.clientY - gridRect.top + scrollTop - state.dragOffset.y;
 
     // Convert pixel position to grid column/row (1-indexed)
     // Each cell occupies (cellWidth + gap) except the last column
@@ -1199,11 +1207,11 @@ function handleGlobalMouseUp(e) {
     if (!state.draggedWidget || !state.isEditMode) return;
 
     const grid = document.getElementById('dashboard-grid');
-    const { cellWidth, cellHeight, cols, gap, gridRect } = getGridCellDimensions(grid);
+    const { cellWidth, cellHeight, cols, gap, gridRect, scrollTop, scrollLeft } = getGridCellDimensions(grid);
 
-    // Calculate final position
-    const relX = e.clientX - gridRect.left - state.dragOffset.x;
-    const relY = e.clientY - gridRect.top - state.dragOffset.y;
+    // Calculate final position, accounting for scroll
+    const relX = e.clientX - gridRect.left + scrollLeft - state.dragOffset.x;
+    const relY = e.clientY - gridRect.top + scrollTop - state.dragOffset.y;
 
     // Convert pixel position to grid column/row (1-indexed)
     const cellWithGap = cellWidth + gap;
@@ -1217,7 +1225,7 @@ function handleGlobalMouseUp(e) {
         widget.col = Math.min(targetCol, cols - colSpan + 1);
         widget.row = Math.max(1, targetRow);
 
-        // Resolve collisions
+        // Resolve collisions (swaps positions instead of pushing down)
         resolveCollisions(widget);
     }
 
@@ -1252,30 +1260,108 @@ function updateDropPreview(col, row, colSpan, rowSpan) {
 }
 
 // ===== Collision Detection =====
+// Store original position before drag for swapping
+let dragOriginalPosition = null;
+
+function saveDragOriginalPosition(widgetId) {
+    const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
+    if (widget) {
+        dragOriginalPosition = {
+            id: widgetId,
+            col: widget.col || 1,
+            row: widget.row || 1
+        };
+    }
+}
+
 function resolveCollisions(movedWidget) {
     const widgets = state.dashboardConfig.widgets.filter(w => w.visible && w.id !== movedWidget.id);
 
+    // Find overlapping widget and SWAP positions instead of pushing down
     for (const widget of widgets) {
         if (widgetsOverlap(movedWidget, widget)) {
-            // Push widget down
-            widget.row = movedWidget.row + (movedWidget.row_span || 1);
+            // Swap: move the overlapped widget to where the dragged widget came from
+            if (dragOriginalPosition) {
+                widget.col = dragOriginalPosition.col;
+                widget.row = dragOriginalPosition.row;
+            } else {
+                // Fallback: find first empty spot
+                const emptySpot = findEmptySpot(widget, movedWidget);
+                widget.col = emptySpot.col;
+                widget.row = emptySpot.row;
+            }
         }
     }
 
-    // Recursively resolve any new collisions
-    let hasCollision = true;
-    let iterations = 0;
-    while (hasCollision && iterations < 20) {
-        hasCollision = false;
-        for (let i = 0; i < widgets.length; i++) {
-            for (let j = i + 1; j < widgets.length; j++) {
-                if (widgetsOverlap(widgets[i], widgets[j])) {
-                    widgets[j].row = widgets[i].row + (widgets[i].row_span || 1);
-                    hasCollision = true;
+    // Clear original position after swap
+    dragOriginalPosition = null;
+
+    // Final pass: resolve any remaining collisions by compacting
+    compactGrid();
+}
+
+// Find an empty spot for a widget, avoiding the excluded widget
+function findEmptySpot(widget, excludeWidget) {
+    const cols = getActualGridCols();
+    const colSpan = widget.col_span || 1;
+    const rowSpan = widget.row_span || 1;
+    const allWidgets = state.dashboardConfig.widgets.filter(w => w.visible && w.id !== widget.id && w.id !== excludeWidget.id);
+
+    // Try each position starting from top-left
+    for (let row = 1; row <= 20; row++) {
+        for (let col = 1; col <= cols - colSpan + 1; col++) {
+            const testWidget = { col, row, col_span: colSpan, row_span: rowSpan };
+            let hasOverlap = false;
+
+            // Check against moved widget
+            if (widgetsOverlap(testWidget, excludeWidget)) {
+                hasOverlap = true;
+            }
+
+            // Check against all other widgets
+            for (const other of allWidgets) {
+                if (widgetsOverlap(testWidget, other)) {
+                    hasOverlap = true;
+                    break;
                 }
             }
+
+            if (!hasOverlap) {
+                return { col, row };
+            }
         }
-        iterations++;
+    }
+
+    // Fallback: just put it at the bottom
+    return { col: 1, row: 20 };
+}
+
+// Compact the grid by moving widgets up to fill gaps
+function compactGrid() {
+    const widgets = state.dashboardConfig.widgets
+        .filter(w => w.visible)
+        .sort((a, b) => (a.row || 1) - (b.row || 1) || (a.col || 1) - (b.col || 1));
+
+    for (const widget of widgets) {
+        // Try to move this widget up as far as possible
+        let targetRow = 1;
+        while (targetRow < (widget.row || 1)) {
+            const testWidget = { ...widget, row: targetRow };
+            let canMove = true;
+
+            for (const other of widgets) {
+                if (other.id !== widget.id && widgetsOverlap(testWidget, other)) {
+                    canMove = false;
+                    break;
+                }
+            }
+
+            if (canMove) {
+                widget.row = targetRow;
+                break;
+            }
+            targetRow++;
+        }
     }
 }
 
