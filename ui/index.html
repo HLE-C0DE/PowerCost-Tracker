@@ -65,9 +65,9 @@
                     <div class="header-controls">
                         <!-- Stream A: Global Display Toggle -->
                         <div class="global-display-toggle" id="global-display-toggle" title="Display Mode">
-                            <button class="global-display-btn active" data-mode="normal">Normal</button>
-                            <button class="global-display-btn" data-mode="minimize">Minimal</button>
-                            <button class="global-display-btn" data-mode="hard">Data</button>
+                            <button class="global-display-btn active" data-mode="normal" data-i18n="dashboard.mode.normal">Normal</button>
+                            <button class="global-display-btn" data-mode="minimize" data-i18n="dashboard.mode.minimal">Minimal</button>
+                            <button class="global-display-btn" data-mode="hard" data-i18n="dashboard.mode.data">Data</button>
                         </div>
                         <div class="status-badge" id="source-badge">
                             <span class="status-dot"></span>
@@ -89,7 +89,7 @@
                             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
-                        Edit Mode
+                        <span data-i18n="dashboard.edit_mode">Edit Mode</span>
                     </span>
                     <div class="edit-toolbar-actions">
                         <button class="btn btn-secondary btn-sm" id="fix-layout-btn" title="Reset widgets to default positions">
@@ -99,23 +99,23 @@
                                 <rect x="3" y="14" width="7" height="7"/>
                                 <rect x="14" y="14" width="7" height="7"/>
                             </svg>
-                            Default Layout
+                            <span data-i18n="dashboard.default_layout">Default Layout</span>
                         </button>
                         <button class="btn btn-secondary btn-sm" id="toggle-visibility-btn">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                             </svg>
-                            Toggle Widgets
+                            <span data-i18n="dashboard.toggle_widgets">Toggle Widgets</span>
                         </button>
-                        <button class="btn btn-primary btn-sm" id="exit-edit-mode-btn">Done</button>
+                        <button class="btn btn-primary btn-sm" id="exit-edit-mode-btn" data-i18n="dashboard.done">Done</button>
                     </div>
                 </div>
 
                 <!-- Visibility Panel -->
                 <div class="visibility-panel hidden" id="visibility-panel">
                     <div class="visibility-panel-header">
-                        <h3>Toggle Widget Visibility</h3>
+                        <h3 data-i18n="dashboard.toggle_visibility">Toggle Widget Visibility</h3>
                         <button class="btn btn-icon btn-sm" id="close-visibility-panel">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -136,7 +136,7 @@
                 <!-- Session Control Bar (Legacy - hidden, use Session Controls widget instead) -->
                 <div class="session-bar hidden" id="session-bar">
                     <div class="session-info">
-                        <span class="session-label" id="session-label">No active session</span>
+                        <span class="session-label" id="session-label" data-i18n="session.no_active">No active session</span>
                         <span class="session-duration" id="session-duration-display">--:--:--</span>
                     </div>
                     <div class="session-controls">
@@ -144,14 +144,14 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
-                            Start Session
+                            <span data-i18n="session.start">Start Session</span>
                         </button>
                         <button class="btn btn-secondary hidden" id="end-session-btn">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <rect x="6" y="4" width="4" height="16"/>
                                 <rect x="14" y="4" width="4" height="16"/>
                             </svg>
-                            End Session
+                            <span data-i18n="session.end">End Session</span>
                         </button>
                     </div>
                 </div>
@@ -172,8 +172,8 @@
                 <header class="view-header">
                     <h1 data-i18n="nav.history">History</h1>
                     <div class="view-tabs">
-                        <button class="tab-btn active" data-tab="power-history">Power</button>
-                        <button class="tab-btn" data-tab="session-history">Sessions</button>
+                        <button class="tab-btn active" data-tab="power-history" data-i18n="history.tab.power">Power</button>
+                        <button class="tab-btn" data-tab="session-history" data-i18n="history.tab.sessions">Sessions</button>
                     </div>
                 </header>
 
@@ -226,7 +226,7 @@
                             <circle cx="12" cy="12" r="10"/>
                             <polyline points="12 6 12 12 16 14"/>
                         </svg>
-                        <p>No sessions recorded yet</p>
+                        <p data-i18n="history.no_sessions">No sessions recorded yet</p>
                     </div>
                 </div>
             </section>
@@ -261,7 +261,7 @@
                         </div>
 
                         <div class="setting-row">
-                            <label data-i18n="settings.refresh_rate">Refresh Rate (Critical)</label>
+                            <label data-i18n="settings.refresh_rate_critical">Refresh Rate (Critical)</label>
                             <select id="setting-refresh-rate">
                                 <option value="500">0.5s</option>
                                 <option value="1000">1s</option>
@@ -272,7 +272,7 @@
                         </div>
 
                         <div class="setting-row">
-                            <label>Refresh Rate (Detailed)</label>
+                            <label data-i18n="settings.refresh_rate_detailed">Refresh Rate (Detailed)</label>
                             <select id="setting-slow-refresh-rate">
                                 <option value="3000">3s</option>
                                 <option value="5000">5s</option>
@@ -309,10 +309,10 @@
 
                     <!-- Baseline Settings -->
                     <div class="settings-section">
-                        <h2>Baseline Detection</h2>
+                        <h2 data-i18n="settings.baseline">Baseline Detection</h2>
 
                         <div class="setting-row">
-                            <label>Auto-detect Baseline</label>
+                            <label data-i18n="settings.baseline.auto">Auto-detect Baseline</label>
                             <label class="toggle">
                                 <input type="checkbox" id="setting-baseline-auto" checked>
                                 <span class="toggle-slider"></span>
@@ -320,19 +320,19 @@
                         </div>
 
                         <div class="setting-row" id="manual-baseline-row">
-                            <label>Manual Baseline (W)</label>
+                            <label data-i18n="settings.baseline.manual">Manual Baseline (W)</label>
                             <input type="number" id="setting-baseline-watts" step="0.1" value="0" min="0">
                         </div>
 
                         <div class="setting-row">
-                            <label>Detected Baseline</label>
+                            <label data-i18n="settings.baseline.detected">Detected Baseline</label>
                             <span class="info-text" id="detected-baseline">-- W</span>
                         </div>
 
-                        <button class="btn btn-secondary" id="detect-baseline-btn">Detect Now</button>
+                        <button class="btn btn-secondary" id="detect-baseline-btn" data-i18n="settings.baseline.detect_now">Detect Now</button>
 
                         <div class="setting-row" style="margin-top: var(--spacing-md);">
-                            <label>Process List Limit</label>
+                            <label data-i18n="settings.process_limit">Process List Limit</label>
                             <input type="number" id="setting-process-limit" step="1" value="10" min="5" max="50">
                         </div>
                     </div>
@@ -481,7 +481,7 @@
     <div class="modal hidden" id="process-search-modal">
         <div class="modal-content process-modal-content">
             <div class="modal-header">
-                <h2>All Processes</h2>
+                <h2 data-i18n="processes.all">All Processes</h2>
                 <button class="btn btn-icon modal-close" id="close-process-modal">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
@@ -494,16 +494,16 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                     </svg>
-                    <input type="text" id="process-search-input" placeholder="Search processes..." autocomplete="off">
+                    <input type="text" id="process-search-input" data-i18n-placeholder="processes.search_placeholder" placeholder="Search processes..." autocomplete="off">
                 </div>
                 <div class="process-loading-bar hidden" id="process-loading-bar">
                     <div class="process-loading-progress"></div>
                 </div>
                 <div class="process-modal-header">
-                    <span class="process-modal-col-name">Process</span>
-                    <span class="process-modal-col-cpu">CPU %</span>
-                    <span class="process-modal-col-gpu">GPU %</span>
-                    <span class="process-modal-col-ram">RAM %</span>
+                    <span class="process-modal-col-name" data-i18n="processes.header.name">Process</span>
+                    <span class="process-modal-col-cpu" data-i18n="processes.header.cpu">CPU %</span>
+                    <span class="process-modal-col-gpu" data-i18n="processes.header.gpu">GPU %</span>
+                    <span class="process-modal-col-ram" data-i18n="processes.header.ram">RAM %</span>
                     <span class="process-modal-col-pin"></span>
                 </div>
                 <div class="process-modal-list" id="process-modal-list">
@@ -517,7 +517,7 @@
     <div class="modal hidden" id="edit-dashboard-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Edit Dashboard</h2>
+                <h2 data-i18n="dashboard.edit">Edit Dashboard</h2>
                 <button class="btn btn-icon modal-close" id="close-edit-modal">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
@@ -526,14 +526,14 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p class="modal-info">Toggle widgets visibility and drag to reorder</p>
+                <p class="modal-info" data-i18n="dashboard.edit_hint">Toggle widgets visibility and drag to reorder</p>
                 <div class="widget-list" id="widget-toggle-list">
                     <!-- Widget toggles will be rendered here -->
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="reset-dashboard-btn">Reset to Default</button>
-                <button class="btn btn-primary" id="save-dashboard-btn">Save</button>
+                <button class="btn btn-secondary" id="reset-dashboard-btn" data-i18n="dashboard.reset_default">Reset to Default</button>
+                <button class="btn btn-primary" id="save-dashboard-btn" data-i18n="action.save">Save</button>
             </div>
         </div>
     </div>

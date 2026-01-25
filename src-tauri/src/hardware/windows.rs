@@ -706,7 +706,8 @@ impl WmiMonitor {
 
         let gpu_usage = self.get_gpu_process_usage();
 
-        let processes: Vec<ProcessMetrics> = process_data
+        // First pass: build individual process metrics
+        let raw_processes: Vec<ProcessMetrics> = process_data
             .into_iter()
             .map(|(pid, name, cpu_percent, memory_bytes)| {
                 let is_pinned = pinned_names.iter().any(|p| p.eq_ignore_ascii_case(&name));
@@ -720,6 +721,41 @@ impl WmiMonitor {
                     gpu_percent,
                     is_pinned,
                 }
+            })
+            .collect();
+
+        // Second pass: aggregate processes by name to avoid duplicates
+        let mut aggregated: HashMap<String, ProcessMetrics> = HashMap::new();
+        for proc in raw_processes {
+            let entry = aggregated.entry(proc.name.clone()).or_insert(ProcessMetrics {
+                pid: proc.pid, // Keep first PID encountered
+                name: proc.name.clone(),
+                cpu_percent: 0.0,
+                memory_bytes: 0,
+                memory_percent: 0.0,
+                gpu_percent: None,
+                is_pinned: proc.is_pinned,
+            });
+            entry.cpu_percent += proc.cpu_percent;
+            entry.memory_bytes += proc.memory_bytes;
+            entry.memory_percent += proc.memory_percent;
+            // For GPU, sum up all GPU usage from same-named processes
+            if let Some(gpu) = proc.gpu_percent {
+                entry.gpu_percent = Some(entry.gpu_percent.unwrap_or(0.0) + gpu);
+            }
+            // If any instance is pinned, mark aggregated as pinned
+            if proc.is_pinned {
+                entry.is_pinned = true;
+            }
+        }
+
+        // Clamp aggregated GPU usage to 100% max
+        let processes: Vec<ProcessMetrics> = aggregated.into_values()
+            .map(|mut p| {
+                if let Some(gpu) = p.gpu_percent {
+                    p.gpu_percent = Some(gpu.min(100.0));
+                }
+                p
             })
             .collect();
 
@@ -773,7 +809,8 @@ impl WmiMonitor {
         // Get GPU usage per process (cached)
         let gpu_usage = self.get_gpu_process_usage();
 
-        let mut processes: Vec<ProcessMetrics> = process_data
+        // First pass: build individual process metrics
+        let raw_processes: Vec<ProcessMetrics> = process_data
             .into_iter()
             .map(|(pid, name, cpu_percent, memory_bytes)| {
                 let gpu_percent = gpu_usage.get(&pid).copied();
@@ -786,6 +823,36 @@ impl WmiMonitor {
                     gpu_percent,
                     is_pinned: false,
                 }
+            })
+            .collect();
+
+        // Second pass: aggregate processes by name to avoid duplicates
+        let mut aggregated: HashMap<String, ProcessMetrics> = HashMap::new();
+        for proc in raw_processes {
+            let entry = aggregated.entry(proc.name.clone()).or_insert(ProcessMetrics {
+                pid: proc.pid,
+                name: proc.name.clone(),
+                cpu_percent: 0.0,
+                memory_bytes: 0,
+                memory_percent: 0.0,
+                gpu_percent: None,
+                is_pinned: false,
+            });
+            entry.cpu_percent += proc.cpu_percent;
+            entry.memory_bytes += proc.memory_bytes;
+            entry.memory_percent += proc.memory_percent;
+            if let Some(gpu) = proc.gpu_percent {
+                entry.gpu_percent = Some(entry.gpu_percent.unwrap_or(0.0) + gpu);
+            }
+        }
+
+        // Clamp aggregated GPU usage to 100% max
+        let mut processes: Vec<ProcessMetrics> = aggregated.into_values()
+            .map(|mut p| {
+                if let Some(gpu) = p.gpu_percent {
+                    p.gpu_percent = Some(gpu.min(100.0));
+                }
+                p
             })
             .collect();
 
@@ -1070,9 +1137,11 @@ impl WmiMonitor {
             if parts.len() >= 4 {
                 // pid is at index 1, sm (GPU utilization) is at index 3
                 if let (Ok(pid), Ok(sm)) = (parts[1].parse::<u32>(), parts[3].parse::<f64>()) {
+                    // Clamp GPU usage to 0-100 range (nvidia-smi can report invalid values)
+                    let sm_clamped = sm.clamp(0.0, 100.0);
                     // If we already have this PID, take the max (multi-GPU scenarios)
                     let entry = result.entry(pid).or_insert(0.0);
-                    *entry = entry.max(sm);
+                    *entry = entry.max(sm_clamped);
                 }
             }
         }

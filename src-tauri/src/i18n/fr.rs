@@ -138,5 +138,72 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("time.minutes".into(), "minutes".into());
     t.insert("time.seconds".into(), "secondes".into());
 
+    // Dashboard - Display modes
+    t.insert("dashboard.mode.normal".into(), "Normal".into());
+    t.insert("dashboard.mode.minimal".into(), "Minimal".into());
+    t.insert("dashboard.mode.data".into(), "Données".into());
+
+    // Dashboard - Edit mode
+    t.insert("dashboard.edit_mode".into(), "Mode édition".into());
+    t.insert("dashboard.default_layout".into(), "Disposition par défaut".into());
+    t.insert("dashboard.toggle_widgets".into(), "Afficher/Masquer".into());
+    t.insert("dashboard.done".into(), "Terminé".into());
+    t.insert("dashboard.toggle_visibility".into(), "Visibilité des widgets".into());
+    t.insert("dashboard.edit".into(), "Modifier le tableau de bord".into());
+    t.insert("dashboard.edit_hint".into(), "Activez/désactivez les widgets et glissez pour réorganiser".into());
+    t.insert("dashboard.reset_default".into(), "Réinitialiser".into());
+    t.insert("dashboard.saved".into(), "Tableau de bord enregistré".into());
+    t.insert("dashboard.save_failed".into(), "Échec de l'enregistrement".into());
+    t.insert("dashboard.reset_success".into(), "Tableau de bord réinitialisé".into());
+    t.insert("dashboard.edit_activated".into(), "Mode édition activé".into());
+    t.insert("dashboard.changes_saved".into(), "Modifications enregistrées".into());
+    t.insert("dashboard.default_applied".into(), "Disposition par défaut appliquée".into());
+    t.insert("dashboard.display_mode".into(), "Mode d'affichage".into());
+
+    // Session tracking
+    t.insert("session.no_active".into(), "Aucune session active".into());
+    t.insert("session.start".into(), "Démarrer la session".into());
+    t.insert("session.end".into(), "Terminer la session".into());
+    t.insert("session.started".into(), "Session démarrée".into());
+    t.insert("session.start_failed".into(), "Échec du démarrage de la session".into());
+    t.insert("session.ended".into(), "Session terminée".into());
+    t.insert("session.end_failed".into(), "Échec de la fin de session".into());
+    t.insert("session.surplus".into(), "surplus".into());
+
+    // Process list
+    t.insert("processes.all".into(), "Tous les processus".into());
+    t.insert("processes.search_placeholder".into(), "Rechercher des processus...".into());
+    t.insert("processes.header.name".into(), "Processus".into());
+    t.insert("processes.header.cpu".into(), "CPU %".into());
+    t.insert("processes.header.gpu".into(), "GPU %".into());
+    t.insert("processes.header.ram".into(), "RAM %".into());
+    t.insert("processes.pinned".into(), "Épinglé".into());
+    t.insert("processes.unpinned".into(), "Désépinglé".into());
+    t.insert("processes.pin_failed".into(), "Échec de la mise à jour de l'épingle".into());
+
+    // Settings - Baseline detection
+    t.insert("settings.baseline".into(), "Détection de base".into());
+    t.insert("settings.baseline.auto".into(), "Détection automatique".into());
+    t.insert("settings.baseline.manual".into(), "Consommation de base (W)".into());
+    t.insert("settings.baseline.detected".into(), "Base détectée".into());
+    t.insert("settings.baseline.detect_now".into(), "Détecter maintenant".into());
+    t.insert("settings.baseline.detected_value".into(), "Base détectée".into());
+    t.insert("settings.baseline.not_enough_data".into(), "Pas assez de données pour détecter la base".into());
+    t.insert("settings.baseline.detect_failed".into(), "Échec de la détection".into());
+    t.insert("settings.baseline.set_success".into(), "Base définie à".into());
+    t.insert("settings.baseline.set_failed".into(), "Échec de la définition de la base".into());
+    t.insert("settings.process_limit".into(), "Limite de processus".into());
+    t.insert("settings.refresh_rate_detailed".into(), "Fréquence (Détaillée)".into());
+    t.insert("settings.refresh_rate_critical".into(), "Fréquence (Critique)".into());
+
+    // History - Tabs
+    t.insert("history.tab.power".into(), "Puissance".into());
+    t.insert("history.tab.sessions".into(), "Sessions".into());
+    t.insert("history.no_sessions".into(), "Aucune session enregistrée".into());
+
+    // Tray menu
+    t.insert("tray.show".into(), "Afficher".into());
+    t.insert("tray.exit".into(), "Quitter".into());
+
     t
 }

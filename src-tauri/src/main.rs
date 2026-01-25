@@ -18,6 +18,8 @@ use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tokio::sync::Mutex;
 
 /// Application state shared across all Tauri commands
@@ -616,6 +618,43 @@ fn main() {
                 }
             }
 
+            // Create tray menu
+            let quit_item = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            // Build tray icon with menu
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| {
+                    match event.id().as_ref() {
+                        "quit" => {
+                            log::info!("Quit requested from tray menu");
+                            std::process::exit(0);
+                        }
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                                log::info!("Window shown from tray menu");
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            log::info!("Window shown from tray icon click");
+                        }
+                    }
+                })
+                .build(app)?;
+
             // Start critical monitoring loop (fast rate: power, CPU%, GPU%, cost)
             let app_handle_critical = app_handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -629,6 +668,17 @@ fn main() {
             });
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Only intercept close for main window
+                if window.label() == "main" {
+                    // Hide window instead of closing
+                    let _ = window.hide();
+                    api.prevent_close();
+                    log::info!("Main window hidden to tray");
+                }
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -138,5 +138,72 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("time.minutes".into(), "minutes".into());
     t.insert("time.seconds".into(), "seconds".into());
 
+    // Dashboard - Display modes
+    t.insert("dashboard.mode.normal".into(), "Normal".into());
+    t.insert("dashboard.mode.minimal".into(), "Minimal".into());
+    t.insert("dashboard.mode.data".into(), "Data".into());
+
+    // Dashboard - Edit mode
+    t.insert("dashboard.edit_mode".into(), "Edit Mode".into());
+    t.insert("dashboard.default_layout".into(), "Default Layout".into());
+    t.insert("dashboard.toggle_widgets".into(), "Toggle Widgets".into());
+    t.insert("dashboard.done".into(), "Done".into());
+    t.insert("dashboard.toggle_visibility".into(), "Toggle Widget Visibility".into());
+    t.insert("dashboard.edit".into(), "Edit Dashboard".into());
+    t.insert("dashboard.edit_hint".into(), "Toggle widgets visibility and drag to reorder".into());
+    t.insert("dashboard.reset_default".into(), "Reset to Default".into());
+    t.insert("dashboard.saved".into(), "Dashboard saved".into());
+    t.insert("dashboard.save_failed".into(), "Failed to save dashboard".into());
+    t.insert("dashboard.reset_success".into(), "Dashboard reset to default".into());
+    t.insert("dashboard.edit_activated".into(), "Edit mode activated".into());
+    t.insert("dashboard.changes_saved".into(), "Changes saved".into());
+    t.insert("dashboard.default_applied".into(), "Default layout applied".into());
+    t.insert("dashboard.display_mode".into(), "Display mode".into());
+
+    // Session tracking
+    t.insert("session.no_active".into(), "No active session".into());
+    t.insert("session.start".into(), "Start Session".into());
+    t.insert("session.end".into(), "End Session".into());
+    t.insert("session.started".into(), "Session started".into());
+    t.insert("session.start_failed".into(), "Failed to start session".into());
+    t.insert("session.ended".into(), "Session ended".into());
+    t.insert("session.end_failed".into(), "Failed to end session".into());
+    t.insert("session.surplus".into(), "surplus".into());
+
+    // Process list
+    t.insert("processes.all".into(), "All Processes".into());
+    t.insert("processes.search_placeholder".into(), "Search processes...".into());
+    t.insert("processes.header.name".into(), "Process".into());
+    t.insert("processes.header.cpu".into(), "CPU %".into());
+    t.insert("processes.header.gpu".into(), "GPU %".into());
+    t.insert("processes.header.ram".into(), "RAM %".into());
+    t.insert("processes.pinned".into(), "Pinned".into());
+    t.insert("processes.unpinned".into(), "Unpinned".into());
+    t.insert("processes.pin_failed".into(), "Failed to update pin".into());
+
+    // Settings - Baseline detection
+    t.insert("settings.baseline".into(), "Baseline Detection".into());
+    t.insert("settings.baseline.auto".into(), "Auto-detect Baseline".into());
+    t.insert("settings.baseline.manual".into(), "Manual Baseline (W)".into());
+    t.insert("settings.baseline.detected".into(), "Detected Baseline".into());
+    t.insert("settings.baseline.detect_now".into(), "Detect Now".into());
+    t.insert("settings.baseline.detected_value".into(), "Baseline detected".into());
+    t.insert("settings.baseline.not_enough_data".into(), "Not enough data to detect baseline".into());
+    t.insert("settings.baseline.detect_failed".into(), "Failed to detect baseline".into());
+    t.insert("settings.baseline.set_success".into(), "Baseline set to".into());
+    t.insert("settings.baseline.set_failed".into(), "Failed to set baseline".into());
+    t.insert("settings.process_limit".into(), "Process List Limit".into());
+    t.insert("settings.refresh_rate_detailed".into(), "Refresh Rate (Detailed)".into());
+    t.insert("settings.refresh_rate_critical".into(), "Refresh Rate (Critical)".into());
+
+    // History - Tabs
+    t.insert("history.tab.power".into(), "Power".into());
+    t.insert("history.tab.sessions".into(), "Sessions".into());
+    t.insert("history.no_sessions".into(), "No sessions recorded yet".into());
+
+    // Tray menu
+    t.insert("tray.show".into(), "Show".into());
+    t.insert("tray.exit".into(), "Exit".into());
+
     t
 }

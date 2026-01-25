@@ -503,6 +503,13 @@ function applyTranslations() {
             el.textContent = state.translations[key];
         }
     });
+    // Also handle placeholder translations
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (state.translations[key]) {
+            el.placeholder = state.translations[key];
+        }
+    });
 }
 
 function t(key) {
@@ -619,17 +626,17 @@ function setupProcessModal() {
 
                 if (isPinned) {
                     await invoke('unpin_process', { name });
-                    showToast(`Unpinned: ${name}`, 'info');
+                    showToast(`${t('processes.unpinned')}: ${name}`, 'info');
                 } else {
                     await invoke('pin_process', { name });
-                    showToast(`Pinned: ${name}`, 'success');
+                    showToast(`${t('processes.pinned')}: ${name}`, 'success');
                 }
 
                 // Refresh the modal list
                 await refreshProcessModalList();
             } catch (error) {
                 console.error('Failed to toggle pin:', error);
-                showToast('Failed to update pin', 'error');
+                showToast(t('processes.pin_failed'), 'error');
             }
         }
     });
@@ -743,10 +750,10 @@ async function handleDashboardClick(e) {
         if (!isNaN(watts) && watts > 0) {
             try {
                 await invoke('set_manual_baseline', { watts });
-                showToast(`Baseline set to ${formatNumber(watts, 1)} W`, 'success');
+                showToast(`${t('settings.baseline.set_success')} ${formatNumber(watts, 1)} W`, 'success');
             } catch (error) {
                 console.error('Failed to set baseline:', error);
-                showToast('Failed to set baseline', 'error');
+                showToast(t('settings.baseline.set_failed'), 'error');
             }
         }
     }
@@ -789,10 +796,10 @@ async function handleDashboardClick(e) {
 
             if (isPinned) {
                 await invoke('unpin_process', { name });
-                showToast(`Unpinned: ${name}`, 'info');
+                showToast(`${t('processes.unpinned')}: ${name}`, 'info');
             } else {
                 await invoke('pin_process', { name });
-                showToast(`Pinned: ${name}`, 'success');
+                showToast(`${t('processes.pinned')}: ${name}`, 'success');
             }
 
             // Refresh processes and update widget
@@ -808,7 +815,7 @@ async function handleDashboardClick(e) {
             }
         } catch (error) {
             console.error('Failed to toggle pin:', error);
-            showToast('Failed to update pin', 'error');
+            showToast(t('processes.pin_failed'), 'error');
         }
     }
 }
@@ -1039,7 +1046,7 @@ function enterEditMode() {
     document.getElementById('edit-toolbar').classList.remove('hidden');
     document.getElementById('edit-dashboard-btn').classList.add('active');
     renderDashboard();
-    showToast('Edit mode activated', 'info');
+    showToast(t('dashboard.edit_activated'), 'info');
 }
 
 function exitEditMode() {
@@ -1054,7 +1061,7 @@ function exitEditMode() {
 
     renderDashboard();
     saveDashboardConfigQuiet();
-    showToast('Changes saved', 'success');
+    showToast(t('dashboard.changes_saved'), 'success');
 }
 
 function toggleVisibilityPanel() {
@@ -1071,7 +1078,7 @@ async function fixLayout() {
     forceGridMigration();
     await saveDashboardConfigQuiet();
     renderDashboard();
-    showToast('Default layout applied', 'success');
+    showToast(t('dashboard.default_applied'), 'success');
 }
 
 function renderVisibilityPanel() {
@@ -1739,10 +1746,10 @@ async function saveDashboardConfig() {
         await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
         renderDashboard();
         closeEditModal();
-        showToast('Dashboard saved', 'success');
+        showToast(t('dashboard.saved'), 'success');
     } catch (error) {
         console.error('Failed to save dashboard:', error);
-        showToast('Failed to save dashboard', 'error');
+        showToast(t('dashboard.save_failed'), 'error');
     }
 }
 
@@ -1758,7 +1765,7 @@ async function resetDashboard() {
         await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
         renderDashboard();
         closeEditModal();
-        showToast('Dashboard reset to default', 'success');
+        showToast(t('dashboard.reset_success'), 'success');
     } catch (error) {
         console.error('Failed to reset dashboard:', error);
     }
@@ -2258,10 +2265,10 @@ async function startSession() {
         state.activeSession = await invoke('get_session_stats').catch(() => null);
         // Re-render session widget
         refreshSessionWidget();
-        showToast('Session started', 'success');
+        showToast(t('session.started'), 'success');
     } catch (error) {
         console.error('Failed to start session:', error);
-        showToast('Failed to start session', 'error');
+        showToast(t('session.start_failed'), 'error');
     }
 }
 
@@ -2273,11 +2280,11 @@ async function endSession() {
         refreshSessionWidget();
 
         if (session) {
-            showToast(`Session ended: ${formatNumber(session.surplus_wh, 2)} Wh surplus`, 'success');
+            showToast(`${t('session.ended')}: ${formatNumber(session.surplus_wh, 2)} Wh ${t('session.surplus')}`, 'success');
         }
     } catch (error) {
         console.error('Failed to end session:', error);
-        showToast('Failed to end session', 'error');
+        showToast(t('session.end_failed'), 'error');
     }
 }
 
@@ -2512,7 +2519,7 @@ function setupSettings() {
         try {
             const isOpen = await invoke('toggle_widget');
             const btn = document.getElementById('toggle-widget-btn');
-            btn.textContent = isOpen ? 'Close Widget' : 'Open Widget';
+            btn.textContent = isOpen ? t('settings.widget.close') : t('settings.widget.open');
         } catch (error) {
             console.error('Widget toggle error:', error);
         }
@@ -2524,13 +2531,13 @@ function setupSettings() {
             if (detection) {
                 document.getElementById('detected-baseline').textContent =
                     `${formatNumber(detection.detected_watts, 1)} W (${Math.round(detection.confidence * 100)}% confidence)`;
-                showToast(`Baseline detected: ${formatNumber(detection.detected_watts, 1)} W`, 'success');
+                showToast(`${t('settings.baseline.detected_value')}: ${formatNumber(detection.detected_watts, 1)} W`, 'success');
             } else {
-                showToast('Not enough data to detect baseline', 'info');
+                showToast(t('settings.baseline.not_enough_data'), 'info');
             }
         } catch (error) {
             console.error('Baseline detection error:', error);
-            showToast('Failed to detect baseline', 'error');
+            showToast(t('settings.baseline.detect_failed'), 'error');
         }
     });
 
@@ -2952,7 +2959,7 @@ async function cycleGlobalDisplay() {
     // Update toggle button state
     updateGlobalDisplayToggle(nextMode);
 
-    showToast(`Display mode: ${nextMode}`, 'info');
+    showToast(`${t('dashboard.display_mode')}: ${t('dashboard.mode.' + nextMode) || nextMode}`, 'info');
 }
 
 /**
