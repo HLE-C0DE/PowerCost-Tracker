@@ -16,6 +16,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "powercost-tracker"
 path = "src/main.rs"
 
+[[bin]]
+name = "powercost-demo"
+path = "src/bin/demo.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -38,6 +42,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # Error handling
 thiserror = "1"
 anyhow = "1"
+
+# Directories
+dirs = "5"
 
 # Logging
 log = "0.4"

@@ -17,7 +17,7 @@ use crate::hardware::PowerMonitor;
 use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::Mutex;
 
 /// Application state shared across all Tauri commands
