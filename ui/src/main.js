@@ -72,21 +72,64 @@ const WIDGET_REGISTRY = {
         title: 'CPU',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
         defaultSize: 'medium',
-        render: (data) => {
+        supportsDisplayModes: true,
+        render: (data, displayMode = 'bar') => {
             const cpu = data.systemMetrics?.cpu;
             if (!cpu) return `<div class="widget-loading">Loading...</div>`;
             const temp = cpu.temperature_celsius ? `${formatNumber(cpu.temperature_celsius, 0)}°C` : '--';
+            const globalDisplay = state.dashboardConfig?.global_display || 'normal';
+
+            // Radial mode
+            if (displayMode === 'radial') {
+                return `
+                    <div class="radial-container">
+                        ${renderRadialProgress(cpu.usage_percent, 'CPU', '#6366f1')}
+                        <div class="radial-details ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                            <span class="metric-value">${temp}</span>
+                        </div>
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
+                `;
+            }
+
+            // Chart mode
+            if (displayMode === 'chart') {
+                return `
+                    <div class="mini-chart-container">
+                        <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                            <span class="metric-label">CPU</span>
+                            <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
+                        </div>
+                        <canvas id="cpu-mini-chart" class="mini-chart"></canvas>
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
+                `;
+            }
+
+            // Text mode
+            if (displayMode === 'text') {
+                return `
+                    <div class="widget-value">${formatNumber(cpu.usage_percent, 0)}<span class="unit">%</span></div>
+                    <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        <span class="metric-label">Temp</span>
+                        <span class="metric-value">${temp}</span>
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
+                `;
+            }
+
+            // Default bar mode
             return `
                 <div class="metric-row">
-                    <span class="metric-label">Usage</span>
+                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">Usage</span>
                     <div class="progress-bar"><div class="progress-fill" style="width: ${cpu.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
                 </div>
-                <div class="metric-row">
+                <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
                     <span class="metric-label">Temp</span>
                     <span class="metric-value">${temp}</span>
                 </div>
-                <div class="metric-info">${cpu.name.slice(0, 30)}</div>
+                <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
             `;
         },
     },
@@ -95,33 +138,83 @@ const WIDGET_REGISTRY = {
         title: 'GPU',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>`,
         defaultSize: 'medium',
-        render: (data) => {
+        supportsDisplayModes: true,
+        render: (data, displayMode = 'bar') => {
             const gpu = data.systemMetrics?.gpu;
             if (!gpu) return `<div class="widget-na">No GPU detected</div>`;
-            const usage = gpu.usage_percent != null ? `${formatNumber(gpu.usage_percent, 0)}%` : '--';
+            const usage = gpu.usage_percent != null ? gpu.usage_percent : 0;
+            const usageStr = gpu.usage_percent != null ? `${formatNumber(gpu.usage_percent, 0)}%` : '--';
             const temp = gpu.temperature_celsius != null ? `${formatNumber(gpu.temperature_celsius, 0)}°C` : '--';
             const power = gpu.power_watts != null ? `${formatNumber(gpu.power_watts, 0)}W` : '--';
             const vram = gpu.vram_used_mb != null && gpu.vram_total_mb != null
                 ? `${formatNumber(gpu.vram_used_mb / 1024, 1)}/${formatNumber(gpu.vram_total_mb / 1024, 1)} GB`
                 : '--';
+            const globalDisplay = state.dashboardConfig?.global_display || 'normal';
+
+            // Radial mode
+            if (displayMode === 'radial') {
+                return `
+                    <div class="radial-container">
+                        ${renderRadialProgress(usage, 'GPU', '#22c55e')}
+                        <div class="radial-details ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                            <span class="metric-value">${temp}</span>
+                            <span class="metric-value">${power}</span>
+                        </div>
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
+                `;
+            }
+
+            // Chart mode
+            if (displayMode === 'chart') {
+                return `
+                    <div class="mini-chart-container">
+                        <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                            <span class="metric-label">GPU</span>
+                            <span class="metric-value">${usageStr}</span>
+                        </div>
+                        <canvas id="gpu-mini-chart" class="mini-chart"></canvas>
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
+                `;
+            }
+
+            // Text mode
+            if (displayMode === 'text') {
+                return `
+                    <div class="widget-value">${usageStr}</div>
+                    <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        <span class="metric-label">Temp</span>
+                        <span class="metric-value">${temp}</span>
+                    </div>
+                    <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        <span class="metric-label">Power</span>
+                        <span class="metric-value">${power}</span>
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
+                `;
+            }
+
+            // Default bar mode
             return `
                 <div class="metric-row">
-                    <span class="metric-label">Usage</span>
-                    <span class="metric-value">${usage}</span>
+                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">Usage</span>
+                    <div class="progress-bar"><div class="progress-fill gpu-fill" style="width: ${usage}%"></div></div>
+                    <span class="metric-value">${usageStr}</span>
                 </div>
-                <div class="metric-row">
+                <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
                     <span class="metric-label">Temp</span>
                     <span class="metric-value">${temp}</span>
                 </div>
-                <div class="metric-row">
+                <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
                     <span class="metric-label">Power</span>
                     <span class="metric-value">${power}</span>
                 </div>
-                <div class="metric-row">
+                <div class="metric-row ${globalDisplay !== 'normal' ? 'hidden' : ''}">
                     <span class="metric-label">VRAM</span>
                     <span class="metric-value">${vram}</span>
                 </div>
-                <div class="metric-info">${gpu.name.slice(0, 25)}</div>
+                <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
             `;
         },
     },
@@ -130,17 +223,51 @@ const WIDGET_REGISTRY = {
         title: 'RAM',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="10" y1="2" x2="10" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="18" y1="2" x2="18" y2="6"/></svg>`,
         defaultSize: 'small',
-        render: (data) => {
+        supportsDisplayModes: true,
+        render: (data, displayMode = 'bar') => {
             const mem = data.systemMetrics?.memory;
             if (!mem) return `<div class="widget-loading">Loading...</div>`;
             const usedGB = mem.used_bytes / (1024 * 1024 * 1024);
             const totalGB = mem.total_bytes / (1024 * 1024 * 1024);
+            const globalDisplay = state.dashboardConfig?.global_display || 'normal';
+
+            // Radial mode
+            if (displayMode === 'radial') {
+                return `
+                    <div class="radial-container compact">
+                        ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
+                    </div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                `;
+            }
+
+            // Chart mode
+            if (displayMode === 'chart') {
+                return `
+                    <div class="mini-chart-container compact">
+                        <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                            <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
+                        </div>
+                        <canvas id="ram-mini-chart" class="mini-chart"></canvas>
+                    </div>
+                `;
+            }
+
+            // Text mode
+            if (displayMode === 'text') {
+                return `
+                    <div class="widget-value">${formatNumber(mem.usage_percent, 0)}<span class="unit">%</span></div>
+                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                `;
+            }
+
+            // Default bar mode
             return `
                 <div class="metric-row">
-                    <div class="progress-bar"><div class="progress-fill" style="width: ${mem.usage_percent}%"></div></div>
+                    <div class="progress-bar"><div class="progress-fill ram-fill" style="width: ${mem.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
                 </div>
-                <div class="metric-info">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
             `;
         },
     },
@@ -151,7 +278,10 @@ const WIDGET_REGISTRY = {
         defaultSize: 'medium',
         render: (data) => {
             const session = data.activeSession;
-            if (!session) return `<div class="widget-na">Start a session to track surplus</div>`;
+            if (!session) return `
+                <div class="widget-na">Start a session to track surplus</div>
+                <button class="btn btn-sm btn-secondary set-baseline-btn" data-power="${formatNumber(data.power_watts, 1)}">Set Baseline (${formatNumber(data.power_watts, 1)} W)</button>
+            `;
             return `
                 <div class="metric-row">
                     <span class="metric-label">Baseline</span>
@@ -168,6 +298,32 @@ const WIDGET_REGISTRY = {
                 <div class="metric-row">
                     <span class="metric-label">Cost</span>
                     <span class="metric-value">${state.currencySymbol}${formatNumber(session.surplus_cost || 0, 4)}</span>
+                </div>
+                <button class="btn btn-sm btn-secondary set-baseline-btn" data-power="${formatNumber(data.power_watts, 1)}">Update Baseline</button>
+            `;
+        },
+    },
+    processes: {
+        id: 'processes',
+        title: 'Top Processes',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+        defaultSize: 'medium',
+        render: (data) => {
+            const processes = data.topProcesses;
+            if (!processes || processes.length === 0) {
+                return `<div class="widget-na">No process data available</div>`;
+            }
+            return `
+                <div class="process-list">
+                    ${processes.slice(0, 5).map(proc => `
+                        <div class="process-row">
+                            <span class="process-name">${proc.name.slice(0, 20)}</span>
+                            <div class="process-cpu-bar">
+                                <div class="process-cpu-fill" style="width: ${Math.min(proc.cpu_percent, 100)}%"></div>
+                            </div>
+                            <span class="process-cpu">${formatNumber(proc.cpu_percent, 1)}%</span>
+                        </div>
+                    `).join('')}
                 </div>
             `;
         },
@@ -186,6 +342,7 @@ const state = {
     dashboardIntervalId: null,
     systemMetrics: null,
     activeSession: null,
+    topProcesses: [],
     isEditMode: false,
     draggedWidget: null,
     draggedWidgetId: null,
@@ -196,6 +353,12 @@ const state = {
     resizeWidgetId: null,
     resizeStartPos: null,
     resizeStartSpan: null,
+    // Stream A: History arrays for mini-charts (max 60 points each)
+    cpuHistory: [],
+    gpuHistory: [],
+    ramHistory: [],
+    sessionStartTime: null,
+    lastDashboardData: null,
 };
 
 // ===== Initialization =====
@@ -265,6 +428,27 @@ function setupNavigation() {
             }
         });
     });
+
+    // Sidebar toggle functionality
+    setupSidebarToggle();
+}
+
+function setupSidebarToggle() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle');
+
+    // Restore collapsed state from localStorage
+    const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+    if (isCollapsed) {
+        sidebar.classList.add('collapsed');
+    }
+
+    // Toggle sidebar on button click
+    toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        const collapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebar-collapsed', collapsed);
+    });
 }
 
 // ===== Dashboard =====
@@ -296,6 +480,54 @@ function setupDashboard() {
     // Global mouse handlers for drag and resize
     document.addEventListener('mousemove', handleGlobalMouseMove);
     document.addEventListener('mouseup', handleGlobalMouseUp);
+
+    // Event delegation for dynamically rendered buttons (Stream C)
+    document.getElementById('dashboard-grid').addEventListener('click', handleDashboardClick);
+
+    // Stream A: Setup global display toggle buttons
+    setupGlobalDisplayToggle();
+}
+
+/**
+ * Stream A: Setup global display toggle button group
+ */
+function setupGlobalDisplayToggle() {
+    const toggleContainer = document.getElementById('global-display-toggle');
+    if (!toggleContainer) return;
+
+    // Set initial state
+    const currentMode = state.dashboardConfig?.global_display || 'normal';
+    updateGlobalDisplayToggle(currentMode);
+
+    // Add click handlers to toggle buttons
+    const buttons = toggleContainer.querySelectorAll('.global-display-btn');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mode = btn.dataset.mode;
+            setGlobalDisplay(mode);
+        });
+    });
+}
+
+// Handle clicks on dynamically rendered elements in the dashboard
+async function handleDashboardClick(e) {
+    // Handle "Set Baseline" button click
+    const baselineBtn = e.target.closest('.set-baseline-btn');
+    if (baselineBtn) {
+        e.stopPropagation();
+        const powerStr = baselineBtn.dataset.power;
+        const watts = parseFloat(powerStr);
+
+        if (!isNaN(watts) && watts > 0) {
+            try {
+                await invoke('set_manual_baseline', { watts });
+                showToast(`Baseline set to ${formatNumber(watts, 1)} W`, 'success');
+            } catch (error) {
+                console.error('Failed to set baseline:', error);
+                showToast('Failed to set baseline', 'error');
+            }
+        }
+    }
 }
 
 // Migrate legacy dashboard config (position-based) to new grid format
@@ -468,6 +700,40 @@ function renderDashboard() {
     } else {
         grid.classList.remove('edit-mode');
     }
+
+    // Populate with cached data during edit mode
+    if (state.isEditMode && state.lastDashboardData) {
+        populateWidgetsWithCachedData();
+    }
+}
+
+/**
+ * Populates widgets with cached data during edit mode
+ * Uses state.lastDashboardData to render widget content
+ */
+function populateWidgetsWithCachedData() {
+    const data = state.lastDashboardData;
+    if (!data) return;
+
+    for (const widgetConfig of state.dashboardConfig?.widgets || []) {
+        if (!widgetConfig.visible) continue;
+        const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
+        if (!widgetDef) continue;
+
+        const body = document.getElementById(`widget-body-${widgetConfig.id}`);
+        if (body) {
+            // Pass display mode to widgets that support it
+            if (widgetDef.supportsDisplayModes) {
+                const displayMode = widgetConfig.display_mode || 'bar';
+                body.innerHTML = widgetDef.render(data, displayMode);
+            } else {
+                body.innerHTML = widgetDef.render(data);
+            }
+        }
+    }
+
+    // Also draw mini charts if any widget is in chart mode
+    drawMiniCharts();
 }
 
 // ===== Edit Mode Functions =====
@@ -529,20 +795,58 @@ function renderVisibilityPanel() {
         const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
         if (!widgetDef) continue;
 
+        const currentMode = widgetConfig.display_mode || 'bar';
+        const displayModeSelect = widgetDef.supportsDisplayModes ? `
+            <select class="display-mode-select" data-widget-id="${widgetConfig.id}">
+                <option value="bar" ${currentMode === 'bar' ? 'selected' : ''}>Bar</option>
+                <option value="text" ${currentMode === 'text' ? 'selected' : ''}>Text</option>
+                <option value="radial" ${currentMode === 'radial' ? 'selected' : ''}>Radial</option>
+                <option value="chart" ${currentMode === 'chart' ? 'selected' : ''}>Chart</option>
+            </select>
+        ` : '';
+
         const item = document.createElement('div');
         item.className = 'visibility-item';
         item.innerHTML = `
             <span class="visibility-item-label">${widgetDef.title}</span>
-            <label class="toggle">
-                <input type="checkbox" class="visibility-checkbox" data-widget-id="${widgetConfig.id}" ${widgetConfig.visible ? 'checked' : ''}>
-                <span class="toggle-slider"></span>
-            </label>
+            <div class="visibility-item-controls">
+                ${displayModeSelect}
+                <label class="toggle">
+                    <input type="checkbox" class="visibility-checkbox" data-widget-id="${widgetConfig.id}" ${widgetConfig.visible ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
         `;
 
         const checkbox = item.querySelector('.visibility-checkbox');
         checkbox.addEventListener('change', (e) => {
             toggleWidgetVisibility(widgetConfig.id, e.target.checked);
         });
+
+        // Add event handler for display mode changes
+        const modeSelect = item.querySelector('.display-mode-select');
+        if (modeSelect) {
+            modeSelect.addEventListener('change', (e) => {
+                const widgetId = e.target.dataset.widgetId;
+                const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
+                if (widget) {
+                    widget.display_mode = e.target.value;
+                    saveDashboardConfigQuiet();
+                    // Re-render the specific widget with new display mode
+                    const body = document.getElementById(`widget-body-${widgetId}`);
+                    if (body && state.lastDashboardData) {
+                        const def = WIDGET_REGISTRY[widgetId];
+                        if (def && def.supportsDisplayModes) {
+                            body.innerHTML = def.render(state.lastDashboardData, e.target.value);
+                            // Redraw mini chart if switching to chart mode
+                            if (e.target.value === 'chart') {
+                                setTimeout(drawMiniCharts, 50);
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         list.appendChild(item);
     }
@@ -1025,23 +1329,42 @@ function restartDashboardUpdates() {
 }
 
 async function updateDashboard() {
+    // Stream I: Skip updates in edit mode to prevent data flickering during drag/resize
+    if (state.isEditMode) return;
+
     try {
-        const [dashboardData, systemMetrics, sessionStats] = await Promise.all([
+        const [dashboardData, systemMetrics, sessionStats, topProcesses] = await Promise.all([
             invoke('get_dashboard_data'),
             invoke('get_system_metrics').catch(() => null),
             invoke('get_session_stats').catch(() => null),
+            invoke('get_top_processes', { limit: 5 }).catch(() => []),
         ]);
 
         state.systemMetrics = systemMetrics;
         state.activeSession = sessionStats;
+        state.topProcesses = topProcesses;
+
+        // Stream A: Update metrics history for mini-charts
+        updateMetricsHistory(systemMetrics);
+
+        // Track session start time for chart temporal axis
+        if (sessionStats && !state.sessionStartTime) {
+            state.sessionStartTime = sessionStats.start_time * 1000;
+        } else if (!sessionStats) {
+            state.sessionStartTime = null;
+        }
 
         const data = {
             ...dashboardData,
             systemMetrics,
             activeSession: sessionStats,
+            topProcesses,
         };
 
-        // Update each visible widget
+        // Cache for use during edit mode
+        state.lastDashboardData = data;
+
+        // Update each visible widget with display mode support
         for (const widgetConfig of state.dashboardConfig?.widgets || []) {
             if (!widgetConfig.visible) continue;
             const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
@@ -1049,7 +1372,13 @@ async function updateDashboard() {
 
             const body = document.getElementById(`widget-body-${widgetConfig.id}`);
             if (body) {
-                body.innerHTML = widgetDef.render(data);
+                // Pass display mode to widgets that support it
+                if (widgetDef.supportsDisplayModes) {
+                    const displayMode = widgetConfig.display_mode || 'text';
+                    body.innerHTML = widgetDef.render(data, displayMode);
+                } else {
+                    body.innerHTML = widgetDef.render(data);
+                }
             }
         }
 
@@ -1072,6 +1401,9 @@ async function updateDashboard() {
 
         // Update session bar
         updateSessionBar(sessionStats);
+
+        // Stream A: Draw mini-charts after DOM is updated
+        drawMiniCharts();
 
     } catch (error) {
         console.error('Dashboard update error:', error);
@@ -1102,35 +1434,36 @@ function drawPowerGraph() {
     const data = state.powerHistory;
     if (data.length < 2) return;
 
-    const padding = 10;
-    const width = canvas.width - padding * 2;
-    const height = canvas.height - padding * 2;
+    // Stream A: Add bottom padding for time axis labels
+    const padding = { top: 10, right: 10, bottom: 20, left: 10 };
+    const width = canvas.width - padding.left - padding.right;
+    const height = canvas.height - padding.top - padding.bottom;
     const powers = data.map(d => d.power);
     const maxPower = Math.max(...powers) * 1.1 || 100;
     const minPower = Math.min(...powers) * 0.9 || 0;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const gradient = ctx.createLinearGradient(0, padding, 0, height + padding);
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, height + padding.top);
     gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
     gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
 
     ctx.beginPath();
-    ctx.moveTo(padding, height + padding);
+    ctx.moveTo(padding.left, height + padding.top);
     data.forEach((point, i) => {
-        const x = padding + (i / (data.length - 1)) * width;
-        const y = padding + height - ((point.power - minPower) / (maxPower - minPower)) * height;
+        const x = padding.left + (i / (data.length - 1)) * width;
+        const y = padding.top + height - ((point.power - minPower) / (maxPower - minPower)) * height;
         ctx.lineTo(x, y);
     });
-    ctx.lineTo(padding + width, height + padding);
+    ctx.lineTo(padding.left + width, height + padding.top);
     ctx.closePath();
     ctx.fillStyle = gradient;
     ctx.fill();
 
     ctx.beginPath();
     data.forEach((point, i) => {
-        const x = padding + (i / (data.length - 1)) * width;
-        const y = padding + height - ((point.power - minPower) / (maxPower - minPower)) * height;
+        const x = padding.left + (i / (data.length - 1)) * width;
+        const y = padding.top + height - ((point.power - minPower) / (maxPower - minPower)) * height;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     });
@@ -1140,12 +1473,31 @@ function drawPowerGraph() {
 
     if (data.length > 0) {
         const lastPoint = data[data.length - 1];
-        const x = padding + width;
-        const y = padding + height - ((lastPoint.power - minPower) / (maxPower - minPower)) * height;
+        const x = padding.left + width;
+        const y = padding.top + height - ((lastPoint.power - minPower) / (maxPower - minPower)) * height;
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fillStyle = '#6366f1';
         ctx.fill();
+    }
+
+    // Stream A: Draw time axis labels (HH:MM format)
+    if (data.length > 5) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = '9px system-ui';
+        ctx.textAlign = 'center';
+
+        // Draw 3-5 time labels along the x-axis
+        const labelCount = Math.min(5, Math.floor(data.length / 10));
+        const step = Math.floor((data.length - 1) / labelCount);
+
+        for (let i = 0; i <= labelCount; i++) {
+            const dataIndex = Math.min(i * step, data.length - 1);
+            const point = data[dataIndex];
+            const x = padding.left + (dataIndex / (data.length - 1)) * width;
+            const timeLabel = formatTimeHHMM(point.time);
+            ctx.fillText(timeLabel, x, canvas.height - 4);
+        }
     }
 }
 
@@ -1441,6 +1793,8 @@ function applyConfig(config) {
     document.getElementById('setting-theme').value = config.general.theme;
     document.getElementById('setting-refresh-rate').value = config.general.refresh_rate_ms;
     document.getElementById('setting-eco-mode').checked = config.general.eco_mode;
+    document.getElementById('setting-start-minimized').checked = config.general.start_minimized || false;
+    document.getElementById('setting-start-with-system').checked = config.general.start_with_system || false;
 
     document.getElementById('setting-baseline-auto').checked = config.advanced.baseline_auto;
     document.getElementById('setting-baseline-watts').value = config.advanced.baseline_watts;
@@ -1491,14 +1845,17 @@ function updatePricingModeUI(mode) {
 
 async function saveSettings() {
     try {
+        const newStartWithSystem = document.getElementById('setting-start-with-system').checked;
+        const oldStartWithSystem = state.config?.general?.start_with_system || false;
+
         const config = {
             general: {
                 language: document.getElementById('setting-language').value,
                 theme: document.getElementById('setting-theme').value,
                 refresh_rate_ms: parseInt(document.getElementById('setting-refresh-rate').value),
                 eco_mode: document.getElementById('setting-eco-mode').checked,
-                start_minimized: state.config?.general?.start_minimized || false,
-                start_with_system: state.config?.general?.start_with_system || false,
+                start_minimized: document.getElementById('setting-start-minimized').checked,
+                start_with_system: newStartWithSystem,
             },
             pricing: {
                 mode: document.getElementById('setting-pricing-mode').value,
@@ -1543,6 +1900,17 @@ async function saveSettings() {
         };
 
         await invoke('set_config', { config });
+
+        // Update autostart setting if it changed
+        if (newStartWithSystem !== oldStartWithSystem) {
+            try {
+                await invoke('set_autostart', { enabled: newStartWithSystem });
+            } catch (autoErr) {
+                console.error('Failed to set autostart:', autoErr);
+                // Don't fail the whole save if autostart fails
+            }
+        }
+
         state.config = config;
         state.currencySymbol = config.pricing.currency_symbol;
         restartDashboardUpdates();
@@ -1592,10 +1960,225 @@ function formatDate(date) {
     return date.toISOString().split('T')[0];
 }
 
+// ===== Stream A: Display Mode Components =====
+
+/**
+ * Renders a radial progress SVG component
+ * @param {number} percent - Progress percentage (0-100)
+ * @param {string} label - Label to display in center
+ * @param {string} color - Stroke color for the progress arc
+ * @returns {string} SVG markup
+ */
+function renderRadialProgress(percent, label, color = '#6366f1') {
+    const radius = 36;
+    const strokeWidth = 6;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (percent / 100) * circumference;
+
+    return `
+        <svg class="radial-progress" viewBox="0 0 100 100">
+            <circle
+                class="radial-bg"
+                cx="50"
+                cy="50"
+                r="${radius}"
+                fill="none"
+                stroke="rgba(255,255,255,0.1)"
+                stroke-width="${strokeWidth}"
+            />
+            <circle
+                class="radial-fill"
+                cx="50"
+                cy="50"
+                r="${radius}"
+                fill="none"
+                stroke="${color}"
+                stroke-width="${strokeWidth}"
+                stroke-linecap="round"
+                stroke-dasharray="${circumference}"
+                stroke-dashoffset="${offset}"
+                transform="rotate(-90 50 50)"
+            />
+            <text x="50" y="45" text-anchor="middle" class="radial-value">${formatNumber(percent, 0)}%</text>
+            <text x="50" y="62" text-anchor="middle" class="radial-label">${label}</text>
+        </svg>
+    `;
+}
+
+/**
+ * Draws a mini sparkline chart on a canvas
+ * @param {string} canvasId - Canvas element ID
+ * @param {number[]} historyArray - Array of values to plot
+ * @param {string} color - Line color
+ */
+function renderMiniChart(canvasId, historyArray, color = '#6366f1') {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || historyArray.length < 2) return;
+
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = 50;
+
+    const data = historyArray;
+    const padding = 4;
+    const width = canvas.width - padding * 2;
+    const height = canvas.height - padding * 2;
+
+    const maxVal = Math.max(...data) * 1.1 || 100;
+    const minVal = Math.min(...data) * 0.9 || 0;
+    const range = maxVal - minVal || 1;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw gradient fill
+    const gradient = ctx.createLinearGradient(0, padding, 0, height + padding);
+    gradient.addColorStop(0, color.replace(')', ', 0.3)').replace('rgb', 'rgba'));
+    gradient.addColorStop(1, 'transparent');
+
+    ctx.beginPath();
+    ctx.moveTo(padding, height + padding);
+    data.forEach((val, i) => {
+        const x = padding + (i / (data.length - 1)) * width;
+        const y = padding + height - ((val - minVal) / range) * height;
+        ctx.lineTo(x, y);
+    });
+    ctx.lineTo(padding + width, height + padding);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw line
+    ctx.beginPath();
+    data.forEach((val, i) => {
+        const x = padding + (i / (data.length - 1)) * width;
+        const y = padding + height - ((val - minVal) / range) * height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Draw endpoint dot
+    if (data.length > 0) {
+        const lastVal = data[data.length - 1];
+        const x = padding + width;
+        const y = padding + height - ((lastVal - minVal) / range) * height;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+}
+
+/**
+ * Updates CPU/GPU/RAM history arrays from system metrics
+ * @param {object} systemMetrics - System metrics object
+ */
+function updateMetricsHistory(systemMetrics) {
+    if (!systemMetrics) return;
+
+    const maxPoints = 60;
+
+    // CPU history
+    if (systemMetrics.cpu?.usage_percent != null) {
+        state.cpuHistory.push(systemMetrics.cpu.usage_percent);
+        if (state.cpuHistory.length > maxPoints) state.cpuHistory.shift();
+    }
+
+    // GPU history
+    if (systemMetrics.gpu?.usage_percent != null) {
+        state.gpuHistory.push(systemMetrics.gpu.usage_percent);
+        if (state.gpuHistory.length > maxPoints) state.gpuHistory.shift();
+    }
+
+    // RAM history
+    if (systemMetrics.memory?.usage_percent != null) {
+        state.ramHistory.push(systemMetrics.memory.usage_percent);
+        if (state.ramHistory.length > maxPoints) state.ramHistory.shift();
+    }
+}
+
+/**
+ * Draws mini charts for widgets in chart display mode
+ */
+function drawMiniCharts() {
+    // Get widget display modes
+    const widgets = state.dashboardConfig?.widgets || [];
+
+    for (const widget of widgets) {
+        if (!widget.visible) continue;
+
+        if (widget.id === 'cpu' && widget.display_mode === 'chart' && state.cpuHistory.length > 1) {
+            renderMiniChart('cpu-mini-chart', state.cpuHistory, '#6366f1');
+        }
+        if (widget.id === 'gpu' && widget.display_mode === 'chart' && state.gpuHistory.length > 1) {
+            renderMiniChart('gpu-mini-chart', state.gpuHistory, '#22c55e');
+        }
+        if (widget.id === 'ram' && widget.display_mode === 'chart' && state.ramHistory.length > 1) {
+            renderMiniChart('ram-mini-chart', state.ramHistory, '#f59e0b');
+        }
+    }
+}
+
+/**
+ * Formats time as HH:MM for chart axis
+ * @param {number} timestamp - Unix timestamp in milliseconds
+ * @returns {string} Formatted time string
+ */
+function formatTimeHHMM(timestamp) {
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const mins = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${mins}`;
+}
+
+/**
+ * Cycles global display mode through normal -> minimize -> hard -> normal
+ */
+async function cycleGlobalDisplay() {
+    const modes = ['normal', 'minimize', 'hard'];
+    const current = state.dashboardConfig?.global_display || 'normal';
+    const currentIndex = modes.indexOf(current);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    const nextMode = modes[nextIndex];
+
+    state.dashboardConfig.global_display = nextMode;
+    await saveDashboardConfigQuiet();
+
+    // Update toggle button state
+    updateGlobalDisplayToggle(nextMode);
+
+    showToast(`Display mode: ${nextMode}`, 'info');
+}
+
+/**
+ * Sets global display mode
+ * @param {string} mode - 'normal', 'minimize', or 'hard'
+ */
+async function setGlobalDisplay(mode) {
+    state.dashboardConfig.global_display = mode;
+    await saveDashboardConfigQuiet();
+    updateGlobalDisplayToggle(mode);
+}
+
+/**
+ * Updates the global display toggle button UI
+ * @param {string} mode - Current display mode
+ */
+function updateGlobalDisplayToggle(mode) {
+    const buttons = document.querySelectorAll('.global-display-btn');
+    buttons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+}
+
 // ===== Window resize handler =====
 window.addEventListener('resize', () => {
     drawPowerGraph();
     if (state.historyData.length > 0) {
         drawHistoryChart();
     }
+    drawMiniCharts();
 });

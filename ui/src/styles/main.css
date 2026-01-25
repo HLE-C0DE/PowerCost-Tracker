@@ -87,6 +87,67 @@ body {
     display: flex;
     flex-direction: column;
     padding: var(--spacing-lg);
+    transition: width var(--transition-normal);
+    overflow: hidden;
+}
+
+/* Sidebar Collapsed State */
+.sidebar.collapsed {
+    width: 60px;
+    padding: var(--spacing-md);
+}
+
+.sidebar.collapsed .logo-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+.sidebar.collapsed .nav-link span {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: var(--spacing-md);
+}
+
+.sidebar.collapsed .logo {
+    justify-content: center;
+}
+
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.sidebar-toggle svg {
+    width: 18px;
+    height: 18px;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    margin: 0 auto var(--spacing-md) auto;
 }
 
 .logo {
@@ -108,6 +169,8 @@ body {
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--text-primary);
+    transition: opacity var(--transition-normal), width var(--transition-normal);
+    white-space: nowrap;
 }
 
 .nav-links {
@@ -126,6 +189,11 @@ body {
     text-decoration: none;
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
+}
+
+.nav-link span {
+    transition: opacity var(--transition-normal), width var(--transition-normal);
+    white-space: nowrap;
 }
 
 .nav-link svg {
@@ -314,6 +382,28 @@ body {
 .visibility-item-label {
     font-size: 0.85rem;
     color: var(--text-secondary);
+    flex: 1;
+}
+
+.visibility-item-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.display-mode-select {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.display-mode-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
 }
 
 .header-controls {
@@ -1078,6 +1168,11 @@ body {
         padding: var(--spacing-md);
     }
 
+    /* Hide toggle button on small screens - sidebar is always collapsed */
+    .sidebar-toggle {
+        display: none;
+    }
+
     .card.main-card {
         grid-column: span 1;
         grid-row: span 1;
@@ -1333,4 +1428,241 @@ body {
     border-radius: var(--radius-sm);
     color: var(--text-primary);
     font-size: 0.8rem;
+}
+
+/* ===== Process List Widget ===== */
+.process-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.process-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+}
+
+.process-name {
+    flex: 0 0 80px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.process-cpu-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 50px;
+}
+
+.process-cpu-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 3px;
+    transition: width var(--transition-fast);
+}
+
+.process-cpu {
+    flex: 0 0 45px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+/* ===== Set Baseline Button (in widgets) ===== */
+.set-baseline-btn {
+    margin-top: var(--spacing-sm);
+    width: 100%;
+    font-size: 0.75rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.set-baseline-btn:hover {
+    background: var(--accent-primary);
+    color: white;
+}
+
+/* ===== Stream A: Global Display Toggle ===== */
+.global-display-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: 2px;
+}
+
+.global-display-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-transform: capitalize;
+}
+
+.global-display-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-card);
+}
+
+.global-display-btn.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+/* ===== Stream A: Radial Progress Component ===== */
+.radial-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) 0;
+}
+
+.radial-container.compact {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.radial-progress {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.radial-container.compact .radial-progress {
+    width: 60px;
+    height: 60px;
+}
+
+.radial-bg {
+    transition: stroke-dashoffset var(--transition-normal);
+}
+
+.radial-fill {
+    transition: stroke-dashoffset var(--transition-normal);
+}
+
+.radial-value {
+    font-size: 14px;
+    font-weight: 700;
+    fill: var(--text-primary);
+}
+
+.radial-container.compact .radial-value {
+    font-size: 12px;
+}
+
+.radial-label {
+    font-size: 9px;
+    font-weight: 500;
+    fill: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.radial-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.radial-details .metric-value {
+    font-size: 0.8rem;
+}
+
+/* ===== Stream A: Mini Chart Component ===== */
+.mini-chart-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.mini-chart-container.compact {
+    min-height: 60px;
+}
+
+.mini-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+}
+
+.mini-chart-header .metric-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.mini-chart-header .metric-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.mini-chart {
+    flex: 1;
+    width: 100%;
+    min-height: 50px;
+}
+
+/* ===== Stream A: Progress Fill Colors ===== */
+.progress-fill.gpu-fill {
+    background: linear-gradient(90deg, var(--accent-green), #4ade80);
+}
+
+.progress-fill.ram-fill {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+/* ===== Stream A: Global Display Mode Classes ===== */
+
+/* Hard mode - data only, no labels */
+.display-hard .metric-label,
+.display-hard .metric-info,
+.display-hard .radial-label,
+.display-hard .mini-chart-header {
+    display: none !important;
+}
+
+.display-hard .metric-row {
+    justify-content: center;
+}
+
+.display-hard .progress-bar {
+    flex: none;
+    width: 60%;
+}
+
+/* Minimize mode - reduced labels */
+.display-minimize .metric-info {
+    display: none !important;
+}
+
+.display-minimize .metric-label {
+    font-size: 0.65rem;
+}
+
+.display-minimize .metric-value {
+    font-size: 0.8rem;
+}
+
+/* ===== Stream A: Widget display mode transition ===== */
+.widget-card .card-body {
+    transition: all var(--transition-fast);
+}
+
+/* Chart widgets get more vertical space */
+.widget-card[data-display-mode="chart"] .card-body {
+    min-height: 80px;
 }
