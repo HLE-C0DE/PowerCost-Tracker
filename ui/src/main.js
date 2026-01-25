@@ -411,7 +411,8 @@ const state = {
     draggedWidgetId: null,
     dragOffset: { x: 0, y: 0 },
     gridCols: 6,
-    cellHeight: 100,
+    cellHeight: 80,  // Match CSS grid-auto-rows: minmax(80px, auto)
+    gridGap: 16,     // Match CSS gap: var(--spacing-md) = 1rem = 16px
     resizing: false,
     resizeWidgetId: null,
     resizeStartPos: null,
@@ -1102,6 +1103,30 @@ function toggleWidgetVisibility(widgetId, visible) {
 }
 
 // ===== Widget Drag Handlers =====
+
+// Get actual grid columns based on viewport width (matching CSS media queries)
+function getActualGridCols() {
+    const width = window.innerWidth;
+    if (width <= 768) return 1;
+    if (width <= 900) return 2;
+    if (width <= 1200) return 4;
+    return 6;
+}
+
+// Calculate cell dimensions accounting for CSS grid gaps
+function getGridCellDimensions(grid) {
+    const gridRect = grid.getBoundingClientRect();
+    const cols = getActualGridCols();
+    const gap = state.gridGap;
+
+    // Cell width = (grid width - total gap space) / number of columns
+    // Total gap space = gap * (cols - 1)
+    const cellWidth = (gridRect.width - gap * (cols - 1)) / cols;
+    const cellHeight = state.cellHeight;
+
+    return { cellWidth, cellHeight, cols, gap, gridRect };
+}
+
 function handleWidgetMouseDown(e) {
     if (!state.isEditMode) return;
     if (e.target.closest('.widget-disable-btn') || e.target.closest('.resize-handle')) return;
@@ -1120,6 +1145,9 @@ function handleWidgetMouseDown(e) {
         y: e.clientY - rect.top
     };
 
+    // Update gridCols to current viewport value
+    state.gridCols = getActualGridCols();
+
     // Create drop preview
     createDropPreview();
 
@@ -1135,27 +1163,27 @@ function handleGlobalMouseMove(e) {
     if (!state.draggedWidget || !state.isEditMode) return;
 
     const grid = document.getElementById('dashboard-grid');
-    const gridRect = grid.getBoundingClientRect();
+    const { cellWidth, cellHeight, cols, gap, gridRect } = getGridCellDimensions(grid);
 
-    // Calculate target grid cell
-    const cellWidth = gridRect.width / state.gridCols;
-    const cellHeight = state.cellHeight;
-
+    // Calculate relative position from grid top-left, accounting for where user clicked on the widget
     const relX = e.clientX - gridRect.left - state.dragOffset.x;
     const relY = e.clientY - gridRect.top - state.dragOffset.y;
 
-    const targetCol = Math.max(1, Math.min(state.gridCols, Math.floor(relX / cellWidth) + 1));
-    const targetRow = Math.max(1, Math.floor(relY / cellHeight) + 1);
+    // Convert pixel position to grid column/row (1-indexed)
+    // Each cell occupies (cellWidth + gap) except the last column
+    const cellWithGap = cellWidth + gap;
+    const targetCol = Math.max(1, Math.min(cols, Math.floor(relX / cellWithGap) + 1));
+    const targetRow = Math.max(1, Math.floor(relY / (cellHeight + gap)) + 1);
 
     // Get widget config for span
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.draggedWidgetId);
     if (!widget) return;
 
-    const colSpan = widget.col_span || 1;
+    const colSpan = Math.min(widget.col_span || 1, cols);  // Clamp span to available columns
     const rowSpan = widget.row_span || 1;
 
     // Clamp to grid bounds
-    const finalCol = Math.min(targetCol, state.gridCols - colSpan + 1);
+    const finalCol = Math.min(targetCol, cols - colSpan + 1);
     const finalRow = Math.max(1, targetRow);
 
     // Update drop preview position
@@ -1171,23 +1199,22 @@ function handleGlobalMouseUp(e) {
     if (!state.draggedWidget || !state.isEditMode) return;
 
     const grid = document.getElementById('dashboard-grid');
-    const gridRect = grid.getBoundingClientRect();
+    const { cellWidth, cellHeight, cols, gap, gridRect } = getGridCellDimensions(grid);
 
     // Calculate final position
-    const cellWidth = gridRect.width / state.gridCols;
-    const cellHeight = state.cellHeight;
-
     const relX = e.clientX - gridRect.left - state.dragOffset.x;
     const relY = e.clientY - gridRect.top - state.dragOffset.y;
 
-    const targetCol = Math.max(1, Math.min(state.gridCols, Math.floor(relX / cellWidth) + 1));
-    const targetRow = Math.max(1, Math.floor(relY / cellHeight) + 1);
+    // Convert pixel position to grid column/row (1-indexed)
+    const cellWithGap = cellWidth + gap;
+    const targetCol = Math.max(1, Math.min(cols, Math.floor(relX / cellWithGap) + 1));
+    const targetRow = Math.max(1, Math.floor(relY / (cellHeight + gap)) + 1);
 
     // Get widget config
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.draggedWidgetId);
     if (widget) {
-        const colSpan = widget.col_span || 1;
-        widget.col = Math.min(targetCol, state.gridCols - colSpan + 1);
+        const colSpan = Math.min(widget.col_span || 1, cols);  // Clamp span to available columns
+        widget.col = Math.min(targetCol, cols - colSpan + 1);
         widget.row = Math.max(1, targetRow);
 
         // Resolve collisions
@@ -1286,15 +1313,14 @@ function handleResize(e) {
     if (!state.resizing) return;
 
     const grid = document.getElementById('dashboard-grid');
-    const gridRect = grid.getBoundingClientRect();
-    const cellWidth = gridRect.width / state.gridCols;
-    const cellHeight = state.cellHeight;
+    const { cellWidth, cellHeight, cols, gap } = getGridCellDimensions(grid);
 
     const deltaX = e.clientX - state.resizeStartPos.x;
     const deltaY = e.clientY - state.resizeStartPos.y;
 
-    const colDelta = Math.round(deltaX / cellWidth);
-    const rowDelta = Math.round(deltaY / cellHeight);
+    // Account for gap when calculating span deltas
+    const colDelta = Math.round(deltaX / (cellWidth + gap));
+    const rowDelta = Math.round(deltaY / (cellHeight + gap));
 
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.resizeWidgetId);
     if (!widget) return;
@@ -1304,7 +1330,7 @@ function handleResize(e) {
     const newRowSpan = Math.max(1, Math.min(2, state.resizeStartSpan.row + rowDelta));
 
     // Ensure widget doesn't exceed grid bounds
-    const maxColSpan = state.gridCols - (widget.col || 1) + 1;
+    const maxColSpan = cols - (widget.col || 1) + 1;
     widget.col_span = Math.min(newColSpan, maxColSpan);
     widget.row_span = newRowSpan;
 
