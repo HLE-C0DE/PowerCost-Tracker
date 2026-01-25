@@ -1,7 +1,7 @@
 # PowerCost Tracker
 
 <p align="center">
-  <img src="assets/logo.svg" alt="PowerCost Tracker Logo" width="128">
+  <img width="600" height="600" alt="icon-dark" src="https://github.com/user-attachments/assets/3258ac20-9465-4c8a-8388-2a192af458aa" />
 </p>
 
 <h3 align="center">Real-Time PC Power Consumption Monitor & Electricity Cost Calculator</h3>
