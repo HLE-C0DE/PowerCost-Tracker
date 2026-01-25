@@ -1477,8 +1477,9 @@ body {
 }
 
 .process-col-cpu,
+.process-col-gpu,
 .process-col-ram {
-    flex: 0 0 48px;
+    flex: 0 0 42px;
     font-size: 0.65rem;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1574,8 +1575,9 @@ body {
 }
 
 .process-modal-col-cpu,
+.process-modal-col-gpu,
 .process-modal-col-ram {
-    flex: 0 0 60px;
+    flex: 0 0 55px;
     font-size: 0.7rem;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1622,15 +1624,23 @@ body {
 }
 
 .process-modal-cpu {
-    flex: 0 0 60px;
+    flex: 0 0 55px;
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--accent-primary);
     text-align: right;
 }
 
+.process-modal-gpu {
+    flex: 0 0 55px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-green);
+    text-align: right;
+}
+
 .process-modal-ram {
-    flex: 0 0 60px;
+    flex: 0 0 55px;
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--accent-yellow);
@@ -1728,15 +1738,23 @@ body {
 }
 
 .process-cpu {
-    flex: 0 0 48px;
+    flex: 0 0 42px;
     font-size: 0.72rem;
     font-weight: 600;
     color: var(--accent-primary);
     text-align: right;
 }
 
+.process-gpu {
+    flex: 0 0 42px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent-green);
+    text-align: right;
+}
+
 .process-ram {
-    flex: 0 0 48px;
+    flex: 0 0 42px;
     font-size: 0.72rem;
     font-weight: 500;
     color: var(--accent-yellow);

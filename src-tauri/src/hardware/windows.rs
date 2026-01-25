@@ -8,6 +8,7 @@ use crate::hardware::PowerSource;
 use std::collections::HashMap;
 use std::process::Command;
 use std::sync::Mutex;
+use sysinfo::ProcessRefreshKind;
 
 /// Available GPU monitoring sources
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -80,6 +81,8 @@ pub struct WmiMonitor {
     gpu_metrics_cache: Mutex<Option<CachedValue<Option<crate::core::GpuMetrics>>>>,
     /// Cached CPU temperature (powershell is slow)
     cpu_temp_cache: Mutex<Option<CachedValue<Option<f64>>>>,
+    /// Cached per-process GPU usage (PID -> GPU% usage)
+    gpu_process_cache: Mutex<Option<CachedValue<HashMap<u32, f64>>>>,
 }
 
 impl WmiMonitor {
@@ -113,6 +116,7 @@ impl WmiMonitor {
             gpu_cache: Mutex::new(None),
             gpu_metrics_cache: Mutex::new(None),
             cpu_temp_cache: Mutex::new(None),
+            gpu_process_cache: Mutex::new(None),
         })
     }
 
@@ -513,24 +517,37 @@ impl WmiMonitor {
     /// Get top N processes by CPU usage, including pinned processes
     pub fn get_top_processes_with_pinned(&self, limit: usize, pinned_names: &[String]) -> Result<Vec<ProcessMetrics>> {
         let mut sys = self.sys.lock().unwrap();
-        sys.refresh_processes();
+        // Must use refresh_processes_specifics with memory flag - refresh_processes() alone doesn't include memory in sysinfo 0.30+
+        sys.refresh_processes_specifics(ProcessRefreshKind::new().with_memory());
+        sys.refresh_memory();
 
         let total_memory = sys.total_memory();
 
-        let processes: Vec<ProcessMetrics> = sys
+        // Get GPU usage per process (cached)
+        // Release the sys lock before calling get_gpu_process_usage to avoid deadlock
+        let process_data: Vec<_> = sys
             .processes()
             .iter()
             .map(|(pid, process)| {
-                let memory_bytes = process.memory();
-                let name = process.name().to_string();
+                (pid.as_u32(), process.name().to_string(), process.cpu_usage() as f64, process.memory())
+            })
+            .collect();
+        drop(sys);
+
+        let gpu_usage = self.get_gpu_process_usage();
+
+        let processes: Vec<ProcessMetrics> = process_data
+            .into_iter()
+            .map(|(pid, name, cpu_percent, memory_bytes)| {
                 let is_pinned = pinned_names.iter().any(|p| p.eq_ignore_ascii_case(&name));
+                let gpu_percent = gpu_usage.get(&pid).copied();
                 ProcessMetrics {
-                    pid: pid.as_u32(),
+                    pid,
                     name,
-                    cpu_percent: process.cpu_usage() as f64,
+                    cpu_percent,
                     memory_bytes,
                     memory_percent: (memory_bytes as f64 / total_memory as f64) * 100.0,
-                    gpu_percent: None, // GPU per-process not available via sysinfo
+                    gpu_percent,
                     is_pinned,
                 }
             })
@@ -557,23 +574,37 @@ impl WmiMonitor {
     /// Get all processes (for advanced/discovery mode)
     pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
         let mut sys = self.sys.lock().unwrap();
-        sys.refresh_processes();
+        // Must use refresh_processes_specifics with memory flag - refresh_processes() alone doesn't include memory in sysinfo 0.30+
+        sys.refresh_processes_specifics(ProcessRefreshKind::new().with_memory());
+        sys.refresh_memory();
 
         let total_memory = sys.total_memory();
 
-        let mut processes: Vec<ProcessMetrics> = sys
+        // Get process data and release the lock before calling get_gpu_process_usage
+        let process_data: Vec<_> = sys
             .processes()
             .iter()
             .filter(|(_, process)| process.cpu_usage() > 0.0 || process.memory() > 0)
             .map(|(pid, process)| {
-                let memory_bytes = process.memory();
+                (pid.as_u32(), process.name().to_string(), process.cpu_usage() as f64, process.memory())
+            })
+            .collect();
+        drop(sys);
+
+        // Get GPU usage per process (cached)
+        let gpu_usage = self.get_gpu_process_usage();
+
+        let mut processes: Vec<ProcessMetrics> = process_data
+            .into_iter()
+            .map(|(pid, name, cpu_percent, memory_bytes)| {
+                let gpu_percent = gpu_usage.get(&pid).copied();
                 ProcessMetrics {
-                    pid: pid.as_u32(),
-                    name: process.name().to_string(),
-                    cpu_percent: process.cpu_usage() as f64,
+                    pid,
+                    name,
+                    cpu_percent,
                     memory_bytes,
                     memory_percent: (memory_bytes as f64 / total_memory as f64) * 100.0,
-                    gpu_percent: None,
+                    gpu_percent,
                     is_pinned: false,
                 }
             })
@@ -802,6 +833,148 @@ impl WmiMonitor {
             }
         }
         None
+    }
+
+    /// Get per-process GPU usage (cached for 1000ms - pmon is expensive)
+    fn get_gpu_process_usage(&self) -> HashMap<u32, f64> {
+        // Check cache first (1000ms TTL)
+        {
+            let cache = self.gpu_process_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(value) = cached.get(1000) {
+                    return value;
+                }
+            }
+        }
+
+        // Cache miss - fetch fresh data based on GPU source
+        let result = match self.gpu_source {
+            GpuSource::Nvidia => self.fetch_nvidia_gpu_processes(),
+            GpuSource::Amd => self.fetch_amd_gpu_processes(),
+            GpuSource::None => HashMap::new(),
+        };
+
+        // Update cache
+        {
+            let mut cache = self.gpu_process_cache.lock().unwrap();
+            *cache = Some(CachedValue::new(result.clone()));
+        }
+
+        result
+    }
+
+    /// Fetch per-process GPU usage from nvidia-smi pmon
+    ///
+    /// Parses output like:
+    /// ```text
+    /// # gpu        pid  type    sm   mem   enc   dec   jpg   ofa  command
+    ///     0       1234    C    45    12     0     0     -     -  game.exe
+    /// ```
+    fn fetch_nvidia_gpu_processes(&self) -> HashMap<u32, f64> {
+        let mut result = HashMap::new();
+
+        // Use nvidia-smi pmon for per-process GPU utilization
+        // -c 1 means capture one sample
+        let output = match Command::new("nvidia-smi")
+            .args(["pmon", "-c", "1", "-s", "u"])
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => return result,
+        };
+
+        if !output.status.success() {
+            return result;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        for line in stdout.lines() {
+            // Skip header lines (start with #) and empty lines
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            // Parse columns: gpu, pid, type, sm, mem, enc, dec, jpg, ofa, command
+            // We want pid (column 1) and sm (column 3) for GPU compute utilization
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 4 {
+                // pid is at index 1, sm (GPU utilization) is at index 3
+                if let (Ok(pid), Ok(sm)) = (parts[1].parse::<u32>(), parts[3].parse::<f64>()) {
+                    // If we already have this PID, take the max (multi-GPU scenarios)
+                    let entry = result.entry(pid).or_insert(0.0);
+                    *entry = entry.max(sm);
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Fetch per-process GPU usage from AMD tools
+    ///
+    /// AMD provides limited per-process GPU data. We try amd-smi process command
+    /// which may show active processes, but exact utilization % is often unavailable.
+    fn fetch_amd_gpu_processes(&self) -> HashMap<u32, f64> {
+        let mut result = HashMap::new();
+
+        // Try amd-smi process --json
+        if let Ok(output) = Command::new("amd-smi")
+            .args(["process", "--json"])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                    // amd-smi process output structure varies, try to extract PIDs
+                    if let Some(arr) = value.as_array() {
+                        for item in arr {
+                            if let Some(pid) = item.get("pid").and_then(|v| v.as_u64()) {
+                                // AMD doesn't always provide per-process GPU%,
+                                // try to get it or use a marker value indicating "active"
+                                let gpu_usage = item.get("gpu_memory_usage")
+                                    .and_then(|v| v.as_f64())
+                                    .or_else(|| item.get("usage").and_then(|v| v.as_f64()));
+
+                                if let Some(usage) = gpu_usage {
+                                    result.insert(pid as u32, usage);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: try rocm-smi --showpidgpus
+        if result.is_empty() {
+            if let Ok(output) = Command::new("rocm-smi")
+                .args(["--showpidgpus"])
+                .output()
+            {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    // Parse text output - format varies by rocm version
+                    for line in stdout.lines() {
+                        // Look for lines containing PID information
+                        if line.contains("PID") || line.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                            // Try to extract PID from the line
+                            for word in line.split_whitespace() {
+                                if let Ok(pid) = word.parse::<u32>() {
+                                    // Mark as active (we don't have exact %)
+                                    // Use a small positive value to indicate GPU activity
+                                    result.entry(pid).or_insert(0.1);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        result
     }
 }
 

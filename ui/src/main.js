@@ -372,6 +372,7 @@ const WIDGET_REGISTRY = {
                         <div class="process-header-row">
                             <span class="process-col-name">Process</span>
                             <span class="process-col-cpu">CPU</span>
+                            <span class="process-col-gpu">GPU</span>
                             <span class="process-col-ram">RAM</span>
                             <span class="process-col-pin"></span>
                         </div>
@@ -384,11 +385,13 @@ const WIDGET_REGISTRY = {
                     <div class="process-list-scroll">
                         ${displayList.map(proc => {
                             const cpuVal = (proc.cpu_percent != null && !isNaN(proc.cpu_percent)) ? formatNumber(proc.cpu_percent, 1) : '--';
+                            const gpuVal = (proc.gpu_percent != null && !isNaN(proc.gpu_percent)) ? formatNumber(proc.gpu_percent, 1) : '--';
                             const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
                             return `
                                 <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
                                     <span class="process-name" title="${proc.name}">${proc.name.slice(0, 20)}</span>
                                     <span class="process-cpu">${cpuVal}%</span>
+                                    <span class="process-gpu">${gpuVal}%</span>
                                     <span class="process-ram">${ramVal}%</span>
                                     <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
                                         ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
@@ -670,11 +673,13 @@ function renderProcessModalList(processes) {
 
     list.innerHTML = processes.map(proc => {
         const cpuVal = (proc.cpu_percent != null && !isNaN(proc.cpu_percent)) ? formatNumber(proc.cpu_percent, 1) : '--';
+        const gpuVal = (proc.gpu_percent != null && !isNaN(proc.gpu_percent)) ? formatNumber(proc.gpu_percent, 1) : '--';
         const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
         return `
             <div class="process-modal-row ${proc.is_pinned ? 'pinned' : ''}">
                 <span class="process-modal-name" title="${proc.name}">${proc.name}</span>
                 <span class="process-modal-cpu">${cpuVal}%</span>
+                <span class="process-modal-gpu">${gpuVal}%</span>
                 <span class="process-modal-ram">${ramVal}%</span>
                 <button class="process-modal-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? 'Unpin' : 'Pin'}">
                     ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
