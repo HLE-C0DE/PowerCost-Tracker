@@ -108,6 +108,11 @@ async function updateDashboard() {
     try {
         const data = await invoke('get_dashboard_data');
 
+        // Debug logging for development
+        if (typeof data.power_watts !== 'number' || isNaN(data.power_watts)) {
+            console.warn('Invalid power_watts received:', data.power_watts, 'Full data:', data);
+        }
+
         // Update current power
         document.getElementById('current-power').textContent =
             formatNumber(data.power_watts, 1);
@@ -490,7 +495,6 @@ function applyConfig(config) {
     }
 
     // Widget
-    document.getElementById('setting-widget-enabled').checked = config.widget.enabled;
     document.getElementById('setting-widget-show-cost').checked = config.widget.show_cost;
     document.getElementById('setting-widget-position').value = config.widget.position;
 
@@ -560,7 +564,7 @@ async function saveSettings() {
                 },
             },
             widget: {
-                enabled: document.getElementById('setting-widget-enabled').checked,
+                enabled: state.config?.widget?.enabled ?? true,
                 show_cost: document.getElementById('setting-widget-show-cost').checked,
                 position: document.getElementById('setting-widget-position').value,
                 opacity: state.config?.widget?.opacity || 0.9,

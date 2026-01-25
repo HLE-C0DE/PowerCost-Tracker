@@ -67,7 +67,10 @@ async fn get_dashboard_data(state: tauri::State<'_, TauriState>) -> Result<core:
     let monitor = state.monitor.lock().await;
     let pricing = state.pricing.lock().await;
 
-    let power_watts = monitor.get_power_watts().unwrap_or(0.0);
+    let power_watts = monitor.get_power_watts().unwrap_or_else(|e| {
+        log::warn!("Failed to get power reading: {}", e);
+        0.0
+    });
     let hourly_cost = pricing.calculate_hourly_cost(power_watts);
     let daily_cost = pricing.calculate_daily_cost(power_watts);
     let monthly_cost = pricing.calculate_monthly_cost(power_watts);
@@ -132,6 +135,16 @@ async fn get_history(
     end_date: String,
 ) -> Result<Vec<db::DailyStats>, String> {
     let db = state.db.lock().await;
+    let config = state.config.lock().await;
+    let pricing_mode = config.pricing.mode.clone();
+    drop(config);
+
+    // Update today's stats before fetching to ensure fresh data
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    if start_date <= today && end_date >= today {
+        let _ = db.update_today_stats(Some(&pricing_mode));
+    }
+
     db.get_daily_stats(&start_date, &end_date)
         .map_err(|e| e.to_string())
 }
@@ -284,10 +297,20 @@ fn main() {
 
 /// Background task that periodically reads power and updates state
 async fn monitoring_loop(app: tauri::AppHandle) {
+    log::info!("Starting monitoring loop");
     let state: tauri::State<'_, TauriState> = app.state();
 
     let mut last_reading_time = std::time::Instant::now();
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(1000));
+
+    // Get initial refresh rate
+    let initial_refresh_ms = {
+        let config = state.config.lock().await;
+        config.general.refresh_rate_ms
+    };
+    let mut current_refresh_ms = initial_refresh_ms;
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(current_refresh_ms));
+
+    log::info!("Monitoring loop initialized with {}ms refresh rate", current_refresh_ms);
 
     loop {
         interval.tick().await;
@@ -298,8 +321,11 @@ async fn monitoring_loop(app: tauri::AppHandle) {
             config.general.refresh_rate_ms
         };
 
-        // Adjust interval if needed
-        interval = tokio::time::interval(tokio::time::Duration::from_millis(refresh_ms));
+        // Only recreate interval if refresh rate changed
+        if refresh_ms != current_refresh_ms {
+            current_refresh_ms = refresh_ms;
+            interval = tokio::time::interval(tokio::time::Duration::from_millis(refresh_ms));
+        }
 
         // Read power
         let power_watts = {
@@ -331,6 +357,14 @@ async fn monitoring_loop(app: tauri::AppHandle) {
             if let Ok(reading) = monitor.get_reading() {
                 let db = state.db.lock().await;
                 let _ = db.insert_reading(&reading);
+
+                // Update daily stats every 60 readings (~every minute at 1s refresh)
+                if count % 60 == 0 {
+                    let config = state.config.lock().await;
+                    let pricing_mode = config.pricing.mode.clone();
+                    drop(config);
+                    let _ = db.update_today_stats(Some(&pricing_mode));
+                }
             }
         }
 

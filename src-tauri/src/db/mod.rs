@@ -211,6 +211,90 @@ impl Database {
             .query_row("SELECT COUNT(*) FROM power_readings", [], |row| row.get(0))?;
         Ok(count)
     }
+
+    /// Compute and update daily stats from power readings for a specific date
+    /// This aggregates all readings for the given date and updates the daily_stats table
+    pub fn update_daily_stats_for_date(&self, date: &str, pricing_mode: Option<&str>) -> Result<Option<DailyStats>> {
+        // Get start and end timestamps for the date
+        let start_of_day = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .map_err(|e| Error::Database(rusqlite::Error::InvalidParameterName(e.to_string())))?
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp();
+        let end_of_day = start_of_day + 86400; // 24 hours in seconds
+
+        // Aggregate readings for this date
+        let result: std::result::Result<(f64, f64, f64, i64), rusqlite::Error> = self.conn.query_row(
+            "SELECT
+                COALESCE(AVG(power_watts), 0.0) as avg_watts,
+                COALESCE(MAX(power_watts), 0.0) as max_watts,
+                COALESCE(SUM(power_watts), 0.0) as sum_watts,
+                COUNT(*) as count
+             FROM power_readings
+             WHERE timestamp >= ?1 AND timestamp < ?2",
+            params![start_of_day, end_of_day],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        );
+
+        match result {
+            Ok((avg_watts, max_watts, sum_watts, count)) => {
+                if count == 0 {
+                    return Ok(None);
+                }
+
+                // Estimate total Wh based on average power and assumed runtime
+                // Since readings are taken every ~10 seconds (every 10 monitoring cycles at 1s each),
+                // we can estimate energy from the sum of power readings
+                // Each reading represents approximately 10 seconds of monitoring
+                let hours_per_reading = 10.0 / 3600.0; // 10 seconds in hours
+                let total_wh = sum_watts * hours_per_reading;
+
+                let stats = DailyStats {
+                    date: date.to_string(),
+                    total_wh,
+                    total_cost: None, // Cost calculation would require pricing engine
+                    avg_watts,
+                    max_watts,
+                    pricing_mode: pricing_mode.map(String::from),
+                };
+
+                self.upsert_daily_stats(&stats)?;
+                Ok(Some(stats))
+            }
+            Err(e) => Err(Error::Database(e)),
+        }
+    }
+
+    /// Update daily stats for today based on current readings
+    pub fn update_today_stats(&self, pricing_mode: Option<&str>) -> Result<Option<DailyStats>> {
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        self.update_daily_stats_for_date(&today, pricing_mode)
+    }
+
+    /// Rebuild daily stats for all dates that have readings
+    pub fn rebuild_all_daily_stats(&self, pricing_mode: Option<&str>) -> Result<u32> {
+        // Get all distinct dates from power_readings
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT date(timestamp, 'unixepoch') as reading_date
+             FROM power_readings
+             ORDER BY reading_date ASC"
+        )?;
+
+        let dates: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut count = 0;
+        for date in dates {
+            if self.update_daily_stats_for_date(&date, pricing_mode)?.is_some() {
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
 }
 
 #[cfg(test)]
@@ -255,5 +339,46 @@ mod tests {
         let retrieved = db.get_daily_stats("2024-01-01", "2024-01-31").unwrap();
         assert_eq!(retrieved.len(), 1);
         assert_eq!(retrieved[0].date, "2024-01-15");
+    }
+
+    #[test]
+    fn test_update_daily_stats_from_readings() {
+        let db = create_test_db();
+
+        // Insert readings with a specific timestamp (2024-01-15 12:00:00 UTC)
+        let base_timestamp = 1705320000i64; // 2024-01-15 12:00:00 UTC
+
+        // Insert multiple readings
+        for i in 0..6 {
+            db.conn.execute(
+                "INSERT INTO power_readings (timestamp, power_watts, source, components) VALUES (?1, ?2, ?3, NULL)",
+                params![base_timestamp + i * 10, 100.0 + (i as f64 * 10.0), "test"],
+            ).unwrap();
+        }
+
+        // Update daily stats for that date
+        let result = db.update_daily_stats_for_date("2024-01-15", Some("simple")).unwrap();
+        assert!(result.is_some());
+
+        let stats = result.unwrap();
+        assert_eq!(stats.date, "2024-01-15");
+        assert!(stats.avg_watts > 0.0);
+        assert!(stats.max_watts >= stats.avg_watts);
+        assert!(stats.total_wh > 0.0);
+        assert_eq!(stats.pricing_mode, Some("simple".to_string()));
+
+        // Verify it was saved to the database
+        let retrieved = db.get_daily_stats("2024-01-15", "2024-01-15").unwrap();
+        assert_eq!(retrieved.len(), 1);
+        assert_eq!(retrieved[0].date, "2024-01-15");
+    }
+
+    #[test]
+    fn test_update_daily_stats_no_readings() {
+        let db = create_test_db();
+
+        // Try to update stats for a date with no readings
+        let result = db.update_daily_stats_for_date("2024-01-15", Some("simple")).unwrap();
+        assert!(result.is_none());
     }
 }

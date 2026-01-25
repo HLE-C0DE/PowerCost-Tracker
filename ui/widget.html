@@ -30,6 +30,7 @@
         }
 
         .widget {
+            position: relative;
             padding: 12px 16px;
             display: flex;
             align-items: center;
@@ -127,14 +128,47 @@
     </div>
 
     <script type="module">
-        const { invoke } = window.__TAURI__.core;
-        const { listen } = window.__TAURI__.event;
-        const { getCurrentWindow } = window.__TAURI__.window;
+        // Wait for Tauri APIs to be available
+        async function waitForTauri() {
+            let attempts = 0;
+            while (!window.__TAURI__ && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            return window.__TAURI__;
+        }
 
         let showCost = true;
         let currencySymbol = '\u20AC';
+        let currentWindow = null;
 
         async function init() {
+            // Wait for Tauri to be available
+            const tauri = await waitForTauri();
+            if (!tauri) {
+                console.error('Tauri APIs not available');
+                return;
+            }
+
+            const { invoke } = tauri.core;
+            const { listen } = tauri.event;
+            const { getCurrentWindow } = tauri.window;
+
+            // Get current window reference
+            currentWindow = getCurrentWindow();
+
+            // Setup drag region - enable dragging on the widget element
+            const widgetEl = document.querySelector('.widget');
+            widgetEl.addEventListener('mousedown', async (e) => {
+                // Don't drag if clicking on the close button
+                if (e.target.closest('.close-btn')) return;
+                try {
+                    await currentWindow.startDragging();
+                } catch (err) {
+                    console.error('Drag error:', err);
+                }
+            });
+
             // Load config
             try {
                 const config = await invoke('get_config');
@@ -150,22 +184,28 @@
                 console.error('Widget init error:', e);
             }
 
+            // Get initial data immediately
+            await updateCost(invoke);
+
             // Listen for power updates
             await listen('power-update', (event) => {
                 document.getElementById('power-value').textContent = event.payload.toFixed(1);
             });
 
             // Update cost periodically
-            setInterval(updateCost, 1000);
+            setInterval(() => updateCost(invoke), 1000);
 
             // Close button
             document.getElementById('close-widget').addEventListener('click', async () => {
-                const win = getCurrentWindow();
-                await win.close();
+                try {
+                    await currentWindow.close();
+                } catch (e) {
+                    console.error('Close error:', e);
+                }
             });
         }
 
-        async function updateCost() {
+        async function updateCost(invoke) {
             try {
                 const data = await invoke('get_dashboard_data');
                 document.getElementById('power-value').textContent = data.power_watts.toFixed(1);
