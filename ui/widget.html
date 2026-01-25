@@ -309,26 +309,38 @@
             // Update periodically
             setInterval(() => updateWidget(invoke), 1000);
 
+            // Setup button handlers with proper event handling
+            const closeBtn = document.getElementById('close-widget');
+            const settingsBtn = document.getElementById('open-app-btn');
+
+            // Prevent drag when clicking buttons
+            closeBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+            settingsBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+
             // Close button
-            document.getElementById('close-widget').addEventListener('click', async () => {
+            closeBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
                 try {
                     await currentWindow.close();
-                } catch (e) {
-                    console.error('Close error:', e);
+                } catch (err) {
+                    console.error('Failed to close widget:', err);
                 }
             });
 
             // Open main app button
-            document.getElementById('open-app-btn').addEventListener('click', async () => {
+            settingsBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
                 try {
-                    // Focus the main window
-                    const WebviewWindow = tauri.window.WebviewWindow;
-                    const mainWindow = WebviewWindow.getByLabel('main');
+                    const { WebviewWindow } = tauri.window;
+                    const mainWindow = await WebviewWindow.getByLabel('main');
                     if (mainWindow) {
+                        await mainWindow.show();
                         await mainWindow.setFocus();
+                    } else {
+                        console.error('Main window not found');
                     }
-                } catch (e) {
-                    console.error('Open app error:', e);
+                } catch (err) {
+                    console.error('Failed to open main app:', err);
                 }
             });
         }

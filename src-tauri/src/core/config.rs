@@ -366,17 +366,20 @@ fn default_layout() -> String { "default".to_string() }
 
 fn default_dashboard_widgets() -> Vec<DashboardWidget> {
     vec![
-        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0 },
-        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1 },
-        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2 },
-        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3 },
-        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4 },
-        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5 },
-        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6 },
-        DashboardWidget { id: "cpu".to_string(), visible: true, size: "medium".to_string(), position: 7 },
-        DashboardWidget { id: "gpu".to_string(), visible: true, size: "medium".to_string(), position: 8 },
-        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9 },
-        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 10 },
+        // Row 1-2: Power widget (large, spans 2 cols x 2 rows) + 4 small stats
+        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 1, col_span: 2, row_span: 2 },
+        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1, col: 3, row: 1, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2, col: 4, row: 1, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3, col: 5, row: 1, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4, col: 6, row: 1, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5, col: 3, row: 2, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6, col: 4, row: 2, col_span: 1, row_span: 1 },
+        // Row 2 cont: CPU and GPU
+        DashboardWidget { id: "cpu".to_string(), visible: true, size: "medium".to_string(), position: 7, col: 5, row: 2, col_span: 2, row_span: 1 },
+        // Row 3: GPU, RAM, Surplus
+        DashboardWidget { id: "gpu".to_string(), visible: true, size: "medium".to_string(), position: 8, col: 1, row: 3, col_span: 2, row_span: 1 },
+        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9, col: 3, row: 3, col_span: 1, row_span: 1 },
+        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 10, col: 4, row: 3, col_span: 2, row_span: 1 },
     ]
 }
 
@@ -396,8 +399,28 @@ pub struct DashboardWidget {
     pub id: String,
     /// Whether widget is visible
     pub visible: bool,
-    /// Widget size: "small" (1x1), "medium" (2x1), "large" (2x2)
+    /// Widget size: "small" (1x1), "medium" (2x1), "large" (2x2) - legacy field for backwards compat
+    #[serde(default = "default_widget_size_small")]
     pub size: String,
-    /// Position in the grid (lower = earlier)
+    /// Position in the grid (lower = earlier) - legacy field for backwards compat
+    #[serde(default)]
     pub position: u32,
+    /// Grid column position (1-based, 1-6)
+    #[serde(default = "default_col")]
+    pub col: u32,
+    /// Grid row position (1-based)
+    #[serde(default = "default_row")]
+    pub row: u32,
+    /// Column span (1-3 for width)
+    #[serde(default = "default_col_span")]
+    pub col_span: u32,
+    /// Row span (1-2 for height)
+    #[serde(default = "default_row_span")]
+    pub row_span: u32,
 }
+
+fn default_widget_size_small() -> String { "small".to_string() }
+fn default_col() -> u32 { 1 }
+fn default_row() -> u32 { 1 }
+fn default_col_span() -> u32 { 1 }
+fn default_row_span() -> u32 { 1 }

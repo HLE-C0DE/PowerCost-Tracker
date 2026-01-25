@@ -62,6 +62,52 @@
                     </div>
                 </header>
 
+                <!-- Edit Mode Toolbar -->
+                <div class="edit-toolbar hidden" id="edit-toolbar">
+                    <span class="edit-mode-indicator">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        Edit Mode
+                    </span>
+                    <div class="edit-toolbar-actions">
+                        <button class="btn btn-secondary btn-sm" id="toggle-visibility-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Toggle Widgets
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="fix-layout-btn" title="Auto-arrange widgets">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                                <rect x="14" y="14" width="7" height="7"/>
+                            </svg>
+                            Fix Layout
+                        </button>
+                        <button class="btn btn-primary btn-sm" id="exit-edit-mode-btn">Done</button>
+                    </div>
+                </div>
+
+                <!-- Visibility Panel -->
+                <div class="visibility-panel hidden" id="visibility-panel">
+                    <div class="visibility-panel-header">
+                        <h3>Toggle Widget Visibility</h3>
+                        <button class="btn btn-icon btn-sm" id="close-visibility-panel">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="visibility-list" id="visibility-list">
+                        <!-- Widget visibility toggles will be rendered here -->
+                    </div>
+                </div>
+
                 <!-- Dashboard Grid Container -->
                 <div class="dashboard-grid" id="dashboard-grid">
                     <!-- Widgets will be dynamically rendered here -->

@@ -188,6 +188,14 @@ const state = {
     activeSession: null,
     isEditMode: false,
     draggedWidget: null,
+    draggedWidgetId: null,
+    dragOffset: { x: 0, y: 0 },
+    gridCols: 6,
+    cellHeight: 100,
+    resizing: false,
+    resizeWidgetId: null,
+    resizeStartPos: null,
+    resizeStartSpan: null,
 };
 
 // ===== Initialization =====
@@ -261,26 +269,136 @@ function setupNavigation() {
 
 // ===== Dashboard =====
 function setupDashboard() {
+    // Migrate legacy configs to new grid format
+    migrateDashboardConfig();
+
     renderDashboard();
 
-    // Edit dashboard button
-    document.getElementById('edit-dashboard-btn').addEventListener('click', openEditModal);
+    // Edit dashboard button - now toggles edit mode
+    document.getElementById('edit-dashboard-btn').addEventListener('click', toggleEditMode);
+
+    // Edit mode toolbar buttons
+    document.getElementById('exit-edit-mode-btn').addEventListener('click', exitEditMode);
+    document.getElementById('toggle-visibility-btn').addEventListener('click', toggleVisibilityPanel);
+    document.getElementById('fix-layout-btn').addEventListener('click', fixLayout);
+    document.getElementById('close-visibility-panel').addEventListener('click', () => {
+        document.getElementById('visibility-panel').classList.add('hidden');
+    });
+
+    // Legacy modal handlers (keep for backwards compatibility)
     document.getElementById('close-edit-modal').addEventListener('click', closeEditModal);
     document.getElementById('save-dashboard-btn').addEventListener('click', saveDashboardConfig);
     document.getElementById('reset-dashboard-btn').addEventListener('click', resetDashboard);
-
-    // Close modal on backdrop click
     document.getElementById('edit-dashboard-modal').addEventListener('click', (e) => {
         if (e.target.classList.contains('modal')) closeEditModal();
     });
+
+    // Global mouse handlers for drag and resize
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+}
+
+// Migrate legacy dashboard config (position-based) to new grid format
+function migrateDashboardConfig() {
+    if (!state.dashboardConfig?.widgets) return;
+
+    const widgets = state.dashboardConfig.widgets;
+
+    // Check if migration is needed by seeing if multiple visible widgets share the same position
+    // This happens when serde applies default values (col=1, row=1) to all widgets
+    const visibleWidgets = widgets.filter(w => w.visible);
+    const positions = new Set();
+    let needsMigration = false;
+
+    for (const widget of visibleWidgets) {
+        const posKey = `${widget.col || 1}-${widget.row || 1}`;
+        if (positions.has(posKey)) {
+            needsMigration = true;
+            break;
+        }
+        positions.add(posKey);
+    }
+
+    if (!needsMigration) return;
+
+    console.log('Migrating dashboard config to grid format...');
+
+    // Sort by position and assign grid positions
+    const sorted = [...widgets].sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    // Track occupied cells using a simple grid map
+    const occupied = new Set();
+
+    function isAreaFree(col, row, colSpan, rowSpan) {
+        for (let r = row; r < row + rowSpan; r++) {
+            for (let c = col; c < col + colSpan; c++) {
+                if (occupied.has(`${c}-${r}`)) return false;
+            }
+        }
+        return true;
+    }
+
+    function occupyArea(col, row, colSpan, rowSpan) {
+        for (let r = row; r < row + rowSpan; r++) {
+            for (let c = col; c < col + colSpan; c++) {
+                occupied.add(`${c}-${r}`);
+            }
+        }
+    }
+
+    function findNextFreePosition(colSpan, rowSpan) {
+        for (let row = 1; row <= 20; row++) {
+            for (let col = 1; col <= state.gridCols - colSpan + 1; col++) {
+                if (isAreaFree(col, row, colSpan, rowSpan)) {
+                    return { col, row };
+                }
+            }
+        }
+        return { col: 1, row: 1 }; // Fallback
+    }
+
+    for (const widget of sorted) {
+        // Determine span based on size
+        let colSpan = 1, rowSpan = 1;
+        if (widget.size === 'large') {
+            colSpan = 2; rowSpan = 2;
+        } else if (widget.size === 'medium') {
+            colSpan = 2; rowSpan = 1;
+        }
+
+        // Find next available position
+        const pos = findNextFreePosition(colSpan, rowSpan);
+
+        widget.col = pos.col;
+        widget.row = pos.row;
+        widget.col_span = colSpan;
+        widget.row_span = rowSpan;
+
+        // Mark cells as occupied
+        occupyArea(pos.col, pos.row, colSpan, rowSpan);
+    }
+
+    // Save migrated config
+    saveDashboardConfigQuiet();
+    console.log('Dashboard migration complete');
 }
 
 function renderDashboard() {
     const grid = document.getElementById('dashboard-grid');
     grid.innerHTML = '';
 
+    // Remove drop preview if it exists
+    const existingPreview = document.querySelector('.drop-preview');
+    if (existingPreview) existingPreview.remove();
+
     const widgets = state.dashboardConfig?.widgets || [];
-    const sortedWidgets = [...widgets].sort((a, b) => a.position - b.position);
+
+    // Sort by row then col for consistent rendering order
+    const sortedWidgets = [...widgets].sort((a, b) => {
+        const rowDiff = (a.row || 1) - (b.row || 1);
+        if (rowDiff !== 0) return rowDiff;
+        return (a.col || 1) - (b.col || 1);
+    });
 
     for (const widgetConfig of sortedWidgets) {
         if (!widgetConfig.visible) continue;
@@ -289,9 +407,22 @@ function renderDashboard() {
         if (!widgetDef) continue;
 
         const card = document.createElement('div');
-        card.className = `card widget-card widget-${widgetConfig.size || widgetDef.defaultSize}`;
+        card.className = `card widget-card`;
         card.dataset.widgetId = widgetConfig.id;
-        card.draggable = true;
+
+        // Apply grid positioning
+        const col = widgetConfig.col || 1;
+        const row = widgetConfig.row || 1;
+        const colSpan = widgetConfig.col_span || 1;
+        const rowSpan = widgetConfig.row_span || 1;
+
+        card.style.gridColumn = `${col} / span ${colSpan}`;
+        card.style.gridRow = `${row} / span ${rowSpan}`;
+
+        // Add edit mode class if active
+        if (state.isEditMode) {
+            card.classList.add('edit-mode');
+        }
 
         card.innerHTML = `
             <div class="card-header">
@@ -301,18 +432,370 @@ function renderDashboard() {
             <div class="card-body" id="widget-body-${widgetConfig.id}">
                 <div class="widget-loading">Loading...</div>
             </div>
+            ${state.isEditMode ? '<button class="widget-disable-btn" title="Hide widget">−</button>' : ''}
+            ${state.isEditMode ? '<div class="resize-handle"></div>' : ''}
         `;
 
-        // Drag and drop
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragover', handleDragOver);
-        card.addEventListener('drop', handleDrop);
-        card.addEventListener('dragend', handleDragEnd);
+        // Edit mode drag handlers
+        if (state.isEditMode) {
+            card.addEventListener('mousedown', handleWidgetMouseDown);
+
+            // Quick disable button handler
+            const disableBtn = card.querySelector('.widget-disable-btn');
+            if (disableBtn) {
+                disableBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleWidgetVisibility(widgetConfig.id, false);
+                });
+            }
+
+            // Resize handle handler
+            const resizeHandle = card.querySelector('.resize-handle');
+            if (resizeHandle) {
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    startResize(e, widgetConfig.id);
+                });
+            }
+        }
 
         grid.appendChild(card);
     }
+
+    // Update grid edit mode class
+    if (state.isEditMode) {
+        grid.classList.add('edit-mode');
+    } else {
+        grid.classList.remove('edit-mode');
+    }
 }
 
+// ===== Edit Mode Functions =====
+function toggleEditMode() {
+    if (state.isEditMode) {
+        exitEditMode();
+    } else {
+        enterEditMode();
+    }
+}
+
+function enterEditMode() {
+    state.isEditMode = true;
+    document.getElementById('edit-toolbar').classList.remove('hidden');
+    document.getElementById('edit-dashboard-btn').classList.add('active');
+    renderDashboard();
+    showToast('Edit mode activated', 'info');
+}
+
+function exitEditMode() {
+    state.isEditMode = false;
+    document.getElementById('edit-toolbar').classList.add('hidden');
+    document.getElementById('visibility-panel').classList.add('hidden');
+    document.getElementById('edit-dashboard-btn').classList.remove('active');
+
+    // Remove drop preview
+    const preview = document.querySelector('.drop-preview');
+    if (preview) preview.remove();
+
+    renderDashboard();
+    saveDashboardConfigQuiet();
+    showToast('Changes saved', 'success');
+}
+
+function toggleVisibilityPanel() {
+    const panel = document.getElementById('visibility-panel');
+    if (panel.classList.contains('hidden')) {
+        renderVisibilityPanel();
+        panel.classList.remove('hidden');
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+async function fixLayout() {
+    forceGridMigration();
+    await saveDashboardConfigQuiet();
+    renderDashboard();
+    showToast('Layout fixed - widgets auto-arranged', 'success');
+}
+
+function renderVisibilityPanel() {
+    const list = document.getElementById('visibility-list');
+    list.innerHTML = '';
+
+    const widgets = state.dashboardConfig?.widgets || [];
+
+    for (const widgetConfig of widgets) {
+        const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
+        if (!widgetDef) continue;
+
+        const item = document.createElement('div');
+        item.className = 'visibility-item';
+        item.innerHTML = `
+            <span class="visibility-item-label">${widgetDef.title}</span>
+            <label class="toggle">
+                <input type="checkbox" class="visibility-checkbox" data-widget-id="${widgetConfig.id}" ${widgetConfig.visible ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+            </label>
+        `;
+
+        const checkbox = item.querySelector('.visibility-checkbox');
+        checkbox.addEventListener('change', (e) => {
+            toggleWidgetVisibility(widgetConfig.id, e.target.checked);
+        });
+
+        list.appendChild(item);
+    }
+}
+
+function toggleWidgetVisibility(widgetId, visible) {
+    const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
+    if (widget) {
+        widget.visible = visible;
+        renderDashboard();
+        renderVisibilityPanel();
+        saveDashboardConfigQuiet();
+    }
+}
+
+// ===== Widget Drag Handlers =====
+function handleWidgetMouseDown(e) {
+    if (!state.isEditMode) return;
+    if (e.target.closest('.widget-disable-btn') || e.target.closest('.resize-handle')) return;
+
+    const card = e.target.closest('.widget-card');
+    if (!card) return;
+
+    state.draggedWidget = card;
+    state.draggedWidgetId = card.dataset.widgetId;
+    card.classList.add('dragging');
+
+    // Calculate offset from card top-left
+    const rect = card.getBoundingClientRect();
+    state.dragOffset = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+
+    // Create drop preview
+    createDropPreview();
+
+    e.preventDefault();
+}
+
+function handleGlobalMouseMove(e) {
+    if (state.resizing) {
+        handleResize(e);
+        return;
+    }
+
+    if (!state.draggedWidget || !state.isEditMode) return;
+
+    const grid = document.getElementById('dashboard-grid');
+    const gridRect = grid.getBoundingClientRect();
+
+    // Calculate target grid cell
+    const cellWidth = gridRect.width / state.gridCols;
+    const cellHeight = state.cellHeight;
+
+    const relX = e.clientX - gridRect.left - state.dragOffset.x;
+    const relY = e.clientY - gridRect.top - state.dragOffset.y;
+
+    const targetCol = Math.max(1, Math.min(state.gridCols, Math.floor(relX / cellWidth) + 1));
+    const targetRow = Math.max(1, Math.floor(relY / cellHeight) + 1);
+
+    // Get widget config for span
+    const widget = state.dashboardConfig.widgets.find(w => w.id === state.draggedWidgetId);
+    if (!widget) return;
+
+    const colSpan = widget.col_span || 1;
+    const rowSpan = widget.row_span || 1;
+
+    // Clamp to grid bounds
+    const finalCol = Math.min(targetCol, state.gridCols - colSpan + 1);
+    const finalRow = Math.max(1, targetRow);
+
+    // Update drop preview position
+    updateDropPreview(finalCol, finalRow, colSpan, rowSpan);
+}
+
+function handleGlobalMouseUp(e) {
+    if (state.resizing) {
+        endResize();
+        return;
+    }
+
+    if (!state.draggedWidget || !state.isEditMode) return;
+
+    const grid = document.getElementById('dashboard-grid');
+    const gridRect = grid.getBoundingClientRect();
+
+    // Calculate final position
+    const cellWidth = gridRect.width / state.gridCols;
+    const cellHeight = state.cellHeight;
+
+    const relX = e.clientX - gridRect.left - state.dragOffset.x;
+    const relY = e.clientY - gridRect.top - state.dragOffset.y;
+
+    const targetCol = Math.max(1, Math.min(state.gridCols, Math.floor(relX / cellWidth) + 1));
+    const targetRow = Math.max(1, Math.floor(relY / cellHeight) + 1);
+
+    // Get widget config
+    const widget = state.dashboardConfig.widgets.find(w => w.id === state.draggedWidgetId);
+    if (widget) {
+        const colSpan = widget.col_span || 1;
+        widget.col = Math.min(targetCol, state.gridCols - colSpan + 1);
+        widget.row = Math.max(1, targetRow);
+
+        // Resolve collisions
+        resolveCollisions(widget);
+    }
+
+    // Cleanup
+    state.draggedWidget.classList.remove('dragging');
+    state.draggedWidget = null;
+    state.draggedWidgetId = null;
+
+    // Remove drop preview
+    const preview = document.querySelector('.drop-preview');
+    if (preview) preview.remove();
+
+    renderDashboard();
+    saveDashboardConfigQuiet();
+}
+
+function createDropPreview() {
+    const existing = document.querySelector('.drop-preview');
+    if (existing) existing.remove();
+
+    const preview = document.createElement('div');
+    preview.className = 'drop-preview';
+    document.getElementById('dashboard-grid').appendChild(preview);
+}
+
+function updateDropPreview(col, row, colSpan, rowSpan) {
+    const preview = document.querySelector('.drop-preview');
+    if (!preview) return;
+
+    preview.style.gridColumn = `${col} / span ${colSpan}`;
+    preview.style.gridRow = `${row} / span ${rowSpan}`;
+}
+
+// ===== Collision Detection =====
+function resolveCollisions(movedWidget) {
+    const widgets = state.dashboardConfig.widgets.filter(w => w.visible && w.id !== movedWidget.id);
+
+    for (const widget of widgets) {
+        if (widgetsOverlap(movedWidget, widget)) {
+            // Push widget down
+            widget.row = movedWidget.row + (movedWidget.row_span || 1);
+        }
+    }
+
+    // Recursively resolve any new collisions
+    let hasCollision = true;
+    let iterations = 0;
+    while (hasCollision && iterations < 20) {
+        hasCollision = false;
+        for (let i = 0; i < widgets.length; i++) {
+            for (let j = i + 1; j < widgets.length; j++) {
+                if (widgetsOverlap(widgets[i], widgets[j])) {
+                    widgets[j].row = widgets[i].row + (widgets[i].row_span || 1);
+                    hasCollision = true;
+                }
+            }
+        }
+        iterations++;
+    }
+}
+
+function widgetsOverlap(a, b) {
+    const aCol = a.col || 1, aRow = a.row || 1;
+    const aColSpan = a.col_span || 1, aRowSpan = a.row_span || 1;
+    const bCol = b.col || 1, bRow = b.row || 1;
+    const bColSpan = b.col_span || 1, bRowSpan = b.row_span || 1;
+
+    // Check if rectangles overlap
+    const aLeft = aCol, aRight = aCol + aColSpan;
+    const aTop = aRow, aBottom = aRow + aRowSpan;
+    const bLeft = bCol, bRight = bCol + bColSpan;
+    const bTop = bRow, bBottom = bRow + bRowSpan;
+
+    return !(aRight <= bLeft || bRight <= aLeft || aBottom <= bTop || bBottom <= aTop);
+}
+
+// ===== Resize Handlers =====
+function startResize(e, widgetId) {
+    state.resizing = true;
+    state.resizeWidgetId = widgetId;
+    state.resizeStartPos = { x: e.clientX, y: e.clientY };
+
+    const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
+    state.resizeStartSpan = {
+        col: widget.col_span || 1,
+        row: widget.row_span || 1
+    };
+
+    e.preventDefault();
+}
+
+function handleResize(e) {
+    if (!state.resizing) return;
+
+    const grid = document.getElementById('dashboard-grid');
+    const gridRect = grid.getBoundingClientRect();
+    const cellWidth = gridRect.width / state.gridCols;
+    const cellHeight = state.cellHeight;
+
+    const deltaX = e.clientX - state.resizeStartPos.x;
+    const deltaY = e.clientY - state.resizeStartPos.y;
+
+    const colDelta = Math.round(deltaX / cellWidth);
+    const rowDelta = Math.round(deltaY / cellHeight);
+
+    const widget = state.dashboardConfig.widgets.find(w => w.id === state.resizeWidgetId);
+    if (!widget) return;
+
+    // Calculate new spans (min 1, max based on grid)
+    const newColSpan = Math.max(1, Math.min(3, state.resizeStartSpan.col + colDelta));
+    const newRowSpan = Math.max(1, Math.min(2, state.resizeStartSpan.row + rowDelta));
+
+    // Ensure widget doesn't exceed grid bounds
+    const maxColSpan = state.gridCols - (widget.col || 1) + 1;
+    widget.col_span = Math.min(newColSpan, maxColSpan);
+    widget.row_span = newRowSpan;
+
+    // Update legacy size field for backwards compat
+    if (widget.col_span >= 2 && widget.row_span >= 2) {
+        widget.size = 'large';
+    } else if (widget.col_span >= 2) {
+        widget.size = 'medium';
+    } else {
+        widget.size = 'small';
+    }
+
+    renderDashboard();
+}
+
+function endResize() {
+    if (!state.resizing) return;
+
+    // Resolve any collisions caused by resize
+    const widget = state.dashboardConfig.widgets.find(w => w.id === state.resizeWidgetId);
+    if (widget) {
+        resolveCollisions(widget);
+    }
+
+    state.resizing = false;
+    state.resizeWidgetId = null;
+    state.resizeStartPos = null;
+    state.resizeStartSpan = null;
+
+    renderDashboard();
+    saveDashboardConfigQuiet();
+}
+
+// Legacy drag handlers (keep for fallback)
 function handleDragStart(e) {
     state.draggedWidget = e.target.closest('.widget-card');
     state.draggedWidget.classList.add('dragging');
@@ -322,24 +805,10 @@ function handleDragStart(e) {
 function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    const target = e.target.closest('.widget-card');
-    if (target && target !== state.draggedWidget) {
-        const grid = document.getElementById('dashboard-grid');
-        const cards = [...grid.querySelectorAll('.widget-card')];
-        const draggedIndex = cards.indexOf(state.draggedWidget);
-        const targetIndex = cards.indexOf(target);
-
-        if (draggedIndex < targetIndex) {
-            target.parentNode.insertBefore(state.draggedWidget, target.nextSibling);
-        } else {
-            target.parentNode.insertBefore(state.draggedWidget, target);
-        }
-    }
 }
 
 function handleDrop(e) {
     e.preventDefault();
-    updateWidgetPositions();
 }
 
 function handleDragEnd(e) {
@@ -347,22 +816,6 @@ function handleDragEnd(e) {
         state.draggedWidget.classList.remove('dragging');
         state.draggedWidget = null;
     }
-}
-
-function updateWidgetPositions() {
-    const grid = document.getElementById('dashboard-grid');
-    const cards = [...grid.querySelectorAll('.widget-card')];
-
-    cards.forEach((card, index) => {
-        const widgetId = card.dataset.widgetId;
-        const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
-        if (widget) {
-            widget.position = index;
-        }
-    });
-
-    // Auto-save positions
-    saveDashboardConfigQuiet();
 }
 
 async function saveDashboardConfigQuiet() {
@@ -378,11 +831,22 @@ function openEditModal() {
     const list = document.getElementById('widget-toggle-list');
     list.innerHTML = '';
 
-    const sortedWidgets = [...state.dashboardConfig.widgets].sort((a, b) => a.position - b.position);
+    const sortedWidgets = [...state.dashboardConfig.widgets].sort((a, b) => {
+        const rowDiff = (a.row || 1) - (b.row || 1);
+        if (rowDiff !== 0) return rowDiff;
+        return (a.col || 1) - (b.col || 1);
+    });
 
     for (const widgetConfig of sortedWidgets) {
         const widgetDef = WIDGET_REGISTRY[widgetConfig.id];
         if (!widgetDef) continue;
+
+        // Determine current size from spans
+        let currentSize = 'small';
+        const colSpan = widgetConfig.col_span || 1;
+        const rowSpan = widgetConfig.row_span || 1;
+        if (colSpan >= 2 && rowSpan >= 2) currentSize = 'large';
+        else if (colSpan >= 2) currentSize = 'medium';
 
         const item = document.createElement('div');
         item.className = 'widget-toggle-item';
@@ -392,9 +856,9 @@ function openEditModal() {
             <span class="drag-handle">&#x2630;</span>
             <span class="widget-toggle-title">${widgetDef.title}</span>
             <select class="widget-size-select" data-widget-id="${widgetConfig.id}">
-                <option value="small" ${widgetConfig.size === 'small' ? 'selected' : ''}>Small</option>
-                <option value="medium" ${widgetConfig.size === 'medium' ? 'selected' : ''}>Medium</option>
-                <option value="large" ${widgetConfig.size === 'large' ? 'selected' : ''}>Large</option>
+                <option value="small" ${currentSize === 'small' ? 'selected' : ''}>Small</option>
+                <option value="medium" ${currentSize === 'medium' ? 'selected' : ''}>Medium</option>
+                <option value="large" ${currentSize === 'large' ? 'selected' : ''}>Large</option>
             </select>
             <label class="toggle">
                 <input type="checkbox" class="widget-toggle-checkbox" data-widget-id="${widgetConfig.id}" ${widgetConfig.visible ? 'checked' : ''}>
@@ -443,7 +907,20 @@ async function saveDashboardConfig() {
         if (widget) {
             widget.position = index;
             widget.visible = item.querySelector('.widget-toggle-checkbox').checked;
-            widget.size = item.querySelector('.widget-size-select').value;
+            const newSize = item.querySelector('.widget-size-select').value;
+            widget.size = newSize;
+
+            // Update spans based on size
+            if (newSize === 'large') {
+                widget.col_span = 2;
+                widget.row_span = 2;
+            } else if (newSize === 'medium') {
+                widget.col_span = 2;
+                widget.row_span = 1;
+            } else {
+                widget.col_span = 1;
+                widget.row_span = 1;
+            }
         }
     });
 
@@ -460,13 +937,75 @@ async function saveDashboardConfig() {
 
 async function resetDashboard() {
     try {
-        state.dashboardConfig = await invoke('get_config').then(c => c.dashboard);
+        // Get fresh config from backend (includes new default grid positions)
+        const freshConfig = await invoke('get_config');
+        state.dashboardConfig = freshConfig.dashboard;
+
+        // Force re-migration to ensure proper grid layout
+        forceGridMigration();
+
         await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
         renderDashboard();
         closeEditModal();
         showToast('Dashboard reset to default', 'success');
     } catch (error) {
         console.error('Failed to reset dashboard:', error);
+    }
+}
+
+// Force grid migration regardless of current state
+function forceGridMigration() {
+    if (!state.dashboardConfig?.widgets) return;
+
+    const widgets = state.dashboardConfig.widgets;
+    const sorted = [...widgets].sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    // Track occupied cells
+    const occupied = new Set();
+
+    function isAreaFree(col, row, colSpan, rowSpan) {
+        for (let r = row; r < row + rowSpan; r++) {
+            for (let c = col; c < col + colSpan; c++) {
+                if (occupied.has(`${c}-${r}`)) return false;
+            }
+        }
+        return true;
+    }
+
+    function occupyArea(col, row, colSpan, rowSpan) {
+        for (let r = row; r < row + rowSpan; r++) {
+            for (let c = col; c < col + colSpan; c++) {
+                occupied.add(`${c}-${r}`);
+            }
+        }
+    }
+
+    function findNextFreePosition(colSpan, rowSpan) {
+        for (let row = 1; row <= 20; row++) {
+            for (let col = 1; col <= state.gridCols - colSpan + 1; col++) {
+                if (isAreaFree(col, row, colSpan, rowSpan)) {
+                    return { col, row };
+                }
+            }
+        }
+        return { col: 1, row: 1 };
+    }
+
+    for (const widget of sorted) {
+        let colSpan = 1, rowSpan = 1;
+        if (widget.size === 'large') {
+            colSpan = 2; rowSpan = 2;
+        } else if (widget.size === 'medium') {
+            colSpan = 2; rowSpan = 1;
+        }
+
+        const pos = findNextFreePosition(colSpan, rowSpan);
+        widget.col = pos.col;
+        widget.row = pos.row;
+        widget.col_span = colSpan;
+        widget.row_span = rowSpan;
+
+        occupyArea(pos.col, pos.row, colSpan, rowSpan);
     }
 }
 
