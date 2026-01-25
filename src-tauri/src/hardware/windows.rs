@@ -40,6 +40,29 @@ struct GpuInfo {
     pub source: GpuSource,
 }
 
+/// Cached value with timestamp
+struct CachedValue<T> {
+    value: T,
+    timestamp: std::time::Instant,
+}
+
+impl<T: Clone> CachedValue<T> {
+    fn new(value: T) -> Self {
+        Self {
+            value,
+            timestamp: std::time::Instant::now(),
+        }
+    }
+
+    fn get(&self, max_age_ms: u64) -> Option<T> {
+        if self.timestamp.elapsed().as_millis() < max_age_ms as u128 {
+            Some(self.value.clone())
+        } else {
+            None
+        }
+    }
+}
+
 /// Windows power monitor using sysinfo + GPU tools
 ///
 /// Combines multiple data sources for power monitoring:
@@ -55,6 +78,12 @@ pub struct WmiMonitor {
     cpu_tdp_estimate: f64,
     /// Whether this is a laptop (has battery)
     is_laptop: bool,
+    /// Cached GPU power reading (nvidia-smi is slow)
+    gpu_cache: Mutex<Option<CachedValue<Option<GpuInfo>>>>,
+    /// Cached GPU metrics (full metrics from nvidia-smi)
+    gpu_metrics_cache: Mutex<Option<CachedValue<Option<crate::core::GpuMetrics>>>>,
+    /// Cached CPU temperature (powershell is slow)
+    cpu_temp_cache: Mutex<Option<CachedValue<Option<f64>>>>,
 }
 
 impl WmiMonitor {
@@ -85,6 +114,9 @@ impl WmiMonitor {
             sys: Mutex::new(sys),
             cpu_tdp_estimate,
             is_laptop,
+            gpu_cache: Mutex::new(None),
+            gpu_metrics_cache: Mutex::new(None),
+            cpu_temp_cache: Mutex::new(None),
         })
     }
 
@@ -306,13 +338,32 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU power based on detected source
+    /// Get GPU power based on detected source (cached for 500ms)
     fn get_gpu_power(&self) -> Option<GpuInfo> {
-        match self.gpu_source {
+        // Check cache first (500ms TTL)
+        {
+            let cache = self.gpu_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(value) = cached.get(500) {
+                    return value;
+                }
+            }
+        }
+
+        // Cache miss - fetch fresh data
+        let result = match self.gpu_source {
             GpuSource::Nvidia => self.get_nvidia_gpu_power(),
             GpuSource::Amd => self.get_amd_gpu_power(),
             GpuSource::None => None,
+        };
+
+        // Update cache
+        {
+            let mut cache = self.gpu_cache.lock().unwrap();
+            *cache = Some(CachedValue::new(result.clone()));
         }
+
+        result
     }
 
     /// Calculate CPU power estimate based on load
@@ -550,8 +601,32 @@ impl WmiMonitor {
         Ok(processes)
     }
 
-    /// Get CPU temperature via WMI (MSAcpi_ThermalZoneTemperature)
+    /// Get CPU temperature via WMI (cached for 3 seconds - powershell is slow)
     fn get_cpu_temperature(&self) -> Option<f64> {
+        // Check cache first (3000ms TTL - temperature doesn't change rapidly)
+        {
+            let cache = self.cpu_temp_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(value) = cached.get(3000) {
+                    return value;
+                }
+            }
+        }
+
+        // Cache miss - fetch fresh data
+        let result = self.fetch_cpu_temperature();
+
+        // Update cache
+        {
+            let mut cache = self.cpu_temp_cache.lock().unwrap();
+            *cache = Some(CachedValue::new(result));
+        }
+
+        result
+    }
+
+    /// Actually fetch CPU temperature (slow - calls powershell)
+    fn fetch_cpu_temperature(&self) -> Option<f64> {
         // Try WMI query for thermal zone temperature
         // Temperature is in tenths of Kelvin, convert: (value / 10) - 273.15
         if let Ok(output) = Command::new("powershell")
@@ -593,13 +668,32 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU metrics including usage, power, temperature, and VRAM
+    /// Get GPU metrics including usage, power, temperature, and VRAM (cached for 500ms)
     fn get_gpu_metrics(&self) -> Option<GpuMetrics> {
-        match self.gpu_source {
+        // Check cache first (500ms TTL)
+        {
+            let cache = self.gpu_metrics_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(value) = cached.get(500) {
+                    return value;
+                }
+            }
+        }
+
+        // Cache miss - fetch fresh data
+        let result = match self.gpu_source {
             GpuSource::Nvidia => self.get_nvidia_gpu_metrics(),
             GpuSource::Amd => self.get_amd_gpu_metrics(),
             GpuSource::None => None,
+        };
+
+        // Update cache
+        {
+            let mut cache = self.gpu_metrics_cache.lock().unwrap();
+            *cache = Some(CachedValue::new(result.clone()));
         }
+
+        result
     }
 
     /// Get NVIDIA GPU metrics via nvidia-smi
