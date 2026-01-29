@@ -15,6 +15,7 @@ const WIDGET_REGISTRY = {
     power: {
         id: 'power',
         titleKey: 'dashboard.current_power',
+        shortTitleKey: 'dashboard.current_power_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
         defaultSize: 'large',
         defaultColSpan: 2,
@@ -27,6 +28,7 @@ const WIDGET_REGISTRY = {
     session_energy: {
         id: 'session_energy',
         titleKey: 'dashboard.session_energy',
+        shortTitleKey: 'dashboard.session_energy_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
         render: (data) => {
@@ -38,6 +40,7 @@ const WIDGET_REGISTRY = {
     session_cost: {
         id: 'session_cost',
         titleKey: 'dashboard.session_cost',
+        shortTitleKey: 'dashboard.session_cost_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
         defaultSize: 'small',
         render: (data) => `<div class="widget-value small cost-value">${state.currencySymbol}${formatNumber(data.current_cost, 4)}</div>`,
@@ -45,27 +48,46 @@ const WIDGET_REGISTRY = {
     hourly_estimate: {
         id: 'hourly_estimate',
         titleKey: 'dashboard.hourly_estimate',
+        shortTitleKey: 'dashboard.hourly_estimate_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.hourly_cost_estimate, 4)}<span class="unit">${t('unit.per_hour')}</span></div>`,
+        render: (data, displayMode, widgetConfig) => renderEstimationWidget(data, widgetConfig, {
+            costValue: data.hourly_cost_estimate,
+            costDecimals: 4,
+            unitKey: 'unit.per_hour',
+            whMultiplier: 1,
+        }),
     },
     daily_estimate: {
         id: 'daily_estimate',
         titleKey: 'dashboard.daily_estimate',
+        shortTitleKey: 'dashboard.daily_estimate_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.daily_cost_estimate, 2)}<span class="unit">${t('unit.per_day')}</span></div>`,
+        render: (data, displayMode, widgetConfig) => renderEstimationWidget(data, widgetConfig, {
+            costValue: data.daily_cost_estimate,
+            costDecimals: 2,
+            unitKey: 'unit.per_day',
+            whMultiplier: 24,
+        }),
     },
     monthly_estimate: {
         id: 'monthly_estimate',
         titleKey: 'dashboard.monthly_estimate',
+        shortTitleKey: 'dashboard.monthly_estimate_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>`,
         defaultSize: 'small',
-        render: (data) => `<div class="widget-value small">${state.currencySymbol}${formatNumber(data.monthly_cost_estimate, 2)}<span class="unit">${t('unit.per_month')}</span></div>`,
+        render: (data, displayMode, widgetConfig) => renderEstimationWidget(data, widgetConfig, {
+            costValue: data.monthly_cost_estimate,
+            costDecimals: 2,
+            unitKey: 'unit.per_month',
+            whMultiplier: 720,
+        }),
     },
     session_duration: {
         id: 'session_duration',
         titleKey: 'dashboard.session_duration',
+        shortTitleKey: 'dashboard.session_duration_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
         render: (data) => `<div class="widget-value small">${formatDuration(data.session_duration_secs)}</div>`,
@@ -285,6 +307,7 @@ const WIDGET_REGISTRY = {
     surplus: {
         id: 'surplus',
         titleKey: 'widget.surplus',
+        shortTitleKey: 'widget.surplus_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
         defaultSize: 'medium',
         render: (data) => {
@@ -317,6 +340,7 @@ const WIDGET_REGISTRY = {
     session_controls: {
         id: 'session_controls',
         titleKey: 'widget.session_controls',
+        shortTitleKey: 'widget.session_controls_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
         defaultSize: 'medium',
         render: (data) => {
@@ -352,6 +376,7 @@ const WIDGET_REGISTRY = {
     processes: {
         id: 'processes',
         titleKey: 'widget.processes',
+        shortTitleKey: 'widget.processes_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
         defaultSize: 'large',
         defaultColSpan: 2,
@@ -409,10 +434,49 @@ const WIDGET_REGISTRY = {
 };
 
 // Helper function to get widget title from translations
-function getWidgetTitle(widgetId) {
+// Uses short title when widget is 1×1 and a short key exists
+function getWidgetTitle(widgetId, widgetConfig) {
     const widget = WIDGET_REGISTRY[widgetId];
     if (!widget) return widgetId;
+
+    // Check if widget is 1×1 and has a short title
+    if (widgetConfig && widget.shortTitleKey) {
+        const colSpan = widgetConfig.col_span || 1;
+        const rowSpan = widgetConfig.row_span || 1;
+        if (colSpan === 1 && rowSpan === 1) {
+            const shortTitle = t(widget.shortTitleKey);
+            if (shortTitle) return shortTitle;
+        }
+    }
+
     return t(widget.titleKey) || widget.titleKey;
+}
+
+// Helper to render estimation widgets with both cost and Wh lines
+function renderEstimationWidget(data, widgetConfig, opts) {
+    const { costValue, costDecimals, unitKey, whMultiplier } = opts;
+    const showWh = widgetConfig?.show_wh !== false; // default true
+    const whValue = data.power_watts * whMultiplier;
+    const whDisplay = whValue >= 1000
+        ? `${formatNumber(whValue / 1000, 1)}<span class="unit">kWh</span>`
+        : `${formatNumber(whValue, 0)}<span class="unit">Wh</span>`;
+
+    const eyeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    const eyeOffIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+    return `
+        <div class="estimation-lines">
+            <div class="estimation-line">
+                <div class="widget-value small cost-value">${state.currencySymbol}${formatNumber(costValue, costDecimals)}<span class="unit">${t(unitKey)}</span></div>
+            </div>
+            ${showWh ? `<div class="estimation-line secondary">
+                <div class="widget-value small">${whDisplay}</div>
+            </div>` : ''}
+        </div>
+        <button class="estimation-toggle-btn" data-widget-id="${widgetConfig?.id}" title="${showWh ? t('widget.show_cost') : t('widget.show_energy')}">
+            ${showWh ? eyeIcon : eyeOffIcon}
+        </button>
+    `;
 }
 
 // ===== State Management =====
@@ -755,6 +819,28 @@ function setupGlobalDisplayToggle() {
 
 // Handle clicks on dynamically rendered elements in the dashboard
 async function handleDashboardClick(e) {
+    // Handle estimation widget Wh toggle
+    const toggleBtn = e.target.closest('.estimation-toggle-btn');
+    if (toggleBtn) {
+        e.stopPropagation();
+        const widgetId = toggleBtn.dataset.widgetId;
+        if (widgetId) {
+            const wc = state.dashboardConfig?.widgets?.find(w => w.id === widgetId);
+            if (wc) {
+                wc.show_wh = !wc.show_wh;
+                saveDashboardConfigQuiet();
+                // Re-render just this widget
+                const data = state.lastDashboardData || buildDashboardData();
+                const widgetDef = WIDGET_REGISTRY[widgetId];
+                const body = document.getElementById(`widget-body-${widgetId}`);
+                if (widgetDef && body) {
+                    body.innerHTML = widgetDef.render(data, null, wc);
+                }
+            }
+        }
+        return;
+    }
+
     // Handle "Set Baseline" button click
     const baselineBtn = e.target.closest('.set-baseline-btn');
     if (baselineBtn) {
@@ -962,6 +1048,11 @@ function renderDashboard() {
         card.style.gridColumn = `${col} / span ${colSpan}`;
         card.style.gridRow = `${row} / span ${rowSpan}`;
 
+        // Add size class for adaptive styling
+        if (colSpan === 1 && rowSpan === 1) {
+            card.classList.add('widget-1x1');
+        }
+
         // Add edit mode class if active
         if (state.isEditMode) {
             card.classList.add('edit-mode');
@@ -970,7 +1061,7 @@ function renderDashboard() {
         card.innerHTML = `
             <div class="card-header">
                 ${widgetDef.icon}
-                <span>${getWidgetTitle(widgetConfig.id)}</span>
+                <span>${getWidgetTitle(widgetConfig.id, widgetConfig)}</span>
             </div>
             <div class="card-body" id="widget-body-${widgetConfig.id}">
                 <div class="widget-loading">${t('widget.loading')}</div>
@@ -1036,9 +1127,9 @@ function populateWidgetsWithCachedData() {
             // Pass display mode to widgets that support it
             if (widgetDef.supportsDisplayModes) {
                 const displayMode = widgetConfig.display_mode || 'bar';
-                body.innerHTML = widgetDef.render(data, displayMode);
+                body.innerHTML = widgetDef.render(data, displayMode, widgetConfig);
             } else {
-                body.innerHTML = widgetDef.render(data);
+                body.innerHTML = widgetDef.render(data, null, widgetConfig);
             }
         }
     }
@@ -1119,7 +1210,7 @@ function renderVisibilityPanel() {
         const item = document.createElement('div');
         item.className = 'visibility-item';
         item.innerHTML = `
-            <span class="visibility-item-label">${getWidgetTitle(widgetConfig.id)}</span>
+            <span class="visibility-item-label">${getWidgetTitle(widgetConfig.id, widgetConfig)}</span>
             <div class="visibility-item-controls">
                 ${displayModeSelect}
                 <label class="toggle">
@@ -1687,7 +1778,7 @@ function openEditModal() {
         item.dataset.widgetId = widgetConfig.id;
         item.innerHTML = `
             <span class="drag-handle">&#x2630;</span>
-            <span class="widget-toggle-title">${getWidgetTitle(widgetConfig.id)}</span>
+            <span class="widget-toggle-title">${getWidgetTitle(widgetConfig.id, widgetConfig)}</span>
             <select class="widget-size-select" data-widget-id="${widgetConfig.id}">
                 <option value="small" ${currentSize === 'small' ? 'selected' : ''}>${t('widget.size.small')}</option>
                 <option value="medium" ${currentSize === 'medium' ? 'selected' : ''}>${t('widget.size.medium')}</option>
@@ -2009,9 +2100,9 @@ function renderWidgetsByType(data, type) {
         if (body) {
             if (widgetDef.supportsDisplayModes) {
                 const displayMode = widgetConfig.display_mode || 'text';
-                body.innerHTML = widgetDef.render(data, displayMode);
+                body.innerHTML = widgetDef.render(data, displayMode, widgetConfig);
             } else {
-                body.innerHTML = widgetDef.render(data);
+                body.innerHTML = widgetDef.render(data, null, widgetConfig);
             }
         }
     }

@@ -482,6 +482,7 @@ body {
     position: relative;
     cursor: grab;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    overflow: hidden;
 }
 
 .widget-card:active {
@@ -2125,4 +2126,148 @@ body {
 /* Chart widgets get more vertical space */
 .widget-card[data-display-mode="chart"] .card-body {
     min-height: 80px;
+}
+
+/* ===== Constrain chart/radial containers within grid cells ===== */
+.widget-card .mini-chart-container {
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.widget-card .radial-container {
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.widget-card .mini-chart {
+    min-height: 0;
+}
+
+/* ===== Adaptive Font Sizes for Small Widgets (1×1) ===== */
+.widget-card.widget-1x1 .card-header {
+    font-size: 0.6rem;
+    margin-bottom: 2px;
+    gap: 4px;
+}
+
+.widget-card.widget-1x1 .card-header svg {
+    width: 12px;
+    height: 12px;
+}
+
+.widget-card.widget-1x1 .card-header span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.widget-card.widget-1x1 .widget-value {
+    font-size: 1.2rem;
+    line-height: 1.1;
+}
+
+.widget-card.widget-1x1 .widget-value.small {
+    font-size: 1rem;
+}
+
+.widget-card.widget-1x1 .widget-value .unit {
+    font-size: 0.6rem;
+}
+
+.widget-card.widget-1x1 .metric-row {
+    padding: 1px 0;
+}
+
+.widget-card.widget-1x1 .metric-label {
+    font-size: 0.6rem;
+    min-width: 30px;
+}
+
+.widget-card.widget-1x1 .metric-value {
+    font-size: 0.7rem;
+}
+
+.widget-card.widget-1x1 .metric-info {
+    display: none;
+}
+
+.widget-card.widget-1x1 .card-body {
+    padding: 0;
+}
+
+.widget-card.widget-1x1 {
+    padding: var(--spacing-sm);
+}
+
+/* ===== Estimation Widget Dual Display ===== */
+.estimation-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    justify-content: center;
+}
+
+.estimation-line {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-xs);
+}
+
+.estimation-line .widget-value {
+    font-size: 1.4rem;
+}
+
+.estimation-line .widget-value.small {
+    font-size: 1.1rem;
+}
+
+.estimation-line.secondary .widget-value {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.estimation-line.secondary .widget-value .unit {
+    font-size: 0.7rem;
+}
+
+.widget-card.widget-1x1 .estimation-line .widget-value {
+    font-size: 1rem;
+}
+
+.widget-card.widget-1x1 .estimation-line .widget-value.small {
+    font-size: 0.85rem;
+}
+
+.widget-card.widget-1x1 .estimation-line.secondary .widget-value {
+    font-size: 0.8rem;
+}
+
+.estimation-toggle-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    z-index: 5;
+}
+
+.estimation-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.estimation-toggle-btn svg {
+    width: 14px;
+    height: 14px;
 }

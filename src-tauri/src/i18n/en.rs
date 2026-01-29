@@ -241,5 +241,21 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("dashboard.display_mode_title".into(), "Display Mode".into());
     t.insert("dashboard.edit_title".into(), "Edit Dashboard".into());
 
+    // Short widget titles (for 1×1 widgets)
+    t.insert("dashboard.hourly_estimate_short".into(), "Hourly".into());
+    t.insert("dashboard.daily_estimate_short".into(), "Daily".into());
+    t.insert("dashboard.monthly_estimate_short".into(), "Monthly".into());
+    t.insert("dashboard.session_energy_short".into(), "Energy".into());
+    t.insert("dashboard.session_cost_short".into(), "Cost".into());
+    t.insert("dashboard.session_duration_short".into(), "Duration".into());
+    t.insert("dashboard.current_power_short".into(), "Power".into());
+    t.insert("widget.processes_short".into(), "Procs".into());
+    t.insert("widget.session_controls_short".into(), "Session".into());
+    t.insert("widget.surplus_short".into(), "Surplus".into());
+
+    // Estimation widget toggle labels
+    t.insert("widget.show_cost".into(), "Cost".into());
+    t.insert("widget.show_energy".into(), "Energy".into());
+
     t
 }
