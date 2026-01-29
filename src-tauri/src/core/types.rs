@@ -214,6 +214,8 @@ pub struct BaselineDetection {
 pub struct CriticalMetrics {
     /// Current power consumption in watts
     pub power_watts: f64,
+    /// Session average power consumption in watts (smoothed)
+    pub avg_power_watts: f64,
     /// CPU usage percentage (0-100)
     pub cpu_usage_percent: f64,
     /// GPU usage percentage (0-100), if available

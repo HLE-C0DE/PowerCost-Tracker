@@ -507,7 +507,7 @@ function getWidgetTitle(widgetId, widgetConfig) {
 function renderEstimationWidget(data, widgetConfig, opts) {
     const { costValue, costDecimals, unitKey, whMultiplier } = opts;
     const showWh = widgetConfig?.show_wh !== false; // default true
-    const whValue = data.power_watts * whMultiplier;
+    const whValue = (data.avg_power_watts || data.power_watts) * whMultiplier;
     const whDisplay = whValue >= 1000
         ? `${formatNumber(whValue / 1000, 1)}<span class="unit">kWh</span>`
         : `${formatNumber(whValue, 0)}<span class="unit">Wh</span>`;
@@ -661,7 +661,7 @@ function setupNavigation() {
             document.getElementById(targetView).classList.add('active');
 
             if (targetView === 'history') {
-                loadHistoryData('today');
+                loadHistoryData('week');
             }
         });
     });

@@ -827,6 +827,7 @@ async fn critical_monitoring_loop(app: tauri::AppHandle) {
         // Build and cache critical metrics
         let critical_metrics = CriticalMetrics {
             power_watts,
+            avg_power_watts,
             cpu_usage_percent: cpu_usage,
             gpu_usage_percent: gpu_usage,
             gpu_power_watts: gpu_power,
