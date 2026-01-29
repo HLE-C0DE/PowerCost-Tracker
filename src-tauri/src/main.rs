@@ -611,11 +611,13 @@ fn main() {
                 config.general.start_minimized
             };
 
-            if start_minimized {
+            if !start_minimized {
                 if let Some(main_window) = app.get_webview_window("main") {
-                    let _ = main_window.hide();
-                    log::info!("Started minimized - main window hidden");
+                    let _ = main_window.show();
+                    log::info!("Main window shown on startup");
                 }
+            } else {
+                log::info!("Started minimized - main window stays hidden");
             }
 
             // Create tray menu
@@ -747,13 +749,20 @@ async fn critical_monitoring_loop(app: tauri::AppHandle) {
             )
         };
 
+        // Use session average power for estimates instead of instantaneous
+        let avg_power_watts = if session_duration_secs > 0 {
+            cumulative_wh / (session_duration_secs as f64 / 3600.0)
+        } else {
+            power_watts // fallback to instantaneous at start
+        };
+
         // Calculate cost estimates
         let (hourly_cost, daily_cost, monthly_cost) = {
             let pricing = state.pricing.lock().await;
             (
-                pricing.calculate_hourly_cost(power_watts),
-                pricing.calculate_daily_cost(power_watts),
-                pricing.calculate_monthly_cost(power_watts),
+                pricing.calculate_hourly_cost(avg_power_watts),
+                pricing.calculate_daily_cost(avg_power_watts),
+                pricing.calculate_monthly_cost(avg_power_watts),
             )
         };
 

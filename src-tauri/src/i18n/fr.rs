@@ -233,6 +233,13 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("widget.size.medium".into(), "Moyen".into());
     t.insert("widget.size.large".into(), "Grand".into());
     t.insert("widget.no_processes_found".into(), "Aucun processus trouv\u{00E9}".into());
+    t.insert("widget.hide".into(), "Masquer le widget".into());
+    t.insert("widget.display.bar".into(), "Barre".into());
+    t.insert("widget.display.text".into(), "Texte".into());
+    t.insert("widget.display.radial".into(), "Radial".into());
+    t.insert("widget.display.chart".into(), "Graphique".into());
+    t.insert("dashboard.display_mode_title".into(), "Mode d'affichage".into());
+    t.insert("dashboard.edit_title".into(), "Modifier le tableau de bord".into());
 
     t
 }

@@ -749,9 +749,11 @@ impl WmiMonitor {
             }
         }
 
-        // Clamp aggregated GPU usage to 100% max
+        // Clamp aggregated percentages to 100% max
         let processes: Vec<ProcessMetrics> = aggregated.into_values()
             .map(|mut p| {
+                p.cpu_percent = p.cpu_percent.min(100.0);
+                p.memory_percent = p.memory_percent.min(100.0);
                 if let Some(gpu) = p.gpu_percent {
                     p.gpu_percent = Some(gpu.min(100.0));
                 }
@@ -846,9 +848,11 @@ impl WmiMonitor {
             }
         }
 
-        // Clamp aggregated GPU usage to 100% max
+        // Clamp aggregated percentages to 100% max
         let mut processes: Vec<ProcessMetrics> = aggregated.into_values()
             .map(|mut p| {
+                p.cpu_percent = p.cpu_percent.min(100.0);
+                p.memory_percent = p.memory_percent.min(100.0);
                 if let Some(gpu) = p.gpu_percent {
                     p.gpu_percent = Some(gpu.min(100.0));
                 }

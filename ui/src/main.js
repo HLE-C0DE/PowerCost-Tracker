@@ -518,6 +518,13 @@ function applyTranslations() {
             el.placeholder = state.translations[key];
         }
     });
+    // Also handle title attribute translations
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (state.translations[key]) {
+            el.title = state.translations[key];
+        }
+    });
 }
 
 function t(key) {
@@ -966,9 +973,9 @@ function renderDashboard() {
                 <span>${getWidgetTitle(widgetConfig.id)}</span>
             </div>
             <div class="card-body" id="widget-body-${widgetConfig.id}">
-                <div class="widget-loading">Loading...</div>
+                <div class="widget-loading">${t('widget.loading')}</div>
             </div>
-            ${state.isEditMode ? '<button class="widget-disable-btn" title="Hide widget">−</button>' : ''}
+            ${state.isEditMode ? `<button class="widget-disable-btn" title="${t('widget.hide')}">−</button>` : ''}
             ${state.isEditMode ? '<div class="resize-handle"></div>' : ''}
         `;
 
@@ -1102,10 +1109,10 @@ function renderVisibilityPanel() {
         const currentMode = widgetConfig.display_mode || 'bar';
         const displayModeSelect = widgetDef.supportsDisplayModes ? `
             <select class="display-mode-select" data-widget-id="${widgetConfig.id}">
-                <option value="bar" ${currentMode === 'bar' ? 'selected' : ''}>Bar</option>
-                <option value="text" ${currentMode === 'text' ? 'selected' : ''}>Text</option>
-                <option value="radial" ${currentMode === 'radial' ? 'selected' : ''}>Radial</option>
-                <option value="chart" ${currentMode === 'chart' ? 'selected' : ''}>Chart</option>
+                <option value="bar" ${currentMode === 'bar' ? 'selected' : ''}>${t('widget.display.bar')}</option>
+                <option value="text" ${currentMode === 'text' ? 'selected' : ''}>${t('widget.display.text')}</option>
+                <option value="radial" ${currentMode === 'radial' ? 'selected' : ''}>${t('widget.display.radial')}</option>
+                <option value="chart" ${currentMode === 'chart' ? 'selected' : ''}>${t('widget.display.chart')}</option>
             </select>
         ` : '';
 
