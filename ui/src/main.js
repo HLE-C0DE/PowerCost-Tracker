@@ -123,12 +123,19 @@ const WIDGET_REGISTRY = {
 
             // Radial mode
             if (displayMode === 'radial') {
+                const cpuBars = [];
+                if (hasTemp && cpu.temperature_celsius != null) {
+                    cpuBars.push({ value: cpu.temperature_celsius, max: 100, label: `${formatNumber(cpu.temperature_celsius, 0)}°`, color: cpu.temperature_celsius > 80 ? '#ef4444' : cpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c' });
+                }
+                if (hasClockRange && perCoreFreq.length > 0) {
+                    const avgFreq = perCoreFreq.reduce((a, b) => a + b, 0) / perCoreFreq.length;
+                    const maxFreq = Math.max(...perCoreFreq) * 1.2 || 5000;
+                    cpuBars.push({ value: avgFreq, max: maxFreq, label: `${formatNumber(avgFreq / 1000, 1)}G`, color: '#6366f1' });
+                }
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(cpu.usage_percent, 'CPU', '#6366f1')}
-                        ${hasTemp ? `<div class="radial-details ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                            <span class="metric-value">${temp}</span>
-                        </div>` : ''}
+                        ${globalDisplay !== 'hard' ? renderChargeBars(cpuBars) : ''}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
                 `;
@@ -207,13 +214,22 @@ const WIDGET_REGISTRY = {
 
             // Radial mode
             if (displayMode === 'radial') {
+                const gpuBars = [];
+                if (gpu.temperature_celsius != null) {
+                    gpuBars.push({ value: gpu.temperature_celsius, max: 100, label: `${formatNumber(gpu.temperature_celsius, 0)}°`, color: gpu.temperature_celsius > 80 ? '#ef4444' : gpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c' });
+                }
+                if (gpu.power_watts != null) {
+                    const maxPower = gpu.power_limit_watts || 300;
+                    gpuBars.push({ value: gpu.power_watts, max: maxPower, label: `${formatNumber(gpu.power_watts, 0)}W`, color: '#eab308' });
+                }
+                if (gpu.vram_used_mb != null && gpu.vram_total_mb != null) {
+                    const vramPct = (gpu.vram_used_mb / gpu.vram_total_mb) * 100;
+                    gpuBars.push({ value: vramPct, max: 100, label: `${formatNumber(gpu.vram_used_mb / 1024, 1)}G`, color: '#a855f7' });
+                }
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(usage, 'GPU', '#22c55e')}
-                        <div class="radial-details ${globalDisplay === 'hard' ? 'hidden' : ''}">
-                            <span class="metric-value">${temp}</span>
-                            <span class="metric-value">${power}</span>
-                        </div>
+                        ${globalDisplay !== 'hard' ? renderChargeBars(gpuBars) : ''}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
                 `;
@@ -297,9 +313,12 @@ const WIDGET_REGISTRY = {
 
             // Radial mode
             if (displayMode === 'radial') {
+                const ramBars = [];
+                ramBars.push({ value: usedGB, max: totalGB, label: `${formatNumber(usedGB, 1)}G`, color: '#f59e0b' });
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
+                        ${globalDisplay !== 'hard' ? renderChargeBars(ramBars) : ''}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
                 `;
@@ -2968,6 +2987,40 @@ function renderRadialProgress(percent, label, color = '#6366f1') {
             <text x="50" y="45" text-anchor="middle" class="radial-value">${formatNumber(percent, 0)}%</text>
             <text x="50" y="62" text-anchor="middle" class="radial-label">${label}</text>
         </svg>
+    `;
+}
+
+/**
+ * Renders a single vertical charge bar (battery-style meter)
+ * @param {number} value - Current value
+ * @param {number} max - Maximum value for the scale
+ * @param {string} label - Short label below the bar (e.g. "58°", "3.2G")
+ * @param {string} color - Fill color
+ * @returns {string} HTML markup
+ */
+function renderChargeBar(value, max, label, color) {
+    const percent = Math.min(100, Math.max(0, (value / max) * 100));
+    return `
+        <div class="charge-bar" title="${label}">
+            <div class="charge-bar-track">
+                <div class="charge-bar-fill" style="height:${percent}%;background:${color}"></div>
+            </div>
+            <span class="charge-bar-label">${label}</span>
+        </div>
+    `;
+}
+
+/**
+ * Renders a container of multiple charge bars
+ * @param {Array<{value: number, max: number, label: string, color: string}>} bars
+ * @returns {string} HTML markup
+ */
+function renderChargeBars(bars) {
+    if (!bars || bars.length === 0) return '';
+    return `
+        <div class="charge-bars">
+            ${bars.map(b => renderChargeBar(b.value, b.max, b.label, b.color)).join('')}
+        </div>
     `;
 }
 
