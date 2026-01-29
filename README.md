@@ -57,7 +57,7 @@ PowerCost Tracker monitors your PC's power consumption in real-time and calculat
 - **CPU, GPU, and RAM metrics** - usage, temperature, frequency
 - **Top processes by power consumption** - see what's using the most energy
 - **Session, daily, weekly, and monthly tracking**
-
+- **Fully customizable dashboard** - drag-and-drop widgets, resize (small/medium/large), show/hide any panel, persistent layout
 
 ### Lightweight & Native
 
@@ -357,13 +357,6 @@ cd src-tauri && cargo run --bin powercost-demo
 - Dark/Light themes
 - System tray integration
 
-### Future Plans
-
-- CSV/JSON data export
-- Power consumption alerts and notifications
-- Multiple hardware profiles
-- Component-level power breakdown
-- macOS support
 
 ---
 
