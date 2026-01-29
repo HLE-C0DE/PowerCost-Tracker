@@ -146,7 +146,7 @@ pub fn get_translations() -> HashMap<String, String> {
     // Dashboard - Edit mode
     t.insert("dashboard.edit_mode".into(), "Mode édition".into());
     t.insert("dashboard.default_layout".into(), "Disposition par défaut".into());
-    t.insert("dashboard.toggle_widgets".into(), "Afficher/Masquer".into());
+    t.insert("dashboard.toggle_widgets".into(), "Paramètres des widgets".into());
     t.insert("dashboard.done".into(), "Terminé".into());
     t.insert("dashboard.toggle_visibility".into(), "Visibilité des widgets".into());
     t.insert("dashboard.edit".into(), "Modifier le tableau de bord".into());
