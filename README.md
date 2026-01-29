@@ -50,7 +50,7 @@ PowerCost Tracker monitors your PC's power consumption in real-time and calculat
 
 ### Real-Time Power Monitoring
 
-<img width="1400" height="777" alt="image" src="https://github.com/user-attachments/assets/2d756f75-2238-4c64-8178-a2225c4e40da" />
+<img width="1964" height="687" alt="image" src="https://github.com/user-attachments/assets/0d6da230-c69b-4354-b30f-46eaa38ec3c7" />
 
 - **Live power reading** in Watts from hardware sensors (Intel RAPL, AMD hwmon) or smart estimation
 - **Interactive power graph** with consumption history
