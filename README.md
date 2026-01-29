@@ -8,7 +8,8 @@
 
 <p align="center">
   Track your PC's energy usage, calculate electricity costs, and monitor hardware performance.<br>
-  Perfect for tracking costs of <b>gaming sessions</b>, <b>local LLM inference</b>, <b>AI training</b>, or <b>crypto mining</b>.
+  Perfect for tracking costs of <b>gaming sessions</b>, <b>local LLM inference</b>, <b>AI training</b>, or <b>crypto mining</b>.<br><br>
+  <i>Built with Rust + Tauri — more features than Task Manager, less RAM than a browser tab. No lag, no bloat, pure performance.</i>
 </p>
 
 <p align="center">
@@ -20,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version 1.0.1">
+  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version 1.1.0">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/RAM-<50MB-success.svg" alt="RAM Usage">
@@ -68,7 +69,7 @@ PowerCost Tracker monitors your PC's power consumption in real-time and calculat
 
 <img width="660" height="374" alt="image" src="https://github.com/user-attachments/assets/5ce8969f-efd0-4102-9087-62954c1d5ab8" />
 
-PowerCost-Tracker vs Windows TaskManager vs NZXT CAM (software I used to track my CPU/GPU usage with dignity) 
+**PowerCost Tracker vs Windows Task Manager vs NZXT CAM** — Same monitoring, fraction of the resources.
 
 
 ### Flexible Pricing Modes
@@ -336,7 +337,15 @@ cd src-tauri && cargo run --bin powercost-demo
 
 ## Roadmap
 
-### v1.0.0 (Current Release)
+### v1.1.0 (Current Release)
+
+- Overhauled dashboard with adaptive grid layout and charge bars
+- Extended hardware metrics: per-core clocks, fan speeds, GPU memory clock
+- Improved history view with daily cost stats
+- Session-average power for accurate Wh estimations
+- Numerous bug fixes (tray icon, CPU >100%, start minimized, and more)
+
+### v1.0.0
 
 - Real-time power monitoring (RAPL, WMI, GPU)
 - 4 flexible pricing modes
