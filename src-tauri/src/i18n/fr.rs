@@ -196,10 +196,19 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.refresh_rate_detailed".into(), "Fréquence (Détaillée)".into());
     t.insert("settings.refresh_rate_critical".into(), "Fréquence (Critique)".into());
 
+    // History - Daily breakdown
+    t.insert("history.daily_breakdown".into(), "D\u{00E9}tail journalier".into());
+    t.insert("history.date".into(), "Date".into());
+    t.insert("history.energy".into(), "\u{00C9}nergie".into());
+    t.insert("history.cost".into(), "Co\u{00FB}t".into());
+    t.insert("history.rate".into(), "Tarif".into());
+    t.insert("history.avg".into(), "Moy.".into());
+    t.insert("history.peak".into(), "Max".into());
+
     // History - Tabs
     t.insert("history.tab.power".into(), "Puissance".into());
     t.insert("history.tab.sessions".into(), "Sessions".into());
-    t.insert("history.no_sessions".into(), "Aucune session enregistrée".into());
+    t.insert("history.no_sessions".into(), "Aucune session enregistr\u{00E9}e".into());
 
     // Tray menu
     t.insert("tray.show".into(), "Afficher".into());

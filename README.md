@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.1-blue.svg" alt="Version 1.0.1">
+  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version 1.0.1">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/RAM-<50MB-success.svg" alt="RAM Usage">
@@ -108,6 +108,7 @@ A compact overlay that stays visible while you work or game:
 - Multiple sizes and themes
 - Adjustable opacity
 - Stays on top of other windows
+
 
 
 ### Bilingual Interface

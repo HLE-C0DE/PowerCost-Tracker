@@ -125,12 +125,12 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'radial') {
                 const cpuBars = [];
                 if (hasTemp && cpu.temperature_celsius != null) {
-                    cpuBars.push({ value: cpu.temperature_celsius, max: 100, label: `${formatNumber(cpu.temperature_celsius, 0)}°`, color: cpu.temperature_celsius > 80 ? '#ef4444' : cpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c' });
+                    cpuBars.push({ value: cpu.temperature_celsius, max: 100, label: `${formatNumber(cpu.temperature_celsius, 0)}°`, color: cpu.temperature_celsius > 80 ? '#ef4444' : cpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c', name: 'TEMP' });
                 }
                 if (hasClockRange && perCoreFreq.length > 0) {
                     const avgFreq = perCoreFreq.reduce((a, b) => a + b, 0) / perCoreFreq.length;
                     const maxFreq = Math.max(...perCoreFreq) * 1.2 || 5000;
-                    cpuBars.push({ value: avgFreq, max: maxFreq, label: `${formatNumber(avgFreq / 1000, 1)}G`, color: '#6366f1' });
+                    cpuBars.push({ value: avgFreq, max: maxFreq, label: `${formatNumber(avgFreq / 1000, 1)}G`, color: '#6366f1', name: 'CLK' });
                 }
                 return `
                     <div class="radial-container">
@@ -216,15 +216,15 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'radial') {
                 const gpuBars = [];
                 if (gpu.temperature_celsius != null) {
-                    gpuBars.push({ value: gpu.temperature_celsius, max: 100, label: `${formatNumber(gpu.temperature_celsius, 0)}°`, color: gpu.temperature_celsius > 80 ? '#ef4444' : gpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c' });
+                    gpuBars.push({ value: gpu.temperature_celsius, max: 100, label: `${formatNumber(gpu.temperature_celsius, 0)}°`, color: gpu.temperature_celsius > 80 ? '#ef4444' : gpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c', name: 'TEMP' });
                 }
                 if (gpu.power_watts != null) {
                     const maxPower = gpu.power_limit_watts || 300;
-                    gpuBars.push({ value: gpu.power_watts, max: maxPower, label: `${formatNumber(gpu.power_watts, 0)}W`, color: '#eab308' });
+                    gpuBars.push({ value: gpu.power_watts, max: maxPower, label: `${formatNumber(gpu.power_watts, 0)}W`, color: '#eab308', name: 'PWR' });
                 }
                 if (gpu.vram_used_mb != null && gpu.vram_total_mb != null) {
                     const vramPct = (gpu.vram_used_mb / gpu.vram_total_mb) * 100;
-                    gpuBars.push({ value: vramPct, max: 100, label: `${formatNumber(gpu.vram_used_mb / 1024, 1)}G`, color: '#a855f7' });
+                    gpuBars.push({ value: vramPct, max: 100, label: `${formatNumber(gpu.vram_used_mb / 1024, 1)}G`, color: '#a855f7', name: 'VRAM' });
                 }
                 return `
                     <div class="radial-container">
@@ -314,7 +314,7 @@ const WIDGET_REGISTRY = {
             // Radial mode
             if (displayMode === 'radial') {
                 const ramBars = [];
-                ramBars.push({ value: usedGB, max: totalGB, label: `${formatNumber(usedGB, 1)}G`, color: '#f59e0b' });
+                ramBars.push({ value: usedGB, max: totalGB, label: `${formatNumber(usedGB, 1)}G`, color: '#f59e0b', name: 'USED' });
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
@@ -2582,13 +2582,16 @@ async function loadHistoryData(range) {
 
         const stats = await invoke('get_history', { startDate, endDate });
 
+        const breakdownEl = document.getElementById('daily-breakdown');
         if (stats.length === 0) {
             document.getElementById('no-history-data').classList.remove('hidden');
             document.querySelector('.history-chart-container').classList.add('hidden');
+            if (breakdownEl) breakdownEl.classList.add('hidden');
             state.historyData = [];
         } else {
             document.getElementById('no-history-data').classList.add('hidden');
             document.querySelector('.history-chart-container').classList.remove('hidden');
+            if (breakdownEl) breakdownEl.classList.remove('hidden');
             state.historyData = stats;
 
             const totalWh = stats.reduce((sum, s) => sum + s.total_wh, 0);
@@ -2600,6 +2603,27 @@ async function loadHistoryData(range) {
             document.getElementById('history-total-cost').textContent = `${state.currencySymbol}${formatNumber(totalCost, 2)}`;
             document.getElementById('history-avg-power').textContent = `${formatNumber(avgPower, 0)} W`;
             document.getElementById('history-peak-power').textContent = `${formatNumber(maxPower, 0)} W`;
+
+            // Show rate badge
+            const rateBadge = document.getElementById('history-rate-badge');
+            if (rateBadge && totalWh > 0 && totalCost > 0) {
+                const avgRate = totalCost / (totalWh / 1000);
+                rateBadge.textContent = `${state.currencySymbol}${formatNumber(avgRate, 4)}/kWh`;
+            }
+
+            // Populate daily breakdown table
+            const tbody = document.getElementById('breakdown-table-body');
+            if (tbody) {
+                tbody.innerHTML = stats.map(day => `
+                    <tr>
+                        <td>${day.date}</td>
+                        <td class="energy-cell">${formatNumber(day.total_wh / 1000, 3)} kWh</td>
+                        <td>${formatNumber(day.avg_watts, 0)} W</td>
+                        <td class="peak-cell">${formatNumber(day.max_watts, 0)} W</td>
+                        <td class="cost-cell">${day.total_cost != null ? state.currencySymbol + formatNumber(day.total_cost, 4) : '--'}</td>
+                    </tr>
+                `).join('');
+            }
 
             drawHistoryChart();
         }
@@ -2622,17 +2646,36 @@ async function loadSessionHistory() {
             list.innerHTML = sessions.map(s => {
                 const startDate = new Date(s.start_time * 1000);
                 const duration = s.end_time ? s.end_time - s.start_time : 0;
+                const t = state.translations;
                 return `
                     <div class="session-item">
                         <div class="session-item-header">
-                            <span class="session-date">${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()}</span>
-                            <span class="session-duration">${formatDuration(duration)}</span>
+                            <div>
+                                <span class="session-date">${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()}</span>
+                                <span class="session-duration">${formatDuration(duration)}</span>
+                            </div>
+                            <span class="session-status completed">
+                                <span class="session-status-dot"></span>
+                                ${s.end_time ? (t['session.ended'] || 'Completed') : (t['widget.session_active'] || 'Active')}
+                            </span>
                         </div>
                         <div class="session-item-stats">
-                            <span>Baseline: ${formatNumber(s.baseline_watts, 1)} W</span>
-                            <span>Total: ${formatNumber(s.total_wh, 2)} Wh</span>
-                            <span>Surplus: ${formatNumber(s.surplus_wh, 2)} Wh</span>
-                            <span>Cost: ${state.currencySymbol}${formatNumber(s.surplus_cost, 4)}</span>
+                            <div class="session-stat">
+                                <span class="session-stat-label">${t['widget.baseline'] || 'Baseline'}</span>
+                                <span class="session-stat-value">${formatNumber(s.baseline_watts, 1)} W</span>
+                            </div>
+                            <div class="session-stat">
+                                <span class="session-stat-label">${t['history.energy'] || 'Energy'}</span>
+                                <span class="session-stat-value">${formatNumber(s.total_wh, 2)} Wh</span>
+                            </div>
+                            <div class="session-stat">
+                                <span class="session-stat-label">${t['session.surplus'] || 'Surplus'}</span>
+                                <span class="session-stat-value surplus">${formatNumber(s.surplus_wh, 2)} Wh</span>
+                            </div>
+                            <div class="session-stat">
+                                <span class="session-stat-label">${t['history.cost'] || 'Cost'}</span>
+                                <span class="session-stat-value cost">${state.currencySymbol}${formatNumber(s.surplus_cost, 4)}</span>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2652,12 +2695,14 @@ function drawHistoryChart() {
     const rect = container.getBoundingClientRect();
 
     canvas.width = rect.width - 32;
-    canvas.height = rect.height - 32;
+    canvas.height = rect.height - 64; // Account for chart header
 
     const data = state.historyData;
     if (data.length === 0) return;
 
-    const padding = { top: 20, right: 20, bottom: 40, left: 60 };
+    const hasCostData = data.some(d => d.total_cost != null && d.total_cost > 0);
+    const rightPad = hasCostData ? 60 : 20;
+    const padding = { top: 20, right: rightPad, bottom: 40, left: 60 };
     const width = canvas.width - padding.left - padding.right;
     const height = canvas.height - padding.top - padding.bottom;
 
@@ -2665,7 +2710,12 @@ function drawHistoryChart() {
 
     const maxWh = Math.max(...data.map(d => d.total_wh)) * 1.1 || 100;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    // Grid lines and left Y-axis (energy)
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const labelColor = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)';
+
+    ctx.strokeStyle = gridColor;
     ctx.lineWidth = 1;
 
     for (let i = 0; i <= 5; i++) {
@@ -2676,15 +2726,30 @@ function drawHistoryChart() {
         ctx.stroke();
 
         const value = maxWh - (maxWh / 5) * i;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillStyle = labelColor;
         ctx.font = '11px system-ui';
         ctx.textAlign = 'right';
         ctx.fillText(formatNumber(value / 1000, 1) + ' kWh', padding.left - 8, y + 4);
     }
 
+    // Right Y-axis labels (cost) if cost data exists
+    let maxCost = 0;
+    if (hasCostData) {
+        maxCost = Math.max(...data.map(d => d.total_cost || 0)) * 1.1 || 1;
+        for (let i = 0; i <= 5; i++) {
+            const y = padding.top + (height / 5) * i;
+            const value = maxCost - (maxCost / 5) * i;
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.6)';
+            ctx.font = '11px system-ui';
+            ctx.textAlign = 'left';
+            ctx.fillText(state.currencySymbol + formatNumber(value, 2), padding.left + width + 8, y + 4);
+        }
+    }
+
     const barWidth = Math.min(40, (width / data.length) * 0.7);
     const barGap = (width - barWidth * data.length) / (data.length + 1);
 
+    // Draw energy bars
     data.forEach((day, i) => {
         const x = padding.left + barGap + i * (barWidth + barGap);
         const barHeight = (day.total_wh / maxWh) * height;
@@ -2699,29 +2764,57 @@ function drawHistoryChart() {
         ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
         ctx.fill();
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        // Date labels
+        ctx.fillStyle = labelColor;
         ctx.font = '10px system-ui';
         ctx.textAlign = 'center';
         const dateLabel = day.date ? day.date.slice(5) : `Day ${i + 1}`;
         ctx.fillText(dateLabel, x + barWidth / 2, padding.top + height + 20);
     });
 
-    const avgWh = data.reduce((sum, d) => sum + d.total_wh, 0) / data.length;
-    const avgY = padding.top + height - (avgWh / maxWh) * height;
+    // Cost line overlay
+    if (hasCostData && data.length > 1) {
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
 
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.beginPath();
-    ctx.moveTo(padding.left, avgY);
-    ctx.lineTo(padding.left + width, avgY);
-    ctx.stroke();
-    ctx.setLineDash([]);
+        data.forEach((day, i) => {
+            const x = padding.left + barGap + i * (barWidth + barGap) + barWidth / 2;
+            const costY = padding.top + height - ((day.total_cost || 0) / maxCost) * height;
+            if (i === 0) ctx.moveTo(x, costY);
+            else ctx.lineTo(x, costY);
+        });
+        ctx.stroke();
 
-    ctx.fillStyle = '#22c55e';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText(`Avg: ${formatNumber(avgWh / 1000, 2)} kWh`, padding.left + 5, avgY - 5);
+        // Cost dots
+        data.forEach((day, i) => {
+            const x = padding.left + barGap + i * (barWidth + barGap) + barWidth / 2;
+            const costY = padding.top + height - ((day.total_cost || 0) / maxCost) * height;
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.arc(x, costY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    } else {
+        // No cost data - show energy average line instead
+        const avgWh = data.reduce((sum, d) => sum + d.total_wh, 0) / data.length;
+        const avgY = padding.top + height - (avgWh / maxWh) * height;
+
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, avgY);
+        ctx.lineTo(padding.left + width, avgY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '11px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Avg: ${formatNumber(avgWh / 1000, 2)} kWh`, padding.left + 5, avgY - 5);
+    }
 }
 
 // ===== Settings =====
@@ -2994,14 +3087,16 @@ function renderRadialProgress(percent, label, color = '#6366f1') {
  * Renders a single vertical charge bar (battery-style meter)
  * @param {number} value - Current value
  * @param {number} max - Maximum value for the scale
- * @param {string} label - Short label below the bar (e.g. "58°", "3.2G")
+ * @param {string} label - Value label below the bar (e.g. "58°", "3.2G")
  * @param {string} color - Fill color
+ * @param {string} name - Metric name above the bar (e.g. "TEMP", "CLK")
  * @returns {string} HTML markup
  */
-function renderChargeBar(value, max, label, color) {
+function renderChargeBar(value, max, label, color, name) {
     const percent = Math.min(100, Math.max(0, (value / max) * 100));
     return `
-        <div class="charge-bar" title="${label}">
+        <div class="charge-bar" title="${name}: ${label}">
+            <span class="charge-bar-name" style="color:${color}">${name}</span>
             <div class="charge-bar-track">
                 <div class="charge-bar-fill" style="height:${percent}%;background:${color}"></div>
             </div>
@@ -3012,14 +3107,14 @@ function renderChargeBar(value, max, label, color) {
 
 /**
  * Renders a container of multiple charge bars
- * @param {Array<{value: number, max: number, label: string, color: string}>} bars
+ * @param {Array<{value: number, max: number, label: string, color: string, name: string}>} bars
  * @returns {string} HTML markup
  */
 function renderChargeBars(bars) {
     if (!bars || bars.length === 0) return '';
     return `
         <div class="charge-bars">
-            ${bars.map(b => renderChargeBar(b.value, b.max, b.label, b.color)).join('')}
+            ${bars.map(b => renderChargeBar(b.value, b.max, b.label, b.color, b.name)).join('')}
         </div>
     `;
 }

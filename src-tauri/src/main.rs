@@ -156,14 +156,29 @@ async fn get_history(
     let pricing_mode = config.pricing.mode.clone();
     drop(config);
 
+    // Get current rate from pricing engine
+    let rate_per_kwh = {
+        let pricing = state.pricing.lock().await;
+        pricing.get_current_rate()
+    };
+
     // Update today's stats before fetching to ensure fresh data
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     if start_date <= today && end_date >= today {
-        let _ = db.update_today_stats(Some(&pricing_mode));
+        let _ = db.update_today_stats(Some(&pricing_mode), Some(rate_per_kwh));
     }
 
-    db.get_daily_stats(&start_date, &end_date)
-        .map_err(|e| e.to_string())
+    let mut stats = db.get_daily_stats(&start_date, &end_date)
+        .map_err(|e| e.to_string())?;
+
+    // Backfill cost for any days that have NULL total_cost
+    for stat in stats.iter_mut() {
+        if stat.total_cost.is_none() && stat.total_wh > 0.0 {
+            stat.total_cost = Some((stat.total_wh / 1000.0) * rate_per_kwh);
+        }
+    }
+
+    Ok(stats)
 }
 
 /// Get power readings for a time range (for graphs)
@@ -848,7 +863,11 @@ async fn critical_monitoring_loop(app: tauri::AppHandle) {
                     let config = state.config.lock().await;
                     let pricing_mode = config.pricing.mode.clone();
                     drop(config);
-                    let _ = db.update_today_stats(Some(&pricing_mode));
+                    let rate = {
+                        let pricing = state.pricing.lock().await;
+                        pricing.get_current_rate()
+                    };
+                    let _ = db.update_today_stats(Some(&pricing_mode), Some(rate));
                 }
             }
         }

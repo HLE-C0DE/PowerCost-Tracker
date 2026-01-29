@@ -186,26 +186,79 @@
                     </div>
 
                     <div class="history-stats">
-                        <div class="stat-card">
-                            <span class="stat-label" data-i18n="history.total_consumption">Total Consumption</span>
-                            <span class="stat-value" id="history-total-wh">-- kWh</span>
+                        <div class="stat-card stat-card--energy">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label" data-i18n="history.total_consumption">Total Consumption</span>
+                                <span class="stat-value" id="history-total-wh">-- kWh</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-label" data-i18n="history.total_cost">Total Cost</span>
-                            <span class="stat-value" id="history-total-cost">--</span>
+                        <div class="stat-card stat-card--cost">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label" data-i18n="history.total_cost">Total Cost</span>
+                                <span class="stat-value" id="history-total-cost">--</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-label" data-i18n="history.average_power">Average Power</span>
-                            <span class="stat-value" id="history-avg-power">-- W</span>
+                        <div class="stat-card stat-card--avg">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label" data-i18n="history.average_power">Average Power</span>
+                                <span class="stat-value" id="history-avg-power">-- W</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-label" data-i18n="history.peak_power">Peak Power</span>
-                            <span class="stat-value" id="history-peak-power">-- W</span>
+                        <div class="stat-card stat-card--peak">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                    <polyline points="17 6 23 6 23 12"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label" data-i18n="history.peak_power">Peak Power</span>
+                                <span class="stat-value" id="history-peak-power">-- W</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="history-chart-container">
+                        <div class="history-chart-header">
+                            <h3 data-i18n="history.energy">Energy</h3>
+                            <span class="history-rate-badge" id="history-rate-badge"></span>
+                        </div>
                         <canvas id="history-chart"></canvas>
+                    </div>
+
+                    <!-- Daily Breakdown Table -->
+                    <div class="daily-breakdown" id="daily-breakdown">
+                        <h3 data-i18n="history.daily_breakdown">Daily Breakdown</h3>
+                        <div class="breakdown-table-wrapper">
+                            <table class="breakdown-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="history.date">Date</th>
+                                        <th data-i18n="history.energy">Energy</th>
+                                        <th data-i18n="history.avg">Avg</th>
+                                        <th data-i18n="history.peak">Peak</th>
+                                        <th data-i18n="history.cost">Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="breakdown-table-body">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <div id="no-history-data" class="empty-state hidden">

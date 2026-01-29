@@ -196,6 +196,15 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.refresh_rate_detailed".into(), "Refresh Rate (Detailed)".into());
     t.insert("settings.refresh_rate_critical".into(), "Refresh Rate (Critical)".into());
 
+    // History - Daily breakdown
+    t.insert("history.daily_breakdown".into(), "Daily Breakdown".into());
+    t.insert("history.date".into(), "Date".into());
+    t.insert("history.energy".into(), "Energy".into());
+    t.insert("history.cost".into(), "Cost".into());
+    t.insert("history.rate".into(), "Rate".into());
+    t.insert("history.avg".into(), "Avg".into());
+    t.insert("history.peak".into(), "Peak".into());
+
     // History - Tabs
     t.insert("history.tab.power".into(), "Power".into());
     t.insert("history.tab.sessions".into(), "Sessions".into());

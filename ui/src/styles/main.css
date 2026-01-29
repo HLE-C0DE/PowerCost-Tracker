@@ -858,32 +858,82 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border-left: 3px solid var(--accent-primary);
 }
 
 .session-item-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
 }
 
 .session-date {
     font-weight: 500;
     color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.session-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.75rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+}
+
+.session-status.completed {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+}
+
+.session-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
 }
 
 .session-item .session-duration {
     font-size: 0.875rem;
     color: var(--text-secondary);
+    font-family: monospace;
 }
 
 .session-item-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.session-stat {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
-    font-size: 0.8rem;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.session-stat-label {
+    font-size: 0.7rem;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.session-stat-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.session-stat-value.surplus {
+    color: var(--accent-yellow);
+}
+
+.session-stat-value.cost {
+    color: var(--accent-green);
 }
 
 /* ===== History View ===== */
@@ -926,6 +976,67 @@ body {
     border-radius: var(--radius-md);
     padding: var(--spacing-lg);
     border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    border-left: 3px solid var(--border-color);
+}
+
+.stat-card--energy {
+    border-left-color: var(--accent-primary);
+}
+
+.stat-card--cost {
+    border-left-color: var(--accent-green);
+}
+
+.stat-card--avg {
+    border-left-color: var(--accent-yellow);
+}
+
+.stat-card--peak {
+    border-left-color: var(--accent-red);
+}
+
+.stat-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+
+.stat-card--energy .stat-card-icon {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--accent-primary);
+}
+
+.stat-card--cost .stat-card-icon {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+}
+
+.stat-card--avg .stat-card-icon {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--accent-yellow);
+}
+
+.stat-card--peak .stat-card-icon {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-red);
+}
+
+.stat-card-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.stat-card-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .stat-label {
@@ -949,11 +1060,110 @@ body {
     padding: var(--spacing-lg);
     border: 1px solid var(--border-color);
     height: 300px;
+    display: flex;
+    flex-direction: column;
+}
+
+.history-chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.history-chart-header h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.history-rate-badge {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
 }
 
 #history-chart {
     width: 100%;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ===== Daily Breakdown Table ===== */
+.daily-breakdown {
+    margin-top: var(--spacing-lg);
+    background-color: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-lg);
+}
+
+.daily-breakdown h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+}
+
+.breakdown-table-wrapper {
+    overflow-x: auto;
+}
+
+.breakdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.breakdown-table th {
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.breakdown-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.breakdown-table tr:hover td {
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.breakdown-table td:first-child {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.breakdown-table .cost-cell {
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+.breakdown-table .energy-cell {
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.breakdown-table .peak-cell {
+    color: var(--accent-red);
+}
+
+[data-theme="light"] .breakdown-table td {
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .breakdown-table tr:hover td {
+    background: rgba(99, 102, 241, 0.04);
 }
 
 .empty-state {
@@ -2030,18 +2240,32 @@ body {
     min-height: 1px;
 }
 
+.charge-bar-name {
+    font-size: 0.5rem;
+    font-weight: 700;
+    white-space: nowrap;
+    line-height: 1;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
 .charge-bar-label {
     font-size: 0.55rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     white-space: nowrap;
     line-height: 1;
     letter-spacing: -0.02em;
+    font-weight: 600;
 }
 
 /* Charge bar sizing for different widget sizes */
 .widget-card.widget-1x1 .charge-bar-track {
     height: 30px;
     width: 5px;
+}
+
+.widget-card.widget-1x1 .charge-bar-name {
+    font-size: 0.4rem;
 }
 
 .widget-card.widget-1x1 .charge-bar-label {
@@ -2057,6 +2281,10 @@ body {
     width: 5px;
 }
 
+.widget-card.widget-2cell .charge-bar-name {
+    font-size: 0.45rem;
+}
+
 .widget-card.widget-2cell .charge-bar-label {
     font-size: 0.5rem;
 }
@@ -2064,6 +2292,10 @@ body {
 .widget-card.widget-4cell .charge-bar-track {
     height: 60px;
     width: 7px;
+}
+
+.widget-card.widget-4cell .charge-bar-name {
+    font-size: 0.55rem;
 }
 
 .widget-card.widget-4cell .charge-bar-label {
@@ -2080,9 +2312,13 @@ body {
     display: none !important;
 }
 
-/* Minimize mode: smaller charge bars */
+/* Minimize mode: smaller charge bars, hide names */
 .display-minimize .charge-bar-track {
     height: 35px;
+}
+
+.display-minimize .charge-bar-name {
+    display: none;
 }
 
 .display-minimize .charge-bar-label {

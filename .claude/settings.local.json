@@ -34,7 +34,8 @@
       "Bash(rocm-smi:*)",
       "Bash(amd-smi process:*)",
       "Bash(git -C \"C:\\\\Users\\\\lescu\\\\Desktop\\\\Projects\\\\PowerCost-Tracker\" status)",
-      "Bash(npm run tauri:*)"
+      "Bash(npm run tauri:*)",
+      "Bash(git tag:*)"
     ]
   }
 }

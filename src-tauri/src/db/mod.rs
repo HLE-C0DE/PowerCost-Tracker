@@ -214,7 +214,8 @@ impl Database {
 
     /// Compute and update daily stats from power readings for a specific date
     /// This aggregates all readings for the given date and updates the daily_stats table
-    pub fn update_daily_stats_for_date(&self, date: &str, pricing_mode: Option<&str>) -> Result<Option<DailyStats>> {
+    /// If `rate_per_kwh` is provided, cost will be calculated as total_kwh * rate
+    pub fn update_daily_stats_for_date(&self, date: &str, pricing_mode: Option<&str>, rate_per_kwh: Option<f64>) -> Result<Option<DailyStats>> {
         // Get start and end timestamps for the date
         let start_of_day = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
             .map_err(|e| Error::Database(rusqlite::Error::InvalidParameterName(e.to_string())))?
@@ -250,10 +251,12 @@ impl Database {
                 let hours_per_reading = 10.0 / 3600.0; // 10 seconds in hours
                 let total_wh = sum_watts * hours_per_reading;
 
+                let total_cost = rate_per_kwh.map(|rate| (total_wh / 1000.0) * rate);
+
                 let stats = DailyStats {
                     date: date.to_string(),
                     total_wh,
-                    total_cost: None, // Cost calculation would require pricing engine
+                    total_cost,
                     avg_watts,
                     max_watts,
                     pricing_mode: pricing_mode.map(String::from),
@@ -267,13 +270,13 @@ impl Database {
     }
 
     /// Update daily stats for today based on current readings
-    pub fn update_today_stats(&self, pricing_mode: Option<&str>) -> Result<Option<DailyStats>> {
+    pub fn update_today_stats(&self, pricing_mode: Option<&str>, rate_per_kwh: Option<f64>) -> Result<Option<DailyStats>> {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        self.update_daily_stats_for_date(&today, pricing_mode)
+        self.update_daily_stats_for_date(&today, pricing_mode, rate_per_kwh)
     }
 
     /// Rebuild daily stats for all dates that have readings
-    pub fn rebuild_all_daily_stats(&self, pricing_mode: Option<&str>) -> Result<u32> {
+    pub fn rebuild_all_daily_stats(&self, pricing_mode: Option<&str>, rate_per_kwh: Option<f64>) -> Result<u32> {
         // Get all distinct dates from power_readings
         let mut stmt = self.conn.prepare(
             "SELECT DISTINCT date(timestamp, 'unixepoch') as reading_date
@@ -288,7 +291,7 @@ impl Database {
 
         let mut count = 0;
         for date in dates {
-            if self.update_daily_stats_for_date(&date, pricing_mode)?.is_some() {
+            if self.update_daily_stats_for_date(&date, pricing_mode, rate_per_kwh)?.is_some() {
                 count += 1;
             }
         }
@@ -480,7 +483,7 @@ mod tests {
         }
 
         // Update daily stats for that date
-        let result = db.update_daily_stats_for_date("2024-01-15", Some("simple")).unwrap();
+        let result = db.update_daily_stats_for_date("2024-01-15", Some("simple"), Some(0.20)).unwrap();
         assert!(result.is_some());
 
         let stats = result.unwrap();
@@ -501,7 +504,7 @@ mod tests {
         let db = create_test_db();
 
         // Try to update stats for a date with no readings
-        let result = db.update_daily_stats_for_date("2024-01-15", Some("simple")).unwrap();
+        let result = db.update_daily_stats_for_date("2024-01-15", Some("simple"), None).unwrap();
         assert!(result.is_none());
     }
 }
