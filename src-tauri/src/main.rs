@@ -88,18 +88,28 @@ async fn get_dashboard_data(state: tauri::State<'_, TauriState>) -> Result<core:
         log::warn!("Failed to get power reading: {}", e);
         0.0
     });
-    let hourly_cost = pricing.calculate_hourly_cost(power_watts);
-    let daily_cost = pricing.calculate_daily_cost(power_watts);
-    let monthly_cost = pricing.calculate_monthly_cost(power_watts);
+
+    // Use session average power for estimates instead of instantaneous
+    let session_duration_secs = app_state.session_start.elapsed().as_secs();
+    let avg_power_watts = if session_duration_secs > 0 {
+        app_state.cumulative_wh / (session_duration_secs as f64 / 3600.0)
+    } else {
+        power_watts
+    };
+
+    let hourly_cost = pricing.calculate_hourly_cost(avg_power_watts);
+    let daily_cost = pricing.calculate_daily_cost(avg_power_watts);
+    let monthly_cost = pricing.calculate_monthly_cost(avg_power_watts);
 
     Ok(core::DashboardData {
         power_watts,
+        avg_power_watts,
         cumulative_wh: app_state.cumulative_wh,
         current_cost: app_state.current_cost,
         hourly_cost_estimate: hourly_cost,
         daily_cost_estimate: daily_cost,
         monthly_cost_estimate: monthly_cost,
-        session_duration_secs: app_state.session_start.elapsed().as_secs(),
+        session_duration_secs,
         source: monitor.get_source_name().to_string(),
         is_estimated: monitor.is_estimated(),
     })

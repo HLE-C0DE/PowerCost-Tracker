@@ -41,6 +41,8 @@ impl PowerReading {
 pub struct DashboardData {
     /// Current power consumption in watts
     pub power_watts: f64,
+    /// Average power consumption in watts over the session
+    pub avg_power_watts: f64,
     /// Cumulative energy since session start in Wh
     pub cumulative_wh: f64,
     /// Current cost since session start
@@ -156,6 +158,18 @@ pub struct MemoryMetrics {
     pub used_bytes: u64,
     pub total_bytes: u64,
     pub usage_percent: f64,
+    /// Swap memory used in bytes
+    #[serde(default)]
+    pub swap_used_bytes: Option<u64>,
+    /// Swap memory total in bytes
+    #[serde(default)]
+    pub swap_total_bytes: Option<u64>,
+    /// Swap usage percentage (0-100)
+    #[serde(default)]
+    pub swap_usage_percent: Option<f64>,
+    /// Physical memory speed in MHz (cached, fetched once via WMI)
+    #[serde(default)]
+    pub memory_speed_mhz: Option<u64>,
 }
 
 /// Process metrics for top processes display
