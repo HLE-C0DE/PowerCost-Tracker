@@ -900,6 +900,20 @@ async fn detailed_monitoring_loop(app: tauri::AppHandle) {
             )
         };
 
+        // Determine if we should collect extended metrics (per-core freq, fans)
+        // based on whether CPU or GPU load exceeds the configured threshold
+        let should_collect_extended = {
+            let critical = state.critical_metrics_cache.lock().await;
+            let config = state.config.lock().await;
+            let threshold = config.advanced.extended_metrics_threshold;
+            if let Some(ref cm) = *critical {
+                cm.cpu_usage_percent >= threshold
+                    || cm.gpu_usage_percent.map_or(false, |g| g >= threshold)
+            } else {
+                false
+            }
+        };
+
         // Collect detailed metrics in a blocking task to avoid blocking async runtime
         // This is where slow GPU commands (nvidia-smi) and process enumeration happen
         let detailed_metrics = {
@@ -909,7 +923,7 @@ async fn detailed_monitoring_loop(app: tauri::AppHandle) {
             let pinned_clone = pinned.clone();
 
             // We need to clone what we need since spawn_blocking requires 'static
-            match monitor.collect_detailed_metrics(limit_clone, &pinned_clone) {
+            match monitor.collect_detailed_metrics(limit_clone, &pinned_clone, should_collect_extended) {
                 Ok(metrics) => Some(metrics),
                 Err(e) => {
                     log::debug!("Failed to collect detailed metrics: {}", e);
@@ -921,6 +935,7 @@ async fn detailed_monitoring_loop(app: tauri::AppHandle) {
                         system_metrics,
                         top_processes,
                         timestamp: chrono::Utc::now().timestamp(),
+                        extended_collected: false,
                     })
                 }
             }

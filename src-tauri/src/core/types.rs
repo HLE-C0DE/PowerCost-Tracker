@@ -95,6 +95,25 @@ pub struct SystemMetrics {
     pub gpu: Option<GpuMetrics>,
     pub memory: MemoryMetrics,
     pub timestamp: i64,
+    /// System fan speeds (only collected when extended metrics enabled)
+    #[serde(default)]
+    pub fans: Option<FanMetrics>,
+}
+
+/// System fan metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanMetrics {
+    pub fans: Vec<FanReading>,
+}
+
+/// Individual fan reading
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanReading {
+    pub name: String,
+    #[serde(default)]
+    pub speed_rpm: Option<u64>,
+    #[serde(default)]
+    pub speed_percent: Option<u64>,
 }
 
 /// CPU metrics
@@ -107,6 +126,9 @@ pub struct CpuMetrics {
     pub temperature_celsius: Option<f64>,
     pub core_count: usize,
     pub thread_count: usize,
+    /// Per-core clock frequencies in MHz (only collected when extended metrics enabled)
+    #[serde(default)]
+    pub per_core_frequency_mhz: Option<Vec<u64>>,
 }
 
 /// GPU metrics
@@ -120,6 +142,12 @@ pub struct GpuMetrics {
     pub vram_total_mb: Option<u64>,
     pub clock_mhz: Option<u64>,
     pub source: String,
+    /// VRAM/memory clock in MHz
+    #[serde(default)]
+    pub memory_clock_mhz: Option<u64>,
+    /// GPU fan speed percentage
+    #[serde(default)]
+    pub fan_speed_percent: Option<u64>,
 }
 
 /// Memory (RAM) metrics
@@ -224,4 +252,7 @@ pub struct DetailedMetrics {
     pub top_processes: Vec<ProcessMetrics>,
     /// Timestamp of this reading
     pub timestamp: i64,
+    /// Whether extended metrics (per-core freq, fans) were collected this cycle
+    #[serde(default)]
+    pub extended_collected: bool,
 }

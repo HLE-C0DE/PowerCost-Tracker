@@ -3,7 +3,7 @@
 //! Uses sysinfo for CPU monitoring and nvidia-smi/rocm-smi for GPU power.
 //! WMI is complex and has version-specific API changes, so we avoid it for simplicity.
 
-use crate::core::{CpuMetrics, DetailedMetrics, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
+use crate::core::{CpuMetrics, DetailedMetrics, FanMetrics, FanReading, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
 use crate::hardware::PowerSource;
 use std::any::Any;
 use std::collections::HashMap;
@@ -147,6 +147,8 @@ pub struct WmiMonitor {
     cpu_temp_cache: Mutex<Option<CachedValue<Option<f64>>>>,
     /// Cached per-process GPU usage (PID -> GPU% usage)
     gpu_process_cache: Mutex<Option<CachedValue<HashMap<u32, f64>>>>,
+    /// Cached system fan speeds (WMI is slow, cache for 5s)
+    fan_cache: Mutex<Option<CachedValue<Option<FanMetrics>>>>,
 }
 
 impl WmiMonitor {
@@ -191,6 +193,7 @@ impl WmiMonitor {
             gpu_metrics_cache: Mutex::new(None),
             cpu_temp_cache: Mutex::new(None),
             gpu_process_cache: Mutex::new(None),
+            fan_cache: Mutex::new(None),
         })
     }
 
@@ -536,9 +539,10 @@ impl WmiMonitor {
     /// Collect all detailed metrics in one blocking call
     /// This consolidates all slow operations: GPU commands, temps, processes
     /// Should be called from a background task, not the main monitoring loop
-    pub fn collect_detailed_metrics_impl(&self, limit: usize, pinned: &[String]) -> Result<DetailedMetrics> {
+    /// When `extended` is true, also collects per-core frequencies and fan speeds
+    pub fn collect_detailed_metrics_impl(&self, limit: usize, pinned: &[String], extended: bool) -> Result<DetailedMetrics> {
         // Get full system metrics (this will refresh GPU cache via nvidia-smi)
-        let system_metrics = self.get_system_metrics().ok();
+        let system_metrics = self.get_system_metrics_impl(extended).ok();
 
         // Get top processes (uses sysinfo which is relatively fast)
         let top_processes = self.get_top_processes_with_pinned(limit, pinned).unwrap_or_default();
@@ -547,6 +551,7 @@ impl WmiMonitor {
             system_metrics,
             top_processes,
             timestamp: chrono::Utc::now().timestamp(),
+            extended_collected: extended,
         })
     }
 
@@ -600,8 +605,8 @@ impl PowerSource for WmiMonitor {
         self.get_power_watts_fast_impl()
     }
 
-    fn collect_detailed_metrics(&self, limit: usize, pinned: &[String]) -> Result<DetailedMetrics> {
-        self.collect_detailed_metrics_impl(limit, pinned)
+    fn collect_detailed_metrics(&self, limit: usize, pinned: &[String], extended: bool) -> Result<DetailedMetrics> {
+        self.collect_detailed_metrics_impl(limit, pinned, extended)
     }
 
     fn get_reading(&self) -> Result<PowerReading> {
@@ -630,6 +635,11 @@ impl PowerSource for WmiMonitor {
 impl WmiMonitor {
     /// Get comprehensive system metrics including CPU, GPU, and memory
     pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
+        self.get_system_metrics_impl(false)
+    }
+
+    /// Get system metrics with optional extended collection (per-core freq, fans)
+    fn get_system_metrics_impl(&self, extended: bool) -> Result<SystemMetrics> {
         let mut sys = self.sys.lock().unwrap();
         // NOTE: Do NOT refresh CPU here - it interferes with critical loop baseline.
         // CPU values are already refreshed by get_cpu_info() in the critical loop.
@@ -647,6 +657,20 @@ impl WmiMonitor {
 
         let cpu_freq = sys.cpus().first().map(|c| c.frequency());
 
+        // Per-core frequencies - only when extended (near-zero cost, sysinfo already in memory)
+        let per_core_frequency_mhz = if extended {
+            Some(sys.cpus().iter().map(|c| c.frequency()).collect())
+        } else {
+            None
+        };
+
+        // Release sys lock before slow operations
+        let used_memory = sys.used_memory();
+        let total_memory = sys.total_memory();
+        let physical_core_count = sys.physical_core_count().unwrap_or(0);
+        let thread_count = sys.cpus().len();
+        drop(sys);
+
         // Get CPU temperature via WMI (if available)
         let cpu_temp = self.get_cpu_temperature();
 
@@ -656,18 +680,26 @@ impl WmiMonitor {
             per_core_usage,
             frequency_mhz: cpu_freq,
             temperature_celsius: cpu_temp,
-            core_count: sys.physical_core_count().unwrap_or(0),
-            thread_count: sys.cpus().len(),
+            core_count: physical_core_count,
+            thread_count,
+            per_core_frequency_mhz,
         };
 
-        // GPU metrics
+        // GPU metrics (fan speed and mem clock come free from nvidia-smi query)
         let gpu = self.get_gpu_metrics();
+
+        // System fan speeds - only when extended (WMI call is slow)
+        let fans = if extended {
+            self.get_system_fans()
+        } else {
+            None
+        };
 
         // Memory metrics
         let memory = MemoryMetrics {
-            used_bytes: sys.used_memory(),
-            total_bytes: sys.total_memory(),
-            usage_percent: (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0,
+            used_bytes: used_memory,
+            total_bytes: total_memory,
+            usage_percent: (used_memory as f64 / total_memory as f64) * 100.0,
         };
 
         Ok(SystemMetrics {
@@ -675,6 +707,7 @@ impl WmiMonitor {
             gpu,
             memory,
             timestamp: chrono::Utc::now().timestamp(),
+            fans,
         })
     }
 
@@ -958,10 +991,11 @@ impl WmiMonitor {
     }
 
     /// Get NVIDIA GPU metrics via nvidia-smi (with timeout)
+    /// Queries clocks.mem and fan.speed in the same call (zero extra process spawns)
     fn get_nvidia_gpu_metrics(&self) -> Option<GpuMetrics> {
         let output = run_command_with_timeout(
             "nvidia-smi",
-            &["--query-gpu=name,utilization.gpu,power.draw,temperature.gpu,memory.used,memory.total,clocks.gr", "--format=csv,noheader,nounits"],
+            &["--query-gpu=name,utilization.gpu,power.draw,temperature.gpu,memory.used,memory.total,clocks.gr,clocks.mem,fan.speed", "--format=csv,noheader,nounits"],
             GPU_COMMAND_TIMEOUT_MS,
         )?;
 
@@ -974,6 +1008,11 @@ impl WmiMonitor {
         let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
 
         if parts.len() >= 7 {
+            // Parse optional extended fields (clocks.mem at index 7, fan.speed at index 8)
+            // nvidia-smi returns "[N/A]" on laptops without fans, which parse().ok() handles as None
+            let memory_clock_mhz = parts.get(7).and_then(|s| s.parse::<u64>().ok());
+            let fan_speed_percent = parts.get(8).and_then(|s| s.parse::<u64>().ok());
+
             Some(GpuMetrics {
                 name: parts[0].to_string(),
                 usage_percent: parts[1].parse().ok(),
@@ -983,6 +1022,8 @@ impl WmiMonitor {
                 vram_total_mb: parts[5].parse().ok(),
                 clock_mhz: parts[6].parse().ok(),
                 source: "nvidia-smi".to_string(),
+                memory_clock_mhz,
+                fan_speed_percent,
             })
         } else {
             None
@@ -1026,6 +1067,8 @@ impl WmiMonitor {
                 vram_total_mb: None,
                 clock_mhz: None,
                 source: "rocm-smi".to_string(),
+                memory_clock_mhz: None,
+                fan_speed_percent: None,
             });
         }
 
@@ -1050,6 +1093,9 @@ impl WmiMonitor {
                 vram_total_mb: card.get("VRAM Total Memory (B)").and_then(|v| v.as_u64()).map(|v| v / 1_000_000),
                 clock_mhz: card.get("sclk clock speed (MHz)").and_then(|v| v.as_u64()),
                 source: "rocm-smi".to_string(),
+                memory_clock_mhz: card.get("mclk clock speed (MHz)").and_then(|v| v.as_u64()),
+                fan_speed_percent: card.get("Fan speed (%)").and_then(|v| v.as_u64())
+                    .or_else(|| card.get("Fan Speed (%)").and_then(|v| v.as_u64())),
             })
         } else {
             None
@@ -1070,11 +1116,88 @@ impl WmiMonitor {
                         vram_total_mb: first.get("vram").and_then(|v| v.get("total")).and_then(|v| v.as_u64()),
                         clock_mhz: first.get("clock").and_then(|c| c.get("gfx")).and_then(|v| v.as_u64()),
                         source: "amd-smi".to_string(),
+                        memory_clock_mhz: first.get("clock").and_then(|c| c.get("mem")).and_then(|v| v.as_u64()),
+                        fan_speed_percent: first.get("fan").and_then(|f| f.get("speed")).and_then(|v| v.as_u64()),
                     });
                 }
             }
         }
         None
+    }
+
+    /// Get system fan speeds via WMI (cached for 5 seconds - WMI/PowerShell is slow)
+    fn get_system_fans(&self) -> Option<FanMetrics> {
+        // Check cache first (5000ms TTL - fans change slowly)
+        {
+            let cache = self.fan_cache.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if let Some(value) = cached.get(5000) {
+                    return value;
+                }
+            }
+        }
+
+        // Cache miss - fetch fresh data
+        let result = self.fetch_system_fans();
+
+        // Update cache
+        {
+            let mut cache = self.fan_cache.lock().unwrap();
+            *cache = Some(CachedValue::new(result.clone()));
+        }
+
+        result
+    }
+
+    /// Fetch system fan speeds via WMI Win32_Fan (slow - calls PowerShell)
+    fn fetch_system_fans(&self) -> Option<FanMetrics> {
+        let output = run_command_with_timeout(
+            "powershell",
+            &["-Command", "Get-WmiObject Win32_Fan 2>$null | Select-Object Name,DesiredSpeed,ActiveCooling | ConvertTo-Json -Compress"],
+            2000,
+        )?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let trimmed = stdout.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let mut fans = Vec::new();
+
+        // WMI may return a single object or an array
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            let items: Vec<&serde_json::Value> = if let Some(arr) = value.as_array() {
+                arr.iter().collect()
+            } else {
+                vec![&value]
+            };
+
+            for item in items {
+                let name = item.get("Name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Fan")
+                    .to_string();
+                let speed_rpm = item.get("DesiredSpeed")
+                    .and_then(|v| v.as_u64());
+
+                fans.push(FanReading {
+                    name,
+                    speed_rpm,
+                    speed_percent: None,
+                });
+            }
+        }
+
+        if fans.is_empty() {
+            None
+        } else {
+            Some(FanMetrics { fans })
+        }
     }
 
     /// Get per-process GPU usage (cached for 2000ms - pmon is expensive)

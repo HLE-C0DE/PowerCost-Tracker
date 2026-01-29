@@ -104,8 +104,9 @@ impl PowerMonitor {
     }
 
     /// Collect detailed metrics (processes, temps, VRAM) - may block for GPU commands
-    pub fn collect_detailed_metrics(&self, limit: usize, pinned: &[String]) -> Result<DetailedMetrics> {
-        self.source.collect_detailed_metrics(limit, pinned)
+    /// When `extended` is true, also collects per-core frequencies, fan speeds, GPU mem clock
+    pub fn collect_detailed_metrics(&self, limit: usize, pinned: &[String], extended: bool) -> Result<DetailedMetrics> {
+        self.source.collect_detailed_metrics(limit, pinned, extended)
     }
 
     /// Get system metrics (CPU, GPU, RAM) - uses stored source for cache sharing
@@ -190,7 +191,8 @@ pub trait PowerSource: Send + Sync {
     }
 
     /// Collect detailed metrics (processes, temps, VRAM) - may block for GPU commands
-    fn collect_detailed_metrics(&self, _limit: usize, _pinned: &[String]) -> Result<DetailedMetrics> {
+    /// When `extended` is true, also collects per-core frequencies, fan speeds, GPU mem clock
+    fn collect_detailed_metrics(&self, _limit: usize, _pinned: &[String], _extended: bool) -> Result<DetailedMetrics> {
         Err(Error::HardwareNotSupported("Detailed metrics not implemented".to_string()))
     }
 

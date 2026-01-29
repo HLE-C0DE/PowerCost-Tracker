@@ -257,5 +257,10 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("widget.show_cost".into(), "Cost".into());
     t.insert("widget.show_energy".into(), "Energy".into());
 
+    // Extended hardware metrics
+    t.insert("widget.fan".into(), "Fan".into());
+    t.insert("widget.clock".into(), "Clock".into());
+    t.insert("widget.mem_clock".into(), "Mem Clock".into());
+
     t
 }

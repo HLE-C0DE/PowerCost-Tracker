@@ -107,6 +107,20 @@ const WIDGET_REGISTRY = {
             const temp = hasTemp ? `${formatNumber(cpu.temperature_celsius, 0)}°C` : '';
             const globalDisplay = state.dashboardConfig?.global_display || 'normal';
 
+            // Per-core clock range (only available when extended metrics collected)
+            const perCoreFreq = cpu.per_core_frequency_mhz;
+            const hasClockRange = perCoreFreq && perCoreFreq.length > 0;
+            const clockRange = hasClockRange
+                ? `${Math.min(...perCoreFreq)}-${Math.max(...perCoreFreq)} MHz`
+                : '';
+
+            // System fan info
+            const fans = data.systemMetrics?.fans;
+            const hasFans = fans && fans.fans && fans.fans.length > 0;
+            const fanStr = hasFans
+                ? fans.fans.map(f => f.speed_rpm != null ? `${f.speed_rpm} RPM` : (f.speed_percent != null ? `${f.speed_percent}%` : '')).filter(Boolean).join(', ')
+                : '';
+
             // Radial mode
             if (displayMode === 'radial') {
                 return `
@@ -157,6 +171,14 @@ const WIDGET_REGISTRY = {
                     <span class="metric-label">${t('widget.temp')}</span>
                     <span class="metric-value">${temp}</span>
                 </div>` : ''}
+                ${hasClockRange && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">${t('widget.clock')}</span>
+                    <span class="metric-value">${clockRange}</span>
+                </div>` : ''}
+                ${hasFans && fanStr && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">${t('widget.fan')}</span>
+                    <span class="metric-value">${fanStr}</span>
+                </div>` : ''}
                 <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
             `;
         },
@@ -179,6 +201,8 @@ const WIDGET_REGISTRY = {
             const vram = gpu.vram_used_mb != null && gpu.vram_total_mb != null
                 ? `${formatNumber(gpu.vram_used_mb / 1024, 1)}/${formatNumber(gpu.vram_total_mb / 1024, 1)} GB`
                 : '--';
+            const hasFan = gpu.fan_speed_percent != null;
+            const hasMemClock = gpu.memory_clock_mhz != null;
             const globalDisplay = state.dashboardConfig?.global_display || 'normal';
 
             // Radial mode
@@ -244,6 +268,14 @@ const WIDGET_REGISTRY = {
                     <span class="metric-label">VRAM</span>
                     <span class="metric-value">${vram}</span>
                 </div>
+                ${hasFan && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">${t('widget.fan')}</span>
+                    <span class="metric-value">${gpu.fan_speed_percent}%</span>
+                </div>` : ''}
+                ${hasMemClock && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">${t('widget.mem_clock')}</span>
+                    <span class="metric-value">${gpu.memory_clock_mhz} MHz</span>
+                </div>` : ''}
                 <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
             `;
         },

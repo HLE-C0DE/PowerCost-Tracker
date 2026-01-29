@@ -381,10 +381,14 @@ pub struct AdvancedConfig {
     /// Number of processes to show in widget (default 10)
     #[serde(default = "default_process_limit")]
     pub process_list_limit: usize,
+    /// CPU/GPU load threshold (%) to collect extended metrics (per-core freq, fans)
+    #[serde(default = "default_extended_threshold")]
+    pub extended_metrics_threshold: f64,
 }
 
 fn default_profile() -> String { "default".to_string() }
 fn default_process_limit() -> usize { 10 }
+fn default_extended_threshold() -> f64 { 15.0 }
 
 impl Default for AdvancedConfig {
     fn default() -> Self {
@@ -394,6 +398,7 @@ impl Default for AdvancedConfig {
             active_profile: default_profile(),
             pinned_processes: Vec::new(),
             process_list_limit: default_process_limit(),
+            extended_metrics_threshold: default_extended_threshold(),
         }
     }
 }
