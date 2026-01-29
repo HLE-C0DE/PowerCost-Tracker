@@ -1152,10 +1152,6 @@ body {
     .dashboard-grid {
         grid-template-columns: repeat(2, 1fr);
     }
-
-    .widget-card {
-        grid-column: span 1 !important;
-    }
 }
 
 @media (max-width: 768px) {
@@ -1196,7 +1192,6 @@ body {
     }
 
     .widget-card {
-        grid-column: span 1 !important;
         grid-row: span 1 !important;
     }
 
@@ -2199,6 +2194,76 @@ body {
     padding: var(--spacing-sm);
 }
 
+/* ===== Adaptive Font Sizes for 2-cell Widgets (2×1, 1×2) ===== */
+.widget-card.widget-2cell .card-header {
+    font-size: 0.65rem;
+    margin-bottom: 2px;
+    gap: 4px;
+}
+
+.widget-card.widget-2cell .card-header svg {
+    width: 13px;
+    height: 13px;
+}
+
+.widget-card.widget-2cell .widget-value {
+    font-size: 1.4rem;
+    line-height: 1.1;
+}
+
+.widget-card.widget-2cell .widget-value.small {
+    font-size: 1.15rem;
+}
+
+.widget-card.widget-2cell .widget-value .unit {
+    font-size: 0.7rem;
+}
+
+.widget-card.widget-2cell .metric-row {
+    padding: 1px 0;
+}
+
+.widget-card.widget-2cell .metric-label {
+    font-size: 0.65rem;
+}
+
+.widget-card.widget-2cell .metric-value {
+    font-size: 0.75rem;
+}
+
+/* ===== Adaptive Font Sizes for 3-4 cell Widgets (2×2, etc.) ===== */
+.widget-card.widget-4cell .card-header {
+    font-size: 0.7rem;
+    margin-bottom: 3px;
+    gap: 5px;
+}
+
+.widget-card.widget-4cell .card-header svg {
+    width: 14px;
+    height: 14px;
+}
+
+.widget-card.widget-4cell .widget-value {
+    font-size: 1.6rem;
+    line-height: 1.15;
+}
+
+.widget-card.widget-4cell .widget-value.small {
+    font-size: 1.3rem;
+}
+
+.widget-card.widget-4cell .widget-value .unit {
+    font-size: 0.8rem;
+}
+
+.widget-card.widget-4cell .metric-label {
+    font-size: 0.7rem;
+}
+
+.widget-card.widget-4cell .metric-value {
+    font-size: 0.8rem;
+}
+
 /* ===== Estimation Widget Dual Display ===== */
 .estimation-lines {
     display: flex;
@@ -2241,6 +2306,30 @@ body {
 
 .widget-card.widget-1x1 .estimation-line.secondary .widget-value {
     font-size: 0.8rem;
+}
+
+.widget-card.widget-2cell .estimation-line .widget-value {
+    font-size: 1.15rem;
+}
+
+.widget-card.widget-2cell .estimation-line .widget-value.small {
+    font-size: 0.95rem;
+}
+
+.widget-card.widget-2cell .estimation-line.secondary .widget-value {
+    font-size: 0.85rem;
+}
+
+.widget-card.widget-4cell .estimation-line .widget-value {
+    font-size: 1.3rem;
+}
+
+.widget-card.widget-4cell .estimation-line .widget-value.small {
+    font-size: 1.1rem;
+}
+
+.widget-card.widget-4cell .estimation-line.secondary .widget-value {
+    font-size: 0.95rem;
 }
 
 .estimation-toggle-btn {

@@ -1080,10 +1080,11 @@ function renderDashboard() {
         card.style.gridColumn = `${col} / span ${colSpan}`;
         card.style.gridRow = `${row} / span ${rowSpan}`;
 
-        // Add size class for adaptive styling
-        if (colSpan === 1 && rowSpan === 1) {
-            card.classList.add('widget-1x1');
-        }
+        // Add size class for adaptive styling based on area
+        const area = colSpan * rowSpan;
+        if (area <= 1) card.classList.add('widget-1x1');
+        else if (area <= 2) card.classList.add('widget-2cell');
+        else if (area <= 4) card.classList.add('widget-4cell');
 
         // Add edit mode class if active
         if (state.isEditMode) {
@@ -1587,9 +1588,10 @@ function verifyNoCollisions() {
 
 // Find an empty spot for a widget, avoiding the excluded widget(s)
 // excludeWidget can be a single widget or an array of widgets
+// Uses column-load balancing to avoid left-side pile-up
 function findEmptySpot(widget, excludeWidget) {
     const cols = getActualGridCols();
-    const colSpan = widget.col_span || 1;
+    const colSpan = Math.min(widget.col_span || 1, cols);
     const rowSpan = widget.row_span || 1;
 
     // Normalize excludeWidget to an array
@@ -1600,67 +1602,130 @@ function findEmptySpot(widget, excludeWidget) {
         w => w.visible && w.id !== widget.id && !excludeIds.includes(w.id)
     );
 
-    // Try each position starting from top-left
-    for (let row = 1; row <= 20; row++) {
+    // Combine allWidgets and excludeWidgets for overlap checking
+    const checkWidgets = [...allWidgets, ...excludeWidgets.filter(Boolean)];
+
+    for (let row = 1; row <= 50; row++) {
+        let bestCol = null;
+        let bestLoad = Infinity;
+
         for (let col = 1; col <= cols - colSpan + 1; col++) {
             const testWidget = { col, row, col_span: colSpan, row_span: rowSpan };
             let hasOverlap = false;
 
-            // Check against excluded widgets
-            for (const excluded of excludeWidgets) {
-                if (excluded && widgetsOverlap(testWidget, excluded)) {
+            for (const other of checkWidgets) {
+                if (widgetsOverlap(testWidget, other)) {
                     hasOverlap = true;
                     break;
                 }
             }
 
-            // Check against all other widgets
             if (!hasOverlap) {
-                for (const other of allWidgets) {
+                const load = getColumnLoad(allWidgets, col, colSpan, cols);
+                if (load < bestLoad) {
+                    bestLoad = load;
+                    bestCol = col;
+                }
+            }
+        }
+
+        if (bestCol !== null) {
+            return { col: bestCol, row };
+        }
+    }
+
+    // Fallback: just put it at the bottom
+    return { col: 1, row: 50 };
+}
+
+// Calculate the total row-span load on a column band [startCol, startCol+colSpan)
+function getColumnLoad(placedWidgets, startCol, colSpan, totalCols) {
+    let load = 0;
+    for (const w of placedWidgets) {
+        const wCol = w.col || 1;
+        const wColSpan = w.col_span || 1;
+        const wRowSpan = w.row_span || 1;
+        // Check if the widget's column band overlaps with [startCol, startCol+colSpan)
+        if (wCol < startCol + colSpan && wCol + wColSpan > startCol) {
+            load += wRowSpan;
+        }
+    }
+    return load;
+}
+
+// Compact the grid by re-placing widgets to fill gaps with column balancing
+function compactGrid() {
+    const cols = getActualGridCols();
+    const widgets = state.dashboardConfig.widgets
+        .filter(w => w.visible)
+        .sort((a, b) => (a.row || 1) - (b.row || 1) || (a.col || 1) - (b.col || 1));
+
+    const placed = [];
+
+    for (const widget of widgets) {
+        const colSpan = Math.min(widget.col_span || 1, cols);
+        const rowSpan = widget.row_span || 1;
+        let bestPos = null;
+        let bestScore = Infinity;
+
+        // Scan positions row by row
+        for (let row = 1; row <= 50; row++) {
+            for (let col = 1; col <= cols - colSpan + 1; col++) {
+                const testWidget = { col, row, col_span: colSpan, row_span: rowSpan };
+                let hasOverlap = false;
+
+                for (const other of placed) {
                     if (widgetsOverlap(testWidget, other)) {
                         hasOverlap = true;
                         break;
                     }
                 }
-            }
 
-            if (!hasOverlap) {
-                return { col, row };
-            }
-        }
-    }
-
-    // Fallback: just put it at the bottom
-    return { col: 1, row: 20 };
-}
-
-// Compact the grid by moving widgets up to fill gaps
-function compactGrid() {
-    const widgets = state.dashboardConfig.widgets
-        .filter(w => w.visible)
-        .sort((a, b) => (a.row || 1) - (b.row || 1) || (a.col || 1) - (b.col || 1));
-
-    for (const widget of widgets) {
-        // Try to move this widget up as far as possible
-        let targetRow = 1;
-        while (targetRow < (widget.row || 1)) {
-            const testWidget = { ...widget, row: targetRow };
-            let canMove = true;
-
-            for (const other of widgets) {
-                if (other.id !== widget.id && widgetsOverlap(testWidget, other)) {
-                    canMove = false;
-                    break;
+                if (!hasOverlap) {
+                    // Score: prefer lowest row, then least-loaded columns
+                    const load = getColumnLoad(placed, col, colSpan, cols);
+                    const score = row * 1000 + load;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestPos = { col, row };
+                    }
                 }
             }
+            // If we found a valid position in this row, no need to check further rows
+            if (bestPos && bestPos.row === row) break;
+        }
 
-            if (canMove) {
-                widget.row = targetRow;
-                break;
-            }
-            targetRow++;
+        if (bestPos) {
+            widget.col = bestPos.col;
+            widget.row = bestPos.row;
+            widget.col_span = colSpan;
+        }
+        placed.push(widget);
+    }
+}
+
+// Track last known grid column count for resize detection
+let lastGridCols = getActualGridCols();
+
+// Reflow dashboard grid when column count changes on resize
+function reflowDashboardGrid() {
+    const newCols = getActualGridCols();
+    if (newCols === lastGridCols) return;
+    lastGridCols = newCols;
+
+    // Clamp col_span and col to fit new column count
+    const widgets = state.dashboardConfig.widgets.filter(w => w.visible);
+    for (const widget of widgets) {
+        if ((widget.col_span || 1) > newCols) {
+            widget.col_span = newCols;
+        }
+        if ((widget.col || 1) + (widget.col_span || 1) - 1 > newCols) {
+            widget.col = Math.max(1, newCols - (widget.col_span || 1) + 1);
         }
     }
+
+    compactGrid();
+    renderDashboard();
 }
 
 function widgetsOverlap(a, b) {
@@ -3122,10 +3187,15 @@ function updateGlobalDisplayToggle(mode) {
 }
 
 // ===== Window resize handler =====
+let resizeReflowTimer = null;
 window.addEventListener('resize', () => {
     drawPowerGraph();
     if (state.historyData.length > 0) {
         drawHistoryChart();
     }
     drawMiniCharts();
+
+    // Debounced dashboard grid reflow on column count change
+    clearTimeout(resizeReflowTimer);
+    resizeReflowTimer = setTimeout(reflowDashboardGrid, 150);
 });
