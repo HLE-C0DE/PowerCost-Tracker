@@ -270,6 +270,8 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("widget.fan".into(), "Ventilateur".into());
     t.insert("widget.clock".into(), "Horloge".into());
     t.insert("widget.mem_clock".into(), "Horloge m\u{00E9}m.".into());
+    t.insert("widget.swap".into(), "Swap".into());
+    t.insert("widget.speed".into(), "Vitesse".into());
 
     t
 }

@@ -149,6 +149,8 @@ pub struct WmiMonitor {
     gpu_process_cache: Mutex<Option<CachedValue<HashMap<u32, f64>>>>,
     /// Cached system fan speeds (WMI is slow, cache for 5s)
     fan_cache: Mutex<Option<CachedValue<Option<FanMetrics>>>>,
+    /// Cached memory speed in MHz (permanent cache - RAM speed never changes at runtime)
+    memory_speed_cache: Mutex<Option<Option<u64>>>,
 }
 
 impl WmiMonitor {
@@ -194,6 +196,7 @@ impl WmiMonitor {
             cpu_temp_cache: Mutex::new(None),
             gpu_process_cache: Mutex::new(None),
             fan_cache: Mutex::new(None),
+            memory_speed_cache: Mutex::new(None),
         })
     }
 
@@ -657,16 +660,14 @@ impl WmiMonitor {
 
         let cpu_freq = sys.cpus().first().map(|c| c.frequency());
 
-        // Per-core frequencies - only when extended (near-zero cost, sysinfo already in memory)
-        let per_core_frequency_mhz = if extended {
-            Some(sys.cpus().iter().map(|c| c.frequency()).collect())
-        } else {
-            None
-        };
+        // Per-core frequencies - always collected (near-zero cost, sysinfo already in memory)
+        let per_core_frequency_mhz = Some(sys.cpus().iter().map(|c| c.frequency()).collect());
 
         // Release sys lock before slow operations
         let used_memory = sys.used_memory();
         let total_memory = sys.total_memory();
+        let used_swap = sys.used_swap();
+        let total_swap = sys.total_swap();
         let physical_core_count = sys.physical_core_count().unwrap_or(0);
         let thread_count = sys.cpus().len();
         drop(sys);
@@ -695,11 +696,21 @@ impl WmiMonitor {
             None
         };
 
-        // Memory metrics
+        // Memory metrics (including swap and speed)
+        let (swap_used, swap_total, swap_percent) = if total_swap > 0 {
+            (Some(used_swap), Some(total_swap), Some((used_swap as f64 / total_swap as f64) * 100.0))
+        } else {
+            (None, None, None)
+        };
+        let mem_speed = self.get_memory_speed();
         let memory = MemoryMetrics {
             used_bytes: used_memory,
             total_bytes: total_memory,
             usage_percent: (used_memory as f64 / total_memory as f64) * 100.0,
+            swap_used_bytes: swap_used,
+            swap_total_bytes: swap_total,
+            swap_usage_percent: swap_percent,
+            memory_speed_mhz: mem_speed,
         };
 
         Ok(SystemMetrics {
@@ -1122,6 +1133,48 @@ impl WmiMonitor {
                 }
             }
         }
+        None
+    }
+
+    /// Get memory speed in MHz (permanently cached - RAM speed never changes at runtime)
+    fn get_memory_speed(&self) -> Option<u64> {
+        // Check permanent cache first
+        {
+            let cache = self.memory_speed_cache.lock().unwrap();
+            if let Some(ref value) = *cache {
+                return *value;
+            }
+        }
+
+        // Cache miss - fetch via WMI (one-time cost)
+        let result = self.fetch_memory_speed();
+
+        // Store permanently
+        {
+            let mut cache = self.memory_speed_cache.lock().unwrap();
+            *cache = Some(result);
+        }
+
+        result
+    }
+
+    /// Fetch memory speed from WMI Win32_PhysicalMemory (slow - calls PowerShell, one-time only)
+    fn fetch_memory_speed(&self) -> Option<u64> {
+        let output = run_command_with_timeout(
+            "powershell",
+            &["-Command", "(Get-WmiObject Win32_PhysicalMemory | Select-Object -First 1 -ExpandProperty Speed) 2>$null"],
+            GPU_COMMAND_TIMEOUT_MS,
+        )?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Ok(speed) = stdout.trim().parse::<u64>() {
+                if speed > 0 {
+                    return Some(speed);
+                }
+            }
+        }
+
         None
     }
 

@@ -315,6 +315,11 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'radial') {
                 const ramBars = [];
                 ramBars.push({ value: usedGB, max: totalGB, label: `${formatNumber(usedGB, 1)}G`, color: '#f59e0b', name: 'USED' });
+                if (mem.swap_total_bytes && mem.swap_total_bytes > 0) {
+                    const swapUsedGB = mem.swap_used_bytes / (1024 * 1024 * 1024);
+                    const swapTotalGB = mem.swap_total_bytes / (1024 * 1024 * 1024);
+                    ramBars.push({ value: swapUsedGB, max: swapTotalGB, label: `${formatNumber(swapUsedGB, 1)}G`, color: '#a855f7', name: 'SWAP' });
+                }
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
@@ -339,19 +344,39 @@ const WIDGET_REGISTRY = {
 
             // Text mode
             if (displayMode === 'text') {
+                const hasSwap = mem.swap_total_bytes && mem.swap_total_bytes > 0;
+                const swapUsedGB = hasSwap ? mem.swap_used_bytes / (1024 * 1024 * 1024) : 0;
+                const swapTotalGB = hasSwap ? mem.swap_total_bytes / (1024 * 1024 * 1024) : 0;
                 return `
                     <div class="widget-value">${formatNumber(mem.usage_percent, 0)}<span class="unit">%</span></div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                    ${hasSwap && globalDisplay === 'normal' ? `<div class="metric-info">${t('widget.swap')}: ${formatNumber(swapUsedGB, 1)} / ${formatNumber(swapTotalGB, 1)} GB</div>` : ''}
                 `;
             }
 
             // Default bar mode
+            const hasSwap = mem.swap_total_bytes && mem.swap_total_bytes > 0;
+            const swapUsedGB = hasSwap ? mem.swap_used_bytes / (1024 * 1024 * 1024) : 0;
+            const swapTotalGB = hasSwap ? mem.swap_total_bytes / (1024 * 1024 * 1024) : 0;
+            const swapPercent = hasSwap ? mem.swap_usage_percent : 0;
             return `
                 <div class="metric-row">
                     <div class="progress-bar"><div class="progress-fill ram-fill" style="width: ${mem.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
                 </div>
                 <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                ${hasSwap && globalDisplay === 'normal' ? `
+                <div class="metric-row">
+                    <span class="metric-label">${t('widget.swap')}</span>
+                    <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width: ${swapPercent}%; background: #a855f7"></div></div>
+                    <span class="metric-value">${formatNumber(swapPercent, 0)}%</span>
+                </div>
+                <div class="metric-info">${formatNumber(swapUsedGB, 1)} / ${formatNumber(swapTotalGB, 1)} GB</div>
+                ` : ''}
+                ${mem.memory_speed_mhz && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">${t('widget.speed')}</span>
+                    <span class="metric-value">${mem.memory_speed_mhz} MHz</span>
+                </div>` : ''}
             `;
         },
     },
