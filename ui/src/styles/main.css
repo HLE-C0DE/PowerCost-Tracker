@@ -2100,6 +2100,27 @@ body {
     flex: 1;
 }
 
+.session-widget-idle {
+    align-items: center;
+    justify-content: center;
+}
+
+.session-widget-start-big {
+    font-size: 0.9rem;
+    padding: var(--spacing-md) var(--spacing-lg);
+    width: 100%;
+    max-width: 200px;
+    background-color: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.session-widget-start-big:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
 /* ===== Set Baseline Button (in widgets) ===== */
 .set-baseline-btn {
     margin-top: var(--spacing-sm);

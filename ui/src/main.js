@@ -401,24 +401,29 @@ const WIDGET_REGISTRY = {
             const surplusWh = session ? formatNumber(session.surplus_wh, 2) : '--';
             const surplusCost = session ? `${state.currencySymbol}${formatNumber(session.surplus_cost || 0, 4)}` : '--';
 
+            if (!session) {
+                return `
+                    <div class="session-widget session-widget-idle">
+                        <button class="btn btn-primary session-widget-start-btn session-widget-start-big">${t('session.start')}</button>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="session-widget">
                     <div class="session-widget-info">
                         <div class="session-widget-status">
-                            <span class="session-widget-indicator ${session ? 'active' : ''}"></span>
-                            <span class="session-widget-label">${session ? t('widget.session_active') : t('session.no_active')}</span>
+                            <span class="session-widget-indicator active"></span>
+                            <span class="session-widget-label">${t('widget.session_active')}</span>
                         </div>
                         <span class="session-widget-duration">${duration}</span>
                     </div>
-                    <div class="session-widget-stats ${session ? '' : 'hidden'}">
+                    <div class="session-widget-stats">
                         <span class="session-widget-stat">${t('session.surplus')}: ${surplusWh} Wh</span>
                         <span class="session-widget-stat">${t('widget.cost')}: ${surplusCost}</span>
                     </div>
                     <div class="session-widget-btns">
-                        ${session
-                            ? `<button class="btn btn-secondary btn-sm session-widget-end-btn">${t('session.end')}</button>`
-                            : `<button class="btn btn-primary btn-sm session-widget-start-btn">${t('session.start')}</button>`
-                        }
+                        <button class="btn btn-secondary btn-sm session-widget-end-btn">${t('session.end')}</button>
                     </div>
                 </div>
             `;
@@ -2214,6 +2219,9 @@ function renderWidgetsByType(data, type) {
 
         const body = document.getElementById(`widget-body-${widgetConfig.id}`);
         if (body) {
+            // Skip re-rendering session_controls when idle (no active session) to avoid hover flicker
+            if (widgetConfig.id === 'session_controls' && !data.activeSession && body.querySelector('.session-widget-idle')) continue;
+
             if (widgetDef.supportsDisplayModes) {
                 const displayMode = widgetConfig.display_mode || 'text';
                 body.innerHTML = widgetDef.render(data, displayMode, widgetConfig);
