@@ -11,6 +11,7 @@ mod linux;
 mod windows;
 mod estimator;
 pub mod baseline;
+pub(crate) mod nvml_gpu;
 
 pub use baseline::BaselineDetector;
 
@@ -27,27 +28,27 @@ impl PowerMonitor {
     pub fn new() -> Result<Self> {
         #[cfg(target_os = "linux")]
         {
-            // Try RAPL first (most accurate)
-            if let Ok(rapl) = linux::RaplMonitor::new() {
-                log::info!("Using RAPL for power monitoring");
+            // Try RAPL first (most accurate) — wrapped in LinuxSystemMonitor for full metrics
+            if let Ok(monitor) = linux::LinuxSystemMonitor::try_rapl() {
+                log::info!("Using RAPL for power monitoring (with system metrics)");
                 return Ok(Self {
-                    source: Box::new(rapl),
+                    source: Box::new(monitor),
                 });
             }
 
             // Try hwmon
-            if let Ok(hwmon) = linux::HwmonMonitor::new() {
-                log::info!("Using hwmon for power monitoring");
+            if let Ok(monitor) = linux::LinuxSystemMonitor::try_hwmon() {
+                log::info!("Using hwmon for power monitoring (with system metrics)");
                 return Ok(Self {
-                    source: Box::new(hwmon),
+                    source: Box::new(monitor),
                 });
             }
 
             // Try battery (for laptops)
-            if let Ok(battery) = linux::BatteryMonitor::new() {
-                log::info!("Using battery interface for power monitoring");
+            if let Ok(monitor) = linux::LinuxSystemMonitor::try_battery() {
+                log::info!("Using battery interface for power monitoring (with system metrics)");
                 return Ok(Self {
-                    source: Box::new(battery),
+                    source: Box::new(monitor),
                 });
             }
         }
@@ -120,11 +121,16 @@ impl PowerMonitor {
         }
     }
 
-    /// Get system metrics (Linux stub)
+    /// Get system metrics (Linux)
     #[cfg(target_os = "linux")]
     pub fn get_system_metrics(&self) -> Result<SystemMetrics> {
-        // TODO: Implement Linux system metrics
-        Err(Error::HardwareNotSupported("System metrics not yet implemented for Linux".to_string()))
+        if let Some(monitor) = self.source.as_any().downcast_ref::<linux::LinuxSystemMonitor>() {
+            // Use collect_detailed_metrics which populates system_metrics
+            let detailed = monitor.collect_detailed_metrics(0, &[], false)?;
+            detailed.system_metrics.ok_or_else(|| Error::HardwareNotSupported("System metrics unavailable".to_string()))
+        } else {
+            Err(Error::HardwareNotSupported("System metrics not available for this source".to_string()))
+        }
     }
 
     /// Get top processes by CPU usage - uses stored source for cache sharing
@@ -137,11 +143,10 @@ impl PowerMonitor {
         }
     }
 
-    /// Get top processes (Linux stub)
+    /// Get top processes (Linux)
     #[cfg(target_os = "linux")]
-    pub fn get_top_processes(&self, _limit: usize) -> Result<Vec<ProcessMetrics>> {
-        // TODO: Implement Linux process metrics
-        Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
+    pub fn get_top_processes(&self, limit: usize) -> Result<Vec<ProcessMetrics>> {
+        self.get_top_processes_with_pinned(limit, &[])
     }
 
     /// Get top processes with pinned processes prioritized - uses stored source
@@ -154,10 +159,12 @@ impl PowerMonitor {
         }
     }
 
-    /// Get top processes with pinned (Linux stub)
+    /// Get top processes with pinned (Linux)
     #[cfg(target_os = "linux")]
-    pub fn get_top_processes_with_pinned(&self, _limit: usize, _pinned: &[String]) -> Result<Vec<ProcessMetrics>> {
-        Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
+    pub fn get_top_processes_with_pinned(&self, limit: usize, pinned: &[String]) -> Result<Vec<ProcessMetrics>> {
+        // Use the collect_detailed_metrics pathway which handles processes
+        let detailed = self.source.collect_detailed_metrics(limit, pinned, false)?;
+        Ok(detailed.top_processes)
     }
 
     /// Get all processes (for discovery mode) - uses stored source
@@ -170,10 +177,14 @@ impl PowerMonitor {
         }
     }
 
-    /// Get all processes (Linux stub)
+    /// Get all processes (Linux)
     #[cfg(target_os = "linux")]
     pub fn get_all_processes(&self) -> Result<Vec<ProcessMetrics>> {
-        Err(Error::HardwareNotSupported("Process metrics not yet implemented for Linux".to_string()))
+        if let Some(monitor) = self.source.as_any().downcast_ref::<linux::LinuxSystemMonitor>() {
+            monitor.get_all_processes_impl()
+        } else {
+            Err(Error::HardwareNotSupported("Process metrics not available for this source".to_string()))
+        }
     }
 }
 

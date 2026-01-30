@@ -100,6 +100,16 @@ pub struct SystemMetrics {
     /// System fan speeds (only collected when extended metrics enabled)
     #[serde(default)]
     pub fans: Option<FanMetrics>,
+    /// Voltage readings (if available from hwmon/sensors)
+    #[serde(default)]
+    pub voltages: Option<Vec<VoltageReading>>,
+}
+
+/// A voltage sensor reading
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoltageReading {
+    pub name: String,
+    pub value_volts: f64,
 }
 
 /// System fan metrics
@@ -131,6 +141,9 @@ pub struct CpuMetrics {
     /// Per-core clock frequencies in MHz (only collected when extended metrics enabled)
     #[serde(default)]
     pub per_core_frequency_mhz: Option<Vec<u64>>,
+    /// Per-core temperatures in Celsius (from hwmon coretemp/k10temp on Linux, or multi-zone on Windows)
+    #[serde(default)]
+    pub per_core_temperature: Option<Vec<f64>>,
 }
 
 /// GPU metrics

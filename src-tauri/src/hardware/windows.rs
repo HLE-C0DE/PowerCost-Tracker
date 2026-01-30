@@ -5,6 +5,7 @@
 
 use crate::core::{CpuMetrics, DetailedMetrics, FanMetrics, FanReading, GpuMetrics, MemoryMetrics, PowerReading, ProcessMetrics, Result, SystemMetrics};
 use crate::hardware::PowerSource;
+use crate::hardware::nvml_gpu;
 use std::any::Any;
 use std::collections::HashMap;
 use std::process::{Command, Output, Stdio};
@@ -14,6 +15,29 @@ use sysinfo::ProcessRefreshKind;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+
+/// PDH query handle for reading thermal zone temperature counters.
+/// Lazily initialized on first use and reused across calls.
+#[cfg(target_os = "windows")]
+struct PdhThermalQuery {
+    query: isize,
+    counter: isize,
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for PdhThermalQuery {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::System::Performance::PdhCloseQuery(self.query);
+        }
+    }
+}
+
+// SAFETY: PDH handles are thread-safe when access is serialized via Mutex
+#[cfg(target_os = "windows")]
+unsafe impl Send for PdhThermalQuery {}
+#[cfg(target_os = "windows")]
+unsafe impl Sync for PdhThermalQuery {}
 
 /// Windows flag to hide console window when spawning processes
 #[cfg(target_os = "windows")]
@@ -77,7 +101,9 @@ fn run_command_with_timeout(program: &str, args: &[&str], timeout_ms: u64) -> Op
 /// Available GPU monitoring sources
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum GpuSource {
-    /// NVIDIA GPU via nvidia-smi
+    /// NVIDIA GPU via NVML library (fast, direct API)
+    NvmlNvidia,
+    /// NVIDIA GPU via nvidia-smi CLI (fallback)
     Nvidia,
     /// AMD GPU via rocm-smi
     Amd,
@@ -133,15 +159,17 @@ impl<T: Clone> CachedValue<T> {
 pub struct WmiMonitor {
     /// Detected GPU monitoring source
     gpu_source: GpuSource,
+    /// NVML state for direct NVIDIA GPU access (if available)
+    nvml_state: Option<nvml_gpu::NvmlState>,
     /// Sysinfo for CPU data
     sys: Mutex<sysinfo::System>,
     /// Cached TDP estimate for CPU (watts)
     cpu_tdp_estimate: f64,
     /// Whether this is a laptop (has battery)
     is_laptop: bool,
-    /// Cached GPU power reading (nvidia-smi is slow)
+    /// Cached GPU power reading (used for CLI fallback; NVML is fast enough to skip cache)
     gpu_cache: Mutex<Option<CachedValue<Option<GpuInfo>>>>,
-    /// Cached GPU metrics (full metrics from nvidia-smi)
+    /// Cached GPU metrics (full metrics)
     gpu_metrics_cache: Mutex<Option<CachedValue<Option<crate::core::GpuMetrics>>>>,
     /// Cached CPU temperature (powershell is slow)
     cpu_temp_cache: Mutex<Option<CachedValue<Option<f64>>>>,
@@ -151,6 +179,9 @@ pub struct WmiMonitor {
     fan_cache: Mutex<Option<CachedValue<Option<FanMetrics>>>>,
     /// Cached memory speed in MHz (permanent cache - RAM speed never changes at runtime)
     memory_speed_cache: Mutex<Option<Option<u64>>>,
+    /// PDH query handle for thermal zone temperature (lazily initialized, reused)
+    #[cfg(target_os = "windows")]
+    pdh_thermal_query: Mutex<Option<PdhThermalQuery>>,
 }
 
 impl WmiMonitor {
@@ -175,9 +206,17 @@ impl WmiMonitor {
             ProcessRefreshKind::new().with_cpu().with_memory()
         );
 
-        // Detect GPU monitoring source
-        let gpu_source = Self::detect_gpu_source();
-        log::info!("GPU monitoring source: {:?}", gpu_source);
+        // Try NVML first for NVIDIA GPU (fast, direct API)
+        let nvml_state = nvml_gpu::init_nvml();
+        let gpu_source = if nvml_state.is_some() {
+            log::info!("Using NVML for NVIDIA GPU monitoring (direct API)");
+            GpuSource::NvmlNvidia
+        } else {
+            // Fallback to CLI-based detection
+            let source = Self::detect_gpu_source();
+            log::info!("GPU monitoring source: {:?}", source);
+            source
+        };
 
         // Estimate CPU TDP based on core count
         let cpu_count = sys.cpus().len();
@@ -188,6 +227,7 @@ impl WmiMonitor {
 
         Ok(Self {
             gpu_source,
+            nvml_state,
             sys: Mutex::new(sys),
             cpu_tdp_estimate,
             is_laptop,
@@ -197,6 +237,8 @@ impl WmiMonitor {
             gpu_process_cache: Mutex::new(None),
             fan_cache: Mutex::new(None),
             memory_speed_cache: Mutex::new(None),
+            #[cfg(target_os = "windows")]
+            pdh_thermal_query: Mutex::new(None),
         })
     }
 
@@ -409,8 +451,20 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU power based on detected source (cached for 2000ms to reduce command overhead)
+    /// Get GPU power based on detected source.
+    /// NVML path skips the cache (fast enough at ~1-5ms).
+    /// CLI fallback is cached for 2000ms to reduce command overhead.
     fn get_gpu_power(&self) -> Option<GpuInfo> {
+        // NVML fast path — no cache needed
+        if self.gpu_source == GpuSource::NvmlNvidia {
+            if let Some(ref nvml) = self.nvml_state {
+                if let Some((power, name)) = nvml_gpu::query_gpu_power(nvml) {
+                    return Some(GpuInfo { power_watts: power, name });
+                }
+            }
+            // NVML query failed, fall through to CLI
+        }
+
         // Check cache first (2000ms TTL - GPU commands are slow)
         {
             let cache = self.gpu_cache.lock().unwrap();
@@ -421,9 +475,9 @@ impl WmiMonitor {
             }
         }
 
-        // Cache miss - fetch fresh data
+        // Cache miss - fetch fresh data via CLI
         let result = match self.gpu_source {
-            GpuSource::Nvidia => self.get_nvidia_gpu_power(),
+            GpuSource::NvmlNvidia | GpuSource::Nvidia => self.get_nvidia_gpu_power(),
             GpuSource::Amd => self.get_amd_gpu_power(),
             GpuSource::None => None,
         };
@@ -588,6 +642,7 @@ impl WmiMonitor {
 
         // Determine source name
         let source = match self.gpu_source {
+            GpuSource::NvmlNvidia => "sysinfo+nvml",
             GpuSource::Nvidia => "sysinfo+nvidia",
             GpuSource::Amd => "sysinfo+amd",
             GpuSource::None => "sysinfo-estimated",
@@ -618,6 +673,7 @@ impl PowerSource for WmiMonitor {
 
     fn name(&self) -> &str {
         match self.gpu_source {
+            GpuSource::NvmlNvidia => "Windows Estimation + NVIDIA (NVML)",
             GpuSource::Nvidia => "Windows Estimation + NVIDIA",
             GpuSource::Amd => "Windows Estimation + AMD",
             GpuSource::None => "Windows Estimation",
@@ -630,6 +686,94 @@ impl PowerSource for WmiMonitor {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+// ===== Native Per-Core Frequency via CallNtPowerInformation =====
+
+/// Layout matching the Win32 PROCESSOR_POWER_INFORMATION struct returned by
+/// `CallNtPowerInformation(ProcessorInformation, ...)`.
+/// See: https://learn.microsoft.com/en-us/windows/win32/power/processor-power-information-str
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+struct ProcessorPowerInformation {
+    number: u32,
+    max_mhz: u32,
+    current_mhz: u32,
+    mhz_limit: u32,
+    max_idle_state: u32,
+    current_idle_state: u32,
+}
+
+impl WmiMonitor {
+    /// Read per-core CPU frequencies using the native Windows
+    /// `CallNtPowerInformation(ProcessorInformation)` API.
+    ///
+    /// This returns the actual current P-state frequency for each logical
+    /// processor, which is more accurate than sysinfo (which often reports the
+    /// base/nominal frequency on Windows).
+    ///
+    /// Returns `None` if the call fails for any reason (non-zero NTSTATUS,
+    /// buffer mismatch, etc.).
+    fn get_per_core_frequency_native(&self) -> Option<Vec<u64>> {
+        use windows_sys::Win32::System::Power::CallNtPowerInformation;
+
+        // ProcessorInformation = 11
+        const PROCESSOR_INFORMATION: i32 = 11;
+
+        let num_cpus = {
+            let sys = self.sys.lock().unwrap();
+            sys.cpus().len()
+        };
+
+        if num_cpus == 0 {
+            return None;
+        }
+
+        let struct_size = std::mem::size_of::<ProcessorPowerInformation>();
+        let buffer_size = struct_size * num_cpus;
+        let mut buffer: Vec<u8> = vec![0u8; buffer_size];
+
+        // SAFETY: We allocate a correctly-sized buffer and pass its length.
+        // CallNtPowerInformation writes `num_cpus` PROCESSOR_POWER_INFORMATION
+        // structs into the output buffer. The input buffer is unused for this
+        // information class (null, 0).
+        let status = unsafe {
+            CallNtPowerInformation(
+                PROCESSOR_INFORMATION,
+                std::ptr::null(),      // no input buffer
+                0,                     // input buffer size = 0
+                buffer.as_mut_ptr() as *mut _,
+                buffer_size as u32,
+            )
+        };
+
+        // NTSTATUS 0 == STATUS_SUCCESS
+        if status != 0 {
+            log::debug!(
+                "CallNtPowerInformation(ProcessorInformation) failed with NTSTATUS 0x{:08X}",
+                status as u32
+            );
+            return None;
+        }
+
+        // Reinterpret the buffer as a slice of ProcessorPowerInformation
+        let infos: &[ProcessorPowerInformation] = unsafe {
+            std::slice::from_raw_parts(
+                buffer.as_ptr() as *const ProcessorPowerInformation,
+                num_cpus,
+            )
+        };
+
+        let freqs: Vec<u64> = infos.iter().map(|info| info.current_mhz as u64).collect();
+
+        // Sanity check: if every core reports 0 MHz, treat as failure
+        if freqs.iter().all(|&f| f == 0) {
+            log::debug!("CallNtPowerInformation returned all-zero frequencies, ignoring");
+            return None;
+        }
+
+        Some(freqs)
     }
 }
 
@@ -660,8 +804,11 @@ impl WmiMonitor {
 
         let cpu_freq = sys.cpus().first().map(|c| c.frequency());
 
-        // Per-core frequencies - always collected (near-zero cost, sysinfo already in memory)
-        let per_core_frequency_mhz = Some(sys.cpus().iter().map(|c| c.frequency()).collect());
+        // Per-core frequencies: prefer native CallNtPowerInformation (accurate
+        // boosted/P-state frequency) and fall back to sysinfo (base frequency).
+        let sysinfo_freqs: Vec<u64> = sys.cpus().iter().map(|c| c.frequency()).collect();
+        let per_core_frequency_mhz = self.get_per_core_frequency_native()
+            .or(Some(sysinfo_freqs));
 
         // Release sys lock before slow operations
         let used_memory = sys.used_memory();
@@ -684,6 +831,7 @@ impl WmiMonitor {
             core_count: physical_core_count,
             thread_count,
             per_core_frequency_mhz,
+            per_core_temperature: None, // Per-core temps not available on Windows without OHM/LHM
         };
 
         // GPU metrics (fan speed and mem clock come free from nvidia-smi query)
@@ -719,6 +867,7 @@ impl WmiMonitor {
             memory,
             timestamp: chrono::Utc::now().timestamp(),
             fans,
+            voltages: None, // Not available on Windows without LibreHardwareMonitor
         })
     }
 
@@ -934,38 +1083,133 @@ impl WmiMonitor {
         result
     }
 
-    /// Actually fetch CPU temperature (slow - calls powershell, with timeout)
+    /// Actually fetch CPU temperature using a cascade of sources:
+    /// PDH Thermal Zone -> OHM WMI -> LHM WMI -> MSAcpi WMI (fallback)
     fn fetch_cpu_temperature(&self) -> Option<f64> {
-        // Try WMI query for thermal zone temperature
-        // Temperature is in tenths of Kelvin, convert: (value / 10) - 273.15
-        if let Some(output) = run_command_with_timeout(
-            "powershell",
-            &["-Command", "Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi 2>$null | Select-Object -First 1 -ExpandProperty CurrentTemperature"],
-            GPU_COMMAND_TIMEOUT_MS,
-        ) {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                if let Ok(temp_decikelvin) = stdout.trim().parse::<f64>() {
-                    let temp_celsius = (temp_decikelvin / 10.0) - 273.15;
-                    if temp_celsius > 0.0 && temp_celsius < 150.0 {
-                        return Some(temp_celsius);
-                    }
-                }
-            }
+        // 1. Try PDH Thermal Zone Information (fast, no PowerShell, no admin needed)
+        #[cfg(target_os = "windows")]
+        if let Some(temp) = self.fetch_cpu_temperature_pdh() {
+            log::debug!("CPU temperature from PDH: {:.1}°C", temp);
+            return Some(temp);
         }
 
-        // Try Open Hardware Monitor WMI if available
-        if let Some(output) = run_command_with_timeout(
+        // 2. Try Open Hardware Monitor WMI if available
+        if let Some(temp) = self.fetch_cpu_temperature_ohm() {
+            log::debug!("CPU temperature from OHM: {:.1}°C", temp);
+            return Some(temp);
+        }
+
+        // 3. Try LibreHardwareMonitor WMI if available
+        if let Some(temp) = self.fetch_cpu_temperature_lhm() {
+            log::debug!("CPU temperature from LHM: {:.1}°C", temp);
+            return Some(temp);
+        }
+
+        // 4. Fallback: MSAcpi_ThermalZoneTemperature (requires admin, often unreliable)
+        if let Some(temp) = self.fetch_cpu_temperature_msacpi() {
+            log::debug!("CPU temperature from MSAcpi: {:.1}°C", temp);
+            return Some(temp);
+        }
+
+        None
+    }
+
+    /// Fetch CPU temperature via PDH (Performance Data Helper) API.
+    /// Reads `\Thermal Zone Information(*)\Temperature` which returns Kelvin.
+    /// The PDH query handle is lazily initialized and cached for reuse.
+    #[cfg(target_os = "windows")]
+    fn fetch_cpu_temperature_pdh(&self) -> Option<f64> {
+        use windows_sys::Win32::System::Performance::{
+            PdhOpenQueryW, PdhAddEnglishCounterW, PdhCollectQueryData,
+            PdhGetFormattedCounterValue, PdhCloseQuery,
+            PDH_FMT_DOUBLE, PDH_FMT_COUNTERVALUE,
+        };
+
+        // Ensure the PDH query is initialized (lazy init)
+        let mut pdh_lock = self.pdh_thermal_query.lock().unwrap();
+
+        if pdh_lock.is_none() {
+            // Initialize PDH query and add the thermal zone counter
+            let mut query: isize = 0;
+            let status = unsafe { PdhOpenQueryW(std::ptr::null(), 0, &mut query) };
+            if status != 0 {
+                log::debug!("PDH: PdhOpenQueryW failed with status 0x{:08X}", status);
+                return None;
+            }
+
+            // Counter path: \Thermal Zone Information(*)\Temperature
+            // Using wide string (UTF-16) for the W-suffix API
+            let counter_path: Vec<u16> = "\\Thermal Zone Information(*)\\Temperature\0"
+                .encode_utf16()
+                .collect();
+
+            let mut counter: isize = 0;
+            let status = unsafe {
+                PdhAddEnglishCounterW(query, counter_path.as_ptr(), 0, &mut counter)
+            };
+            if status != 0 {
+                log::debug!("PDH: PdhAddEnglishCounterW failed with status 0x{:08X}", status);
+                unsafe { PdhCloseQuery(query); }
+                return None;
+            }
+
+            // First collect to establish baseline (PDH needs at least one collect before reading)
+            let status = unsafe { PdhCollectQueryData(query) };
+            if status != 0 {
+                log::debug!("PDH: initial PdhCollectQueryData failed with status 0x{:08X}", status);
+                unsafe { PdhCloseQuery(query); }
+                return None;
+            }
+
+            *pdh_lock = Some(PdhThermalQuery { query, counter });
+            log::info!("PDH thermal zone query initialized successfully");
+        }
+
+        let pdh = pdh_lock.as_ref()?;
+
+        // Collect fresh data
+        let status = unsafe { PdhCollectQueryData(pdh.query) };
+        if status != 0 {
+            log::debug!("PDH: PdhCollectQueryData failed with status 0x{:08X}", status);
+            return None;
+        }
+
+        // Read the formatted counter value
+        let mut counter_type: u32 = 0;
+        let mut value: PDH_FMT_COUNTERVALUE = unsafe { std::mem::zeroed() };
+        let status = unsafe {
+            PdhGetFormattedCounterValue(pdh.counter, PDH_FMT_DOUBLE, &mut counter_type, &mut value)
+        };
+        if status != 0 {
+            log::debug!("PDH: PdhGetFormattedCounterValue failed with status 0x{:08X}", status);
+            return None;
+        }
+
+        // PDH returns temperature in Kelvin, convert to Celsius
+        let temp_kelvin = unsafe { value.Anonymous.doubleValue };
+        let temp_celsius = temp_kelvin - 273.15;
+
+        if temp_celsius > 0.0 && temp_celsius < 150.0 {
+            Some(temp_celsius)
+        } else {
+            log::debug!("PDH: temperature out of range: {:.1}K = {:.1}°C", temp_kelvin, temp_celsius);
+            None
+        }
+    }
+
+    /// Fetch CPU temperature via Open Hardware Monitor WMI namespace (with timeout)
+    fn fetch_cpu_temperature_ohm(&self) -> Option<f64> {
+        let output = run_command_with_timeout(
             "powershell",
             &["-Command", "Get-WmiObject Sensor -Namespace root/OpenHardwareMonitor 2>$null | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1 -ExpandProperty Value"],
             GPU_COMMAND_TIMEOUT_MS,
-        ) {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                if let Ok(temp) = stdout.trim().parse::<f64>() {
-                    if temp > 0.0 && temp < 150.0 {
-                        return Some(temp);
-                    }
+        )?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Ok(temp) = stdout.trim().parse::<f64>() {
+                if temp > 0.0 && temp < 150.0 {
+                    return Some(temp);
                 }
             }
         }
@@ -973,13 +1217,58 @@ impl WmiMonitor {
         None
     }
 
-    /// Get GPU metrics including usage, power, temperature, and VRAM (cached for 2000ms)
+    /// Fetch CPU temperature via LibreHardwareMonitor WMI namespace (with timeout)
+    fn fetch_cpu_temperature_lhm(&self) -> Option<f64> {
+        let output = run_command_with_timeout(
+            "powershell",
+            &["-Command", "Get-WmiObject Sensor -Namespace root/LibreHardwareMonitor 2>$null | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1 -ExpandProperty Value"],
+            GPU_COMMAND_TIMEOUT_MS,
+        )?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Ok(temp) = stdout.trim().parse::<f64>() {
+                if temp > 0.0 && temp < 150.0 {
+                    return Some(temp);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Fetch CPU temperature via MSAcpi_ThermalZoneTemperature WMI (fallback, requires admin)
+    fn fetch_cpu_temperature_msacpi(&self) -> Option<f64> {
+        let output = run_command_with_timeout(
+            "powershell",
+            &["-Command", "Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi 2>$null | Select-Object -First 1 -ExpandProperty CurrentTemperature"],
+            GPU_COMMAND_TIMEOUT_MS,
+        )?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Ok(temp_decikelvin) = stdout.trim().parse::<f64>() {
+                // MSAcpi returns tenths of Kelvin
+                let temp_celsius = (temp_decikelvin / 10.0) - 273.15;
+                if temp_celsius > 0.0 && temp_celsius < 150.0 {
+                    return Some(temp_celsius);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Get GPU metrics including usage, power, temperature, and VRAM.
+    /// NVML: cached for 500ms (fast API). CLI: cached for 2000ms (slow subprocess).
     fn get_gpu_metrics(&self) -> Option<GpuMetrics> {
-        // Check cache first (2000ms TTL - GPU commands are slow)
+        let cache_ttl = if self.gpu_source == GpuSource::NvmlNvidia { 500 } else { 2000 };
+
+        // Check cache first
         {
             let cache = self.gpu_metrics_cache.lock().unwrap();
             if let Some(ref cached) = *cache {
-                if let Some(value) = cached.get(2000) {
+                if let Some(value) = cached.get(cache_ttl) {
                     return value;
                 }
             }
@@ -987,6 +1276,12 @@ impl WmiMonitor {
 
         // Cache miss - fetch fresh data
         let result = match self.gpu_source {
+            GpuSource::NvmlNvidia => {
+                // Try NVML first
+                self.nvml_state.as_ref()
+                    .and_then(nvml_gpu::query_gpu_metrics)
+                    .or_else(|| self.get_nvidia_gpu_metrics()) // CLI fallback
+            }
             GpuSource::Nvidia => self.get_nvidia_gpu_metrics(),
             GpuSource::Amd => self.get_amd_gpu_metrics(),
             GpuSource::None => None,
@@ -1162,7 +1457,7 @@ impl WmiMonitor {
     fn fetch_memory_speed(&self) -> Option<u64> {
         let output = run_command_with_timeout(
             "powershell",
-            &["-Command", "(Get-WmiObject Win32_PhysicalMemory | Select-Object -First 1 -ExpandProperty Speed) 2>$null"],
+            &["-Command", "Get-WmiObject Win32_PhysicalMemory | Select-Object -First 1 -ExpandProperty Speed"],
             GPU_COMMAND_TIMEOUT_MS,
         )?;
 
@@ -1253,13 +1548,16 @@ impl WmiMonitor {
         }
     }
 
-    /// Get per-process GPU usage (cached for 2000ms - pmon is expensive)
+    /// Get per-process GPU usage.
+    /// NVML: cached for 500ms (fast). CLI: cached for 2000ms (slow subprocess).
     fn get_gpu_process_usage(&self) -> HashMap<u32, f64> {
-        // Check cache first (2000ms TTL - GPU commands are slow)
+        let cache_ttl = if self.gpu_source == GpuSource::NvmlNvidia { 500 } else { 2000 };
+
+        // Check cache first
         {
             let cache = self.gpu_process_cache.lock().unwrap();
             if let Some(ref cached) = *cache {
-                if let Some(value) = cached.get(2000) {
+                if let Some(value) = cached.get(cache_ttl) {
                     return value;
                 }
             }
@@ -1267,6 +1565,12 @@ impl WmiMonitor {
 
         // Cache miss - fetch fresh data based on GPU source
         let result = match self.gpu_source {
+            GpuSource::NvmlNvidia => {
+                // Try NVML first, fall back to CLI pmon
+                self.nvml_state.as_ref()
+                    .map(nvml_gpu::query_gpu_processes)
+                    .unwrap_or_else(|| self.fetch_nvidia_gpu_processes())
+            }
             GpuSource::Nvidia => self.fetch_nvidia_gpu_processes(),
             GpuSource::Amd => self.fetch_amd_gpu_processes(),
             GpuSource::None => HashMap::new(),

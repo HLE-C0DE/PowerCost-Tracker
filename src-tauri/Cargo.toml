@@ -58,12 +58,16 @@ tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
 # System info
 sysinfo = "0.30"
 
+# NVIDIA GPU monitoring (replaces nvidia-smi CLI)
+nvml-wrapper = "0.10"
+
 # Platform-specific dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
 # No additional deps needed - we use sysfs directly
 
 [target.'cfg(target_os = "windows")'.dependencies]
-# No additional deps needed - we use sysinfo + CLI tools (nvidia-smi, rocm-smi)
+# PDH for CPU temperature + CallNtPowerInformation for per-core frequency
+windows-sys = { version = "0.59", features = ["Win32_System_Performance", "Win32_System_Power"] }
 
 [features]
 default = ["custom-protocol"]

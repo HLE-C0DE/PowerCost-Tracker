@@ -118,13 +118,27 @@ const WIDGET_REGISTRY = {
             const fans = data.systemMetrics?.fans;
             const hasFans = fans && fans.fans && fans.fans.length > 0;
             const fanStr = hasFans
-                ? fans.fans.map(f => f.speed_rpm != null ? `${f.speed_rpm} RPM` : (f.speed_percent != null ? `${f.speed_percent}%` : '')).filter(Boolean).join(', ')
+                ? fans.fans.map(f => {
+                    const rpm = f.speed_rpm != null ? `${f.speed_rpm} RPM` : (f.speed_percent != null ? `${f.speed_percent}%` : '');
+                    return f.name && rpm ? `${f.name}: ${rpm}` : rpm;
+                }).filter(Boolean).join(' \u00b7 ')
                 : '';
+
+            // Per-core temperature info
+            const perCoreTemp = cpu.per_core_temperature;
+            const hasPerCoreTemp = perCoreTemp && perCoreTemp.length > 1;
+
+            // Voltage info
+            const voltages = data.systemMetrics?.voltages;
+            const hasVoltages = voltages && voltages.length > 0;
 
             // Radial mode
             if (displayMode === 'radial') {
                 const cpuBars = [];
-                if (hasTemp && cpu.temperature_celsius != null) {
+                if (hasPerCoreTemp) {
+                    const maxCoreTemp = Math.max(...perCoreTemp);
+                    cpuBars.push({ value: maxCoreTemp, max: 100, label: `${formatNumber(maxCoreTemp, 0)}°`, color: maxCoreTemp > 80 ? '#ef4444' : maxCoreTemp > 60 ? '#f59e0b' : '#fb923c', name: 'TMAX' });
+                } else if (hasTemp && cpu.temperature_celsius != null) {
                     cpuBars.push({ value: cpu.temperature_celsius, max: 100, label: `${formatNumber(cpu.temperature_celsius, 0)}°`, color: cpu.temperature_celsius > 80 ? '#ef4444' : cpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c', name: 'TEMP' });
                 }
                 if (hasClockRange && perCoreFreq.length > 0) {
@@ -178,6 +192,10 @@ const WIDGET_REGISTRY = {
                     <span class="metric-label">${t('widget.temp')}</span>
                     <span class="metric-value">${temp}</span>
                 </div>` : ''}
+                ${hasPerCoreTemp && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">Core temps</span>
+                    <span class="metric-value">${Math.min(...perCoreTemp).toFixed(0)}-${Math.max(...perCoreTemp).toFixed(0)}°C</span>
+                </div>` : ''}
                 ${hasClockRange && globalDisplay === 'normal' ? `<div class="metric-row">
                     <span class="metric-label">${t('widget.clock')}</span>
                     <span class="metric-value">${clockRange}</span>
@@ -185,6 +203,10 @@ const WIDGET_REGISTRY = {
                 ${hasFans && fanStr && globalDisplay === 'normal' ? `<div class="metric-row">
                     <span class="metric-label">${t('widget.fan')}</span>
                     <span class="metric-value">${fanStr}</span>
+                </div>` : ''}
+                ${hasVoltages && globalDisplay === 'normal' ? `<div class="metric-row">
+                    <span class="metric-label">Voltages</span>
+                    <span class="metric-value">${voltages.slice(0, 3).map(v => `${v.name}: ${v.value_volts.toFixed(2)}V`).join(', ')}</span>
                 </div>` : ''}
                 <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
             `;
@@ -292,7 +314,7 @@ const WIDGET_REGISTRY = {
                     <span class="metric-label">${t('widget.mem_clock')}</span>
                     <span class="metric-value">${gpu.memory_clock_mhz} MHz</span>
                 </div>` : ''}
-                <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
+                <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}${(() => { const sl = gpu.source === 'nvml' ? 'NVML' : gpu.source === 'nvidia-smi' ? 'CLI' : gpu.source === 'amdgpu-sysfs' ? 'sysfs' : ''; return sl ? ` <span class="metric-source">(${sl})</span>` : ''; })()}</div>
             `;
         },
     },

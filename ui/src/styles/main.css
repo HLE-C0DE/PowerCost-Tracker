@@ -707,6 +707,12 @@ body {
     white-space: nowrap;
 }
 
+.metric-source {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
 /* Progress Bar */
 .progress-bar {
     flex: 1;
