@@ -37,7 +37,7 @@ Running a local LLM like LLaMA or Mistral? Playing games for hours? Training AI 
 PowerCost Tracker monitors your PC's power consumption in real-time and calculates electricity costs based on your actual energy rates. No more guessing - see the real cost of your computing activities.
 
 <img width="1389" height="458" alt="image" src="https://github.com/user-attachments/assets/b3a0065b-c8cc-410c-b253-08ad884c4bac" />
-<p align="center"><i>**Fully customizable dashboard** - drag-and-drop widgets, resize (small/medium/large), show/hide any panel, persistent layout</i></p>
+<p align="center"><i>Fully customizable dashboard - drag&drop, resize, show/hide widgets</i></p>
 
 ### Use Cases
 
