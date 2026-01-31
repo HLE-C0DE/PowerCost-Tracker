@@ -350,23 +350,23 @@ cd src-tauri && cargo run --bin powercost-demo
 
 ### v1.1.0
 
-- Overhauled dashboard with adaptive grid layout and charge bars
-- Extended hardware metrics: per-core clocks, fan speeds, GPU memory clock
-- Improved history view with daily cost stats
-- Session-average power for accurate Wh estimations
-- Numerous bug fixes (tray icon, CPU >100%, start minimized, and more)
+- **Overhauled dashboard** with adaptive grid layout and charge bars
+- **Extended hardware metrics**: per-core clocks, fan speeds, GPU memory clock
+- **Improved history view** with daily cost stats
+- **Session-average power** for accurate Wh estimations
+- Bug fixes (tray icon, CPU >100%, start minimized, and more)
 
 ### v1.0.0
 
-- Real-time power monitoring (RAPL, WMI, GPU)
-- 4 flexible pricing modes
-- Hardware monitoring (CPU, GPU, RAM, temperatures)
-- Surplus/session tracking for activity cost calculation
-- Customizable dashboard with drag-and-drop widgets
-- Floating overlay widget
-- Bilingual UI (EN/FR)
-- Dark/Light themes
-- System tray integration
+- **Real-time power monitoring** (RAPL, WMI, GPU)
+- **4 flexible pricing modes**
+- **Hardware monitoring** (CPU, GPU, RAM, temperatures)
+- **Surplus/session tracking** for activity cost calculation
+- **Customizable dashboard** with drag-and-drop widgets
+- **Floating overlay** widget
+- **Bilingual** UI (EN/FR)
+- **Dark/Light themes**
+- **System tray integration**
 
 
 ---
