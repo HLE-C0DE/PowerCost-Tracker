@@ -149,7 +149,7 @@ const WIDGET_REGISTRY = {
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(cpu.usage_percent, 'CPU', '#6366f1')}
-                        ${globalDisplay !== 'hard' ? renderChargeBars(cpuBars) : ''}
+                        ${renderChargeBars(cpuBars)}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${cpu.name.slice(0, 30)}</div>
                 `;
@@ -159,7 +159,7 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'chart') {
                 return `
                     <div class="mini-chart-container">
-                        <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        <div class="mini-chart-header ">
                             <span class="metric-label">CPU</span>
                             <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
                         </div>
@@ -173,7 +173,7 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'text') {
                 return `
                     <div class="widget-value">${formatNumber(cpu.usage_percent, 0)}<span class="unit">%</span></div>
-                    ${hasTemp ? `<div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                    ${hasTemp ? `<div class="metric-row ">
                         <span class="metric-label">${t('widget.temp')}</span>
                         <span class="metric-value">${temp}</span>
                     </div>` : ''}
@@ -184,11 +184,11 @@ const WIDGET_REGISTRY = {
             // Default bar mode
             return `
                 <div class="metric-row">
-                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">${t('widget.usage')}</span>
+                    <span class="metric-label ">${t('widget.usage')}</span>
                     <div class="progress-bar"><div class="progress-fill" style="width: ${cpu.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(cpu.usage_percent, 0)}%</span>
                 </div>
-                ${hasTemp ? `<div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                ${hasTemp ? `<div class="metric-row ">
                     <span class="metric-label">${t('widget.temp')}</span>
                     <span class="metric-value">${temp}</span>
                 </div>` : ''}
@@ -251,7 +251,7 @@ const WIDGET_REGISTRY = {
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(usage, 'GPU', '#22c55e')}
-                        ${globalDisplay !== 'hard' ? renderChargeBars(gpuBars) : ''}
+                        ${renderChargeBars(gpuBars)}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${gpu.name.slice(0, 25)}</div>
                 `;
@@ -261,7 +261,7 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'chart') {
                 return `
                     <div class="mini-chart-container">
-                        <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        <div class="mini-chart-header ">
                             <span class="metric-label">GPU</span>
                             <span class="metric-value">${usageStr}</span>
                         </div>
@@ -275,11 +275,11 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'text') {
                 return `
                     <div class="widget-value">${usageStr}</div>
-                    <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                    <div class="metric-row ">
                         <span class="metric-label">${t('widget.temp')}</span>
                         <span class="metric-value">${temp}</span>
                     </div>
-                    <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                    <div class="metric-row ">
                         <span class="metric-label">${t('widget.power')}</span>
                         <span class="metric-value">${power}</span>
                     </div>
@@ -290,15 +290,15 @@ const WIDGET_REGISTRY = {
             // Default bar mode
             return `
                 <div class="metric-row">
-                    <span class="metric-label ${globalDisplay === 'hard' ? 'hidden' : ''}">${t('widget.usage')}</span>
+                    <span class="metric-label ">${t('widget.usage')}</span>
                     <div class="progress-bar"><div class="progress-fill gpu-fill" style="width: ${usage}%"></div></div>
                     <span class="metric-value">${usageStr}</span>
                 </div>
-                <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                <div class="metric-row ">
                     <span class="metric-label">${t('widget.temp')}</span>
                     <span class="metric-value">${temp}</span>
                 </div>
-                <div class="metric-row ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                <div class="metric-row ">
                     <span class="metric-label">${t('widget.power')}</span>
                     <span class="metric-value">${power}</span>
                 </div>
@@ -345,7 +345,7 @@ const WIDGET_REGISTRY = {
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
-                        ${globalDisplay !== 'hard' ? renderChargeBars(ramBars) : ''}
+                        ${renderChargeBars(ramBars)}
                     </div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
                 `;
@@ -355,7 +355,7 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'chart') {
                 return `
                     <div class="mini-chart-container">
-                        <div class="mini-chart-header ${globalDisplay === 'hard' ? 'hidden' : ''}">
+                        <div class="mini-chart-header ">
                             <span class="metric-label">RAM</span>
                             <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
                         </div>
@@ -637,6 +637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupNavigation();
         setupSettings();
         setupDashboard();
+        setupSourceBadgeToggle();
         setupSessionControls();
         setupHistoryTabs();
 
@@ -737,6 +738,23 @@ function setupSidebarToggle() {
         sidebar.classList.toggle('collapsed');
         const collapsed = sidebar.classList.contains('collapsed');
         localStorage.setItem('sidebar-collapsed', collapsed);
+    });
+}
+
+// ===== Source Badge Toggle =====
+function setupSourceBadgeToggle() {
+    const badge = document.getElementById('source-badge');
+    if (!badge) return;
+
+    // Start expanded, auto-collapse after 5s
+    setTimeout(() => {
+        if (!badge.classList.contains('collapsed')) {
+            badge.classList.add('collapsed');
+        }
+    }, 5000);
+
+    badge.addEventListener('click', () => {
+        badge.classList.toggle('collapsed');
     });
 }
 
@@ -3350,10 +3368,10 @@ function formatTimeHHMM(timestamp) {
 }
 
 /**
- * Cycles global display mode through normal -> minimize -> hard -> normal
+ * Cycles global display mode through normal -> minimize -> normal
  */
 async function cycleGlobalDisplay() {
-    const modes = ['normal', 'minimize', 'hard'];
+    const modes = ['normal', 'minimize'];
     const current = state.dashboardConfig?.global_display || 'normal';
     const currentIndex = modes.indexOf(current);
     const nextIndex = (currentIndex + 1) % modes.length;
@@ -3370,7 +3388,7 @@ async function cycleGlobalDisplay() {
 
 /**
  * Sets global display mode
- * @param {string} mode - 'normal', 'minimize', or 'hard'
+ * @param {string} mode - 'normal' or 'minimize'
  */
 async function setGlobalDisplay(mode) {
     state.dashboardConfig.global_display = mode;

@@ -123,7 +123,7 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("error.using_estimation".into(), "Utilisation du mode estimation".into());
     t.insert("error.permission_denied".into(), "Permission refus\u{00E9}e".into());
     t.insert("error.save_failed".into(), "\u{00C9}chec de l'enregistrement".into());
-    t.insert("warning.estimated_values".into(), "Les valeurs sont estim\u{00E9}es et peuvent ne pas \u{00EA}tre pr\u{00E9}cises".into());
+    t.insert("warning.estimated_values".into(), "Les valeurs de puissance sont estim\u{00E9}es (aucun capteur direct d\u{00E9}tect\u{00E9})".into());
 
     // Actions
     t.insert("action.save".into(), "Enregistrer".into());
@@ -141,7 +141,7 @@ pub fn get_translations() -> HashMap<String, String> {
     // Dashboard - Display modes
     t.insert("dashboard.mode.normal".into(), "Normal".into());
     t.insert("dashboard.mode.minimal".into(), "Minimal".into());
-    t.insert("dashboard.mode.data".into(), "Données".into());
+
 
     // Dashboard - Edit mode
     t.insert("dashboard.edit_mode".into(), "Mode édition".into());

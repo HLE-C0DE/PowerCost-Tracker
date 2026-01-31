@@ -249,6 +249,22 @@ body {
     border-radius: var(--radius-lg);
     font-size: 0.875rem;
     color: var(--text-secondary);
+    cursor: pointer;
+    transition: padding 0.2s ease, gap 0.2s ease;
+}
+
+.status-badge.collapsed #power-source {
+    display: none;
+}
+
+.status-badge.collapsed {
+    padding: var(--spacing-xs);
+    gap: 0;
+}
+
+.status-badge.collapsed .status-dot {
+    width: 10px;
+    height: 10px;
 }
 
 .status-dot {
@@ -2334,10 +2350,6 @@ body {
     background: rgba(0, 0, 0, 0.08);
 }
 
-/* Hide charge bars in hard display mode */
-.display-hard .charge-bars {
-    display: none !important;
-}
 
 /* Minimize mode: smaller charge bars, hide names */
 .display-minimize .charge-bar-track {
@@ -2440,22 +2452,6 @@ body {
 
 /* ===== Stream A: Global Display Mode Classes ===== */
 
-/* Hard mode - data only, no labels */
-.display-hard .metric-label,
-.display-hard .metric-info,
-.display-hard .radial-label,
-.display-hard .mini-chart-header {
-    display: none !important;
-}
-
-.display-hard .metric-row {
-    justify-content: center;
-}
-
-.display-hard .progress-bar {
-    flex: none;
-    width: 60%;
-}
 
 /* Minimize mode - reduced labels */
 .display-minimize .metric-info {
