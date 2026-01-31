@@ -293,8 +293,59 @@
 
                 <!-- Sessions content -->
                 <div id="history-sessions-content" class="hidden">
+                    <!-- Session Summary Stats -->
+                    <div class="history-stats">
+                        <div class="stat-card stat-card--energy">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label">Sessions</span>
+                                <span class="stat-value" id="session-total-count">--</span>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--peak">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label">Total Energy</span>
+                                <span class="stat-value" id="session-total-energy">-- Wh</span>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--energy">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label">Total Surplus</span>
+                                <span class="stat-value" id="session-total-surplus">-- Wh</span>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--cost">
+                            <div class="stat-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                                </svg>
+                            </div>
+                            <div class="stat-card-content">
+                                <span class="stat-label">Total Cost</span>
+                                <span class="stat-value" id="session-total-cost">--</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Histogram Canvas -->
                     <div class="session-histogram-container">
+                        <div class="history-chart-header">
+                            <h3>Sessions</h3>
+                        </div>
                         <canvas id="session-histogram"></canvas>
                     </div>
 

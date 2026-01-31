@@ -2700,7 +2700,7 @@ function updateSegmentedControl(container, activeBtn) {
 
     const index = buttons.indexOf(activeBtn);
     const btnWidth = activeBtn.offsetWidth;
-    const offset = activeBtn.offsetLeft - container.offsetLeft - 3; // 3px padding
+    const offset = activeBtn.offsetLeft - 3; // 3px = container padding
     indicator.style.width = `${btnWidth}px`;
     indicator.style.transform = `translateX(${offset}px)`;
 }
@@ -2984,6 +2984,21 @@ async function loadSessionHistoryView(startDate, endDate) {
                 `;
             }).join('');
         }
+
+        // Update session summary stats
+        const totalCount = sessions.length;
+        const totalEnergy = sessions.reduce((sum, s) => sum + (s.total_wh || 0), 0);
+        const totalSurplus = sessions.reduce((sum, s) => sum + (s.surplus_wh || 0), 0);
+        const totalCost = sessions.reduce((sum, s) => sum + (s.surplus_cost || 0), 0);
+
+        document.getElementById('session-total-count').textContent = totalCount;
+        document.getElementById('session-total-energy').textContent = totalEnergy >= 1000
+            ? `${formatNumber(totalEnergy / 1000, 2)} kWh`
+            : `${formatNumber(totalEnergy, 1)} Wh`;
+        document.getElementById('session-total-surplus').textContent = totalSurplus >= 1000
+            ? `${formatNumber(totalSurplus / 1000, 2)} kWh`
+            : `${formatNumber(totalSurplus, 1)} Wh`;
+        document.getElementById('session-total-cost').textContent = `${state.currencySymbol}${formatNumber(totalCost, 4)}`;
 
         // Draw histogram
         renderSessionHistogram(sessions, startDate, endDate);
