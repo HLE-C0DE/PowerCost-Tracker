@@ -804,11 +804,10 @@ impl WmiMonitor {
 
         let cpu_freq = sys.cpus().first().map(|c| c.frequency());
 
-        // Per-core frequencies: prefer native CallNtPowerInformation (accurate
-        // boosted/P-state frequency) and fall back to sysinfo (base frequency).
+        // Per-core frequencies: collect sysinfo values while lock is held,
+        // but call get_per_core_frequency_native() AFTER dropping the lock
+        // (it also needs self.sys.lock(), so calling it here would deadlock).
         let sysinfo_freqs: Vec<u64> = sys.cpus().iter().map(|c| c.frequency()).collect();
-        let per_core_frequency_mhz = self.get_per_core_frequency_native()
-            .or(Some(sysinfo_freqs));
 
         // Release sys lock before slow operations
         let used_memory = sys.used_memory();
@@ -818,6 +817,10 @@ impl WmiMonitor {
         let physical_core_count = sys.physical_core_count().unwrap_or(0);
         let thread_count = sys.cpus().len();
         drop(sys);
+
+        // Safe now: sys lock is released, get_per_core_frequency_native can acquire it
+        let per_core_frequency_mhz = self.get_per_core_frequency_native()
+            .or(Some(sysinfo_freqs));
 
         // Get CPU temperature via WMI (if available)
         let cpu_temp = self.get_cpu_temperature();
