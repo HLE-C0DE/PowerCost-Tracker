@@ -49,6 +49,7 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.eco_mode.description".into(), "R\u{00E9}duire la fr\u{00E9}quence quand minimis\u{00E9}".into());
     t.insert("settings.start_minimized".into(), "D\u{00E9}marrer minimis\u{00E9}".into());
     t.insert("settings.start_with_system".into(), "D\u{00E9}marrer avec le syst\u{00E8}me".into());
+    t.insert("settings.remember_window_position".into(), "M\u{00E9}moriser la position et la taille de la fen\u{00EA}tre".into());
 
     // Settings - Pricing
     t.insert("settings.pricing".into(), "Tarification".into());

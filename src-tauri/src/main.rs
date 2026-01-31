@@ -17,7 +17,7 @@ use crate::hardware::{BaselineDetector, PowerMonitor};
 use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tokio::sync::Mutex;
@@ -795,11 +795,53 @@ fn main() {
 
             // Check if start_minimized is enabled and hide the main window
             let state: tauri::State<'_, TauriState> = app.state();
-            let start_minimized = {
+            let (start_minimized, remember_pos, win_x, win_y, win_w, win_h) = {
                 // Use block_on since we're in sync context
                 let config = tauri::async_runtime::block_on(state.config.lock());
-                config.general.start_minimized
+                (
+                    config.general.start_minimized,
+                    config.general.remember_window_position,
+                    config.general.window_x,
+                    config.general.window_y,
+                    config.general.window_width,
+                    config.general.window_height,
+                )
             };
+
+            // Restore saved window position and size
+            if remember_pos {
+                if let Some(main_window) = app.get_webview_window("main") {
+                    if let (Some(w), Some(h)) = (win_w, win_h) {
+                        let _ = main_window.set_size(LogicalSize::new(w, h));
+                    }
+                    if let (Some(x), Some(y)) = (win_x, win_y) {
+                        // Verify position is within available screen area
+                        let is_visible = main_window.available_monitors().ok()
+                            .map(|monitors| {
+                                monitors.iter().any(|m| {
+                                    let pos = m.position();
+                                    let size = m.size();
+                                    let scale = m.scale_factor();
+                                    let mx = pos.x as f64 / scale;
+                                    let my = pos.y as f64 / scale;
+                                    let mw = size.width as f64 / scale;
+                                    let mh = size.height as f64 / scale;
+                                    // Check if at least part of the window is visible on this monitor
+                                    x < mx + mw && x + win_w.unwrap_or(900.0) > mx &&
+                                    y < my + mh && y + win_h.unwrap_or(600.0) > my
+                                })
+                            })
+                            .unwrap_or(false);
+
+                        if is_visible {
+                            let _ = main_window.set_position(LogicalPosition::new(x, y));
+                            log::info!("Restored window position: ({}, {})", x, y);
+                        } else {
+                            log::info!("Saved window position ({}, {}) is off-screen, using default", x, y);
+                        }
+                    }
+                }
+            }
 
             if !start_minimized {
                 if let Some(main_window) = app.get_webview_window("main") {
@@ -862,18 +904,63 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Only intercept close for main window
-                if window.label() == "main" {
+            if window.label() != "main" {
+                return;
+            }
+
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // Save window geometry before hiding
+                    let app = window.app_handle().clone();
+                    let win = window.clone();
+                    tauri::async_runtime::spawn(async move {
+                        save_window_geometry(&app, &win).await;
+                    });
+
                     // Hide window instead of closing
                     let _ = window.hide();
                     api.prevent_close();
                     log::info!("Main window hidden to tray");
                 }
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                    // Save geometry on move/resize (in case of crash before close)
+                    let app = window.app_handle().clone();
+                    let win = window.clone();
+                    tauri::async_runtime::spawn(async move {
+                        save_window_geometry(&app, &win).await;
+                    });
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Save window position and size to config
+async fn save_window_geometry(app: &tauri::AppHandle, window: &tauri::Window) {
+    let state: tauri::State<'_, TauriState> = app.state();
+    let mut config = state.config.lock().await;
+
+    if !config.general.remember_window_position {
+        return;
+    }
+
+    let scale = window.scale_factor().unwrap_or(1.0);
+
+    if let Ok(pos) = window.outer_position() {
+        config.general.window_x = Some(pos.x as f64 / scale);
+        config.general.window_y = Some(pos.y as f64 / scale);
+    }
+
+    if let Ok(size) = window.outer_size() {
+        config.general.window_width = Some(size.width as f64 / scale);
+        config.general.window_height = Some(size.height as f64 / scale);
+    }
+
+    if let Err(e) = config.save() {
+        log::warn!("Failed to save window geometry: {}", e);
+    }
 }
 
 /// Critical monitoring loop - runs at fast rate (user's refresh_rate_ms)

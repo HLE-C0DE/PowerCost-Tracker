@@ -129,6 +129,21 @@ pub struct GeneralConfig {
     /// Start with system
     #[serde(default)]
     pub start_with_system: bool,
+    /// Remember window position and size across launches
+    #[serde(default = "default_true")]
+    pub remember_window_position: bool,
+    /// Saved window X position
+    #[serde(default)]
+    pub window_x: Option<f64>,
+    /// Saved window Y position
+    #[serde(default)]
+    pub window_y: Option<f64>,
+    /// Saved window width
+    #[serde(default)]
+    pub window_width: Option<f64>,
+    /// Saved window height
+    #[serde(default)]
+    pub window_height: Option<f64>,
 }
 
 fn default_language() -> String { "auto".to_string() }
@@ -146,6 +161,11 @@ impl Default for GeneralConfig {
             eco_mode: false,
             start_minimized: false,
             start_with_system: false,
+            remember_window_position: true,
+            window_x: None,
+            window_y: None,
+            window_width: None,
+            window_height: None,
         }
     }
 }

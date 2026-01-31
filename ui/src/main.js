@@ -3613,6 +3613,7 @@ function applyConfig(config) {
     document.getElementById('setting-eco-mode').checked = config.general.eco_mode;
     document.getElementById('setting-start-minimized').checked = config.general.start_minimized || false;
     document.getElementById('setting-start-with-system').checked = config.general.start_with_system || false;
+    document.getElementById('setting-remember-window-position').checked = config.general.remember_window_position !== false;
 
     document.getElementById('setting-baseline-auto').checked = config.advanced.baseline_auto;
     document.getElementById('setting-baseline-watts').value = config.advanced.baseline_watts;
@@ -3676,6 +3677,11 @@ async function saveSettings() {
                 eco_mode: document.getElementById('setting-eco-mode').checked,
                 start_minimized: document.getElementById('setting-start-minimized').checked,
                 start_with_system: newStartWithSystem,
+                remember_window_position: document.getElementById('setting-remember-window-position').checked,
+                window_x: state.config?.general?.window_x ?? null,
+                window_y: state.config?.general?.window_y ?? null,
+                window_width: state.config?.general?.window_width ?? null,
+                window_height: state.config?.general?.window_height ?? null,
             },
             pricing: {
                 mode: document.getElementById('setting-pricing-mode').value,

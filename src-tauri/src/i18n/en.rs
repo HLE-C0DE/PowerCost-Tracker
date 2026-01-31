@@ -49,6 +49,7 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.eco_mode.description".into(), "Reduce refresh rate when minimized".into());
     t.insert("settings.start_minimized".into(), "Start Minimized".into());
     t.insert("settings.start_with_system".into(), "Start with System".into());
+    t.insert("settings.remember_window_position".into(), "Remember window position and size".into());
 
     // Settings - Pricing
     t.insert("settings.pricing".into(), "Pricing".into());
