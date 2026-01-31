@@ -2249,6 +2249,7 @@ function buildDashboardData() {
 
     return {
         power_watts: cm?.power_watts || 0,
+        avg_power_watts: cm?.avg_power_watts ?? 0,
         cumulative_wh: cm?.cumulative_wh || 0,
         current_cost: cm?.current_cost || 0,
         hourly_cost_estimate: cm?.hourly_cost_estimate || 0,
