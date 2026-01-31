@@ -137,14 +137,16 @@ const WIDGET_REGISTRY = {
                 const cpuBars = [];
                 if (hasPerCoreTemp) {
                     const maxCoreTemp = Math.max(...perCoreTemp);
-                    cpuBars.push({ value: maxCoreTemp, max: 100, label: `${formatNumber(maxCoreTemp, 0)}°`, color: maxCoreTemp > 80 ? '#ef4444' : maxCoreTemp > 60 ? '#f59e0b' : '#fb923c', name: 'TMAX' });
+                    const tempColor = maxCoreTemp > 80 ? '#ef4444' : maxCoreTemp > 60 ? '#f59e0b' : '#fb923c';
+                    cpuBars.push({ value: maxCoreTemp, max: 100, label: `<span style="font-weight:700;color:${tempColor}">${formatNumber(maxCoreTemp, 0)}°</span>`, color: tempColor, name: 'TMAX' });
                 } else if (hasTemp && cpu.temperature_celsius != null) {
-                    cpuBars.push({ value: cpu.temperature_celsius, max: 100, label: `${formatNumber(cpu.temperature_celsius, 0)}°`, color: cpu.temperature_celsius > 80 ? '#ef4444' : cpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c', name: 'TEMP' });
+                    const tempColor = cpu.temperature_celsius > 80 ? '#ef4444' : cpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c';
+                    cpuBars.push({ value: cpu.temperature_celsius, max: 100, label: `<span style="font-weight:700;color:${tempColor}">${formatNumber(cpu.temperature_celsius, 0)}°</span>`, color: tempColor, name: 'TEMP' });
                 }
                 if (hasClockRange && perCoreFreq.length > 0) {
                     const avgFreq = perCoreFreq.reduce((a, b) => a + b, 0) / perCoreFreq.length;
                     const maxFreq = Math.max(...perCoreFreq) * 1.2 || 5000;
-                    cpuBars.push({ value: avgFreq, max: maxFreq, label: `${formatNumber(avgFreq / 1000, 1)}G`, color: '#6366f1', name: 'CLK' });
+                    cpuBars.push({ value: avgFreq, max: maxFreq, label: `<span style="font-weight:700;color:#6366f1">${formatNumber(avgFreq / 1000, 1)}G</span>`, color: '#6366f1', name: 'CLK' });
                 }
                 return `
                     <div class="radial-container">
@@ -238,15 +240,16 @@ const WIDGET_REGISTRY = {
             if (displayMode === 'radial') {
                 const gpuBars = [];
                 if (gpu.temperature_celsius != null) {
-                    gpuBars.push({ value: gpu.temperature_celsius, max: 100, label: `${formatNumber(gpu.temperature_celsius, 0)}°`, color: gpu.temperature_celsius > 80 ? '#ef4444' : gpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c', name: 'TEMP' });
+                    const tempColor = gpu.temperature_celsius > 80 ? '#ef4444' : gpu.temperature_celsius > 60 ? '#f59e0b' : '#fb923c';
+                    gpuBars.push({ value: gpu.temperature_celsius, max: 100, label: `<span style="font-weight:700;color:${tempColor}">${formatNumber(gpu.temperature_celsius, 0)}°</span>`, color: tempColor, name: 'TEMP' });
                 }
                 if (gpu.power_watts != null) {
                     const maxPower = gpu.power_limit_watts || 300;
-                    gpuBars.push({ value: gpu.power_watts, max: maxPower, label: `${formatNumber(gpu.power_watts, 0)}W`, color: '#eab308', name: 'PWR' });
+                    gpuBars.push({ value: gpu.power_watts, max: maxPower, label: `<span style="font-weight:700;color:#eab308">${formatNumber(gpu.power_watts, 0)}W</span>`, color: '#eab308', name: 'PWR' });
                 }
                 if (gpu.vram_used_mb != null && gpu.vram_total_mb != null) {
                     const vramPct = (gpu.vram_used_mb / gpu.vram_total_mb) * 100;
-                    gpuBars.push({ value: vramPct, max: 100, label: `${formatNumber(gpu.vram_used_mb / 1024, 1)}G`, color: '#a855f7', name: 'VRAM' });
+                    gpuBars.push({ value: vramPct, max: 100, label: `<span style="font-weight:700;color:#a855f7">${formatNumber(gpu.vram_used_mb / 1024, 1)}G</span>`, color: '#a855f7', name: 'VRAM' });
                 }
                 return `
                     <div class="radial-container">
@@ -340,7 +343,7 @@ const WIDGET_REGISTRY = {
                 if (mem.swap_total_bytes && mem.swap_total_bytes > 0) {
                     const swapUsedGB = mem.swap_used_bytes / (1024 * 1024 * 1024);
                     const swapTotalGB = mem.swap_total_bytes / (1024 * 1024 * 1024);
-                    ramBars.push({ value: swapUsedGB, max: swapTotalGB, label: `${formatNumber(swapUsedGB, 1)}G`, color: '#a855f7', name: 'SWAP' });
+                    ramBars.push({ value: swapUsedGB, max: swapTotalGB, label: `<span style="font-weight:700;color:#a855f7">${formatNumber(swapUsedGB, 1)}G</span>`, color: '#a855f7', name: 'SWAP' });
                 }
                 return `
                     <div class="radial-container">
