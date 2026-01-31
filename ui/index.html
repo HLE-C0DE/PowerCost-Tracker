@@ -132,29 +132,6 @@
                     <!-- Widgets will be dynamically rendered here -->
                 </div>
 
-                <!-- Session Control Bar (Legacy - hidden, use Session Controls widget instead) -->
-                <div class="session-bar hidden" id="session-bar">
-                    <div class="session-info">
-                        <span class="session-label" id="session-label" data-i18n="session.no_active">No active session</span>
-                        <span class="session-duration" id="session-duration-display">--:--:--</span>
-                    </div>
-                    <div class="session-controls">
-                        <button class="btn btn-primary" id="start-session-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <polygon points="5 3 19 12 5 21 5 3"/>
-                            </svg>
-                            <span data-i18n="session.start">Start Session</span>
-                        </button>
-                        <button class="btn btn-secondary hidden" id="end-session-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <rect x="6" y="4" width="4" height="16"/>
-                                <rect x="14" y="4" width="4" height="16"/>
-                            </svg>
-                            <span data-i18n="session.end">End Session</span>
-                        </button>
-                    </div>
-                </div>
-
                 <!-- Estimation Warning -->
                 <div id="estimation-warning" class="warning-banner hidden">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -197,11 +174,14 @@
                     </div>
                 </div>
 
-                <!-- Mode toggle: Power / Sessions -->
-                <div class="segmented-control segmented-control--mode" id="history-mode-control">
-                    <div class="segmented-indicator"></div>
-                    <button class="active" data-mode="power" data-i18n="history.tab.power">Power</button>
-                    <button data-mode="sessions" data-i18n="history.tab.sessions">Sessions</button>
+                <!-- Mode toggle: Power / Sessions + Category Filter -->
+                <div class="history-mode-row">
+                    <div class="segmented-control segmented-control--mode" id="history-mode-control">
+                        <div class="segmented-indicator"></div>
+                        <button class="active" data-mode="power" data-i18n="history.tab.power">Power</button>
+                        <button data-mode="sessions" data-i18n="history.tab.sessions">Sessions</button>
+                    </div>
+                    <div class="session-category-filter hidden" id="session-category-filter"></div>
                 </div>
 
                 <!-- Power content -->
@@ -348,9 +328,6 @@
                         </div>
                         <canvas id="session-histogram"></canvas>
                     </div>
-
-                    <!-- Category Legend -->
-                    <div class="session-legend" id="session-legend"></div>
 
                     <!-- Session List -->
                     <div class="session-list" id="session-list">

@@ -486,7 +486,7 @@ impl Database {
             "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label, category
              FROM sessions
              WHERE start_time >= ?1 AND start_time <= ?2
-             ORDER BY start_time ASC",
+             ORDER BY start_time DESC",
         )?;
 
         let sessions = stmt

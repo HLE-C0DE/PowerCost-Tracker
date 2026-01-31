@@ -45,6 +45,8 @@ pub struct SessionState {
     pub total_wh: f64,
     pub surplus_wh: f64,
     pub start_time: std::time::Instant,
+    pub label: Option<String>,
+    pub category: Option<String>,
 }
 
 // Tauri commands exposed to the frontend
@@ -332,6 +334,14 @@ async fn start_tracking_session(
     state: tauri::State<'_, TauriState>,
     label: Option<String>,
 ) -> Result<i64, String> {
+    // Guard: don't start a new session if one is already active
+    {
+        let active = state.active_session.lock().await;
+        if active.is_some() {
+            return Err("A session is already active".to_string());
+        }
+    }
+
     // Get baseline
     let baseline_watts = {
         let config = state.config.lock().await;
@@ -359,6 +369,8 @@ async fn start_tracking_session(
             total_wh: 0.0,
             surplus_wh: 0.0,
             start_time: std::time::Instant::now(),
+            label: label.clone(),
+            category: None,
         });
     }
 
@@ -408,8 +420,8 @@ async fn get_session_stats(state: tauri::State<'_, TauriState>) -> Result<Option
                 total_wh: session.total_wh,
                 surplus_wh: session.surplus_wh,
                 surplus_cost,
-                label: None, // Would need to fetch from DB for label
-                category: None,
+                label: session.label.clone(),
+                category: session.category.clone(),
             }))
         }
         None => Ok(None),
@@ -512,6 +524,15 @@ async fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), Strin
 /// Update a session's label
 #[tauri::command]
 async fn update_session_label(state: tauri::State<'_, TauriState>, session_id: i64, label: String) -> Result<(), String> {
+    // Update in-memory state if this is the active session
+    {
+        let mut active = state.active_session.lock().await;
+        if let Some(ref mut session) = *active {
+            if session.id == session_id {
+                session.label = Some(label.clone());
+            }
+        }
+    }
     let db = state.db.lock().await;
     db.update_session_label(session_id, &label).map_err(|e| e.to_string())
 }
@@ -519,6 +540,15 @@ async fn update_session_label(state: tauri::State<'_, TauriState>, session_id: i
 /// Update a session's category
 #[tauri::command]
 async fn update_session_category(state: tauri::State<'_, TauriState>, session_id: i64, category: Option<String>) -> Result<(), String> {
+    // Update in-memory state if this is the active session
+    {
+        let mut active = state.active_session.lock().await;
+        if let Some(ref mut session) = *active {
+            if session.id == session_id {
+                session.category = category.clone();
+            }
+        }
+    }
     let db = state.db.lock().await;
     db.update_session_category(session_id, category.as_deref()).map_err(|e| e.to_string())
 }
@@ -887,8 +917,8 @@ async fn critical_monitoring_loop(app: tauri::AppHandle) {
                     total_wh: session.total_wh,
                     surplus_wh: session.surplus_wh,
                     surplus_cost,
-                    label: None,
-                    category: None,
+                    label: session.label.clone(),
+                    category: session.category.clone(),
                 })
             } else {
                 None

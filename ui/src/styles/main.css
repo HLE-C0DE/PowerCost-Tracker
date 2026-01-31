@@ -2961,26 +2961,43 @@ body {
     min-height: 0;
 }
 
-.session-legend {
+.history-mode-row {
     display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
     flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
 }
 
-.legend-item {
+.session-category-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    align-items: center;
+}
+
+.category-filter-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    padding: 4px 10px;
     font-size: 0.8rem;
+    border-radius: 12px;
+    border: 1.5px solid var(--chip-color, #888);
+    background: transparent;
     color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.15s, background 0.15s;
 }
 
-.legend-swatch {
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    display: inline-block;
+.category-filter-chip.active {
+    opacity: 1;
+    background: color-mix(in srgb, var(--chip-color, #888) 15%, transparent);
+    color: var(--text-primary);
+}
+
+.category-filter-chip:hover {
+    opacity: 0.85;
 }
 
 .session-category-badge {

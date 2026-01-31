@@ -639,6 +639,7 @@ const state = {
     historyRange: 7,
     historyOffset: 0,
     historyMode: 'power',
+    sessionCategoryFilter: [],
 };
 
 // Widget classification for tiered updates
@@ -658,7 +659,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupSettings();
         setupDashboard();
         setupSourceBadgeToggle();
-        setupSessionControls();
         setupHistoryTabs();
         setupCategorySettings();
 
@@ -2287,8 +2287,6 @@ function handleCriticalUpdate(metrics) {
     // Update power history for graph
     updatePowerHistory(metrics.power_watts);
 
-    // Update session bar
-    updateSessionBar(metrics.active_session);
 }
 
 // Handle push updates from backend (detailed-update event)
@@ -2416,7 +2414,6 @@ async function updateCriticalWidgets() {
             }
 
             updatePowerHistory(dashboardData.power_watts);
-            updateSessionBar(sessionStats);
         }
     } catch (error) {
         console.error('Critical update error:', error);
@@ -2527,9 +2524,6 @@ async function updateDashboard() {
         // Update power history for graph
         updatePowerHistory(dashboardData.power_watts);
 
-        // Update session bar
-        updateSessionBar(sessionStats);
-
         // Stream A: Draw mini-charts after DOM is updated
         drawMiniCharts();
 
@@ -2558,22 +2552,27 @@ function drawPowerGraph() {
     const container = canvas.parentElement;
     const rect = container.getBoundingClientRect();
 
-    // Use actual container size
-    canvas.width = Math.max(rect.width, 100);
-    canvas.height = Math.max(rect.height, 60);
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = Math.max(rect.width, 100);
+    const logicalHeight = Math.max(rect.height, 60);
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = logicalWidth + 'px';
+    canvas.style.height = logicalHeight + 'px';
+    ctx.scale(dpr, dpr);
 
     const data = state.powerHistory;
     if (data.length < 2) return;
 
     // Stream A: Add bottom padding for time axis labels
     const padding = { top: 10, right: 10, bottom: 20, left: 10 };
-    const width = canvas.width - padding.left - padding.right;
-    const height = canvas.height - padding.top - padding.bottom;
+    const width = logicalWidth - padding.left - padding.right;
+    const height = logicalHeight - padding.top - padding.bottom;
     const powers = data.map(d => d.power);
     const maxPower = Math.max(...powers) * 1.1 || 100;
     const minPower = Math.min(...powers) * 0.9 || 0;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     const gradient = ctx.createLinearGradient(0, padding.top, 0, height + padding.top);
     gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
@@ -2627,18 +2626,17 @@ function drawPowerGraph() {
             const point = data[dataIndex];
             const x = padding.left + (dataIndex / (data.length - 1)) * width;
             const timeLabel = formatTimeHHMM(point.time);
-            ctx.fillText(timeLabel, x, canvas.height - 4);
+            ctx.fillText(timeLabel, x, logicalHeight - 4);
         }
     }
 }
 
 // ===== Session Controls =====
-function setupSessionControls() {
-    document.getElementById('start-session-btn').addEventListener('click', startSession);
-    document.getElementById('end-session-btn').addEventListener('click', endSession);
-}
 
 async function startSession() {
+    // Guard: don't start a new session if one is already active
+    if (state.activeSession) return;
+
     try {
         await invoke('start_tracking_session', { label: null });
         // Fetch fresh session data
@@ -2673,20 +2671,6 @@ function refreshSessionWidget() {
     if (widgetBody && state.lastDashboardData) {
         state.lastDashboardData.activeSession = state.activeSession;
         widgetBody.innerHTML = WIDGET_REGISTRY.session_controls.render(state.lastDashboardData);
-    }
-}
-
-function updateSessionBar(session) {
-    if (session) {
-        document.getElementById('start-session-btn').classList.add('hidden');
-        document.getElementById('end-session-btn').classList.remove('hidden');
-        document.getElementById('session-label').textContent = t('widget.session_active');
-
-        const elapsed = Math.floor(Date.now() / 1000) - session.start_time;
-        document.getElementById('session-duration-display').textContent = formatDuration(elapsed);
-    } else {
-        document.getElementById('start-session-btn').classList.remove('hidden');
-        document.getElementById('end-session-btn').classList.add('hidden');
     }
 }
 
@@ -2782,9 +2766,11 @@ function setupHistoryTabs() {
 
             const powerContent = document.getElementById('history-power-content');
             const sessionsContent = document.getElementById('history-sessions-content');
+            const categoryFilter = document.getElementById('session-category-filter');
             if (mode === 'power') {
                 powerContent.classList.remove('hidden');
                 sessionsContent.classList.add('hidden');
+                if (categoryFilter) categoryFilter.classList.add('hidden');
             } else {
                 powerContent.classList.add('hidden');
                 sessionsContent.classList.remove('hidden');
@@ -2932,12 +2918,83 @@ async function loadSessionHistory() {
     if (range) loadSessionHistoryView(range.startDate, range.endDate);
 }
 
+function renderCategoryFilterChips(sessions) {
+    const container = document.getElementById('session-category-filter');
+    if (!container) return;
+
+    // Collect unique categories from sessions
+    const categoriesInData = new Set();
+    for (const s of sessions) {
+        categoriesInData.add(s.category || '');
+    }
+
+    if (categoriesInData.size <= 1) {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+    }
+
+    container.classList.remove('hidden');
+    const filter = state.sessionCategoryFilter;
+
+    container.innerHTML = Array.from(categoriesInData).map(cat => {
+        const isActive = filter.length === 0 || filter.includes(cat);
+        const display = cat ? getCategoryDisplay(cat) : (state.translations['session.no_category'] || 'No category');
+        const color = cat ? getCategoryColor(cat) : '#888';
+        return `<button class="category-filter-chip ${isActive ? 'active' : ''}" data-category="${cat}" style="--chip-color: ${color}">${display}</button>`;
+    }).join('');
+
+    // Click handler for chips
+    container.onclick = (e) => {
+        const chip = e.target.closest('.category-filter-chip');
+        if (!chip) return;
+
+        const cat = chip.dataset.category;
+        const allChips = container.querySelectorAll('.category-filter-chip');
+        const allCategories = Array.from(allChips).map(c => c.dataset.category);
+
+        if (filter.length === 0) {
+            // First click: select only this category (deselect others)
+            state.sessionCategoryFilter = [cat];
+        } else if (filter.includes(cat)) {
+            // Deselect this category
+            state.sessionCategoryFilter = filter.filter(c => c !== cat);
+            // If none selected, show all
+            if (state.sessionCategoryFilter.length === 0) {
+                state.sessionCategoryFilter = [];
+            }
+        } else {
+            // Select this category too
+            state.sessionCategoryFilter = [...filter, cat];
+            // If all selected, reset to show all
+            if (state.sessionCategoryFilter.length === allCategories.length) {
+                state.sessionCategoryFilter = [];
+            }
+        }
+
+        // Re-render with current date range
+        const range = getHistoryRange();
+        if (range) loadSessionHistoryView(range.startDate, range.endDate);
+    };
+}
+
 async function loadSessionHistoryView(startDate, endDate) {
     try {
         const startTs = Math.floor(startDate.getTime() / 1000);
         const endTs = Math.floor(endDate.getTime() / 1000);
 
-        const sessions = await invoke('get_sessions_in_range', { start: startTs, end: endTs });
+        const allSessions = await invoke('get_sessions_in_range', { start: startTs, end: endTs });
+
+        // Build category filter chips
+        renderCategoryFilterChips(allSessions);
+
+        // Apply category filter
+        const filter = state.sessionCategoryFilter;
+        const sessions = filter.length === 0 ? allSessions : allSessions.filter(s => {
+            const cat = s.category || '';
+            return filter.includes(cat);
+        });
+
         const list = document.getElementById('session-list');
         const empty = document.getElementById('no-sessions');
 
@@ -3116,10 +3173,16 @@ function renderSessionHistogram(sessions, startDate, endDate) {
     const container = canvas.parentElement;
     const rect = container.getBoundingClientRect();
 
-    canvas.width = rect.width - 16;
-    canvas.height = 200;
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = rect.width - 16;
+    const logicalHeight = 200;
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = logicalWidth + 'px';
+    canvas.style.height = logicalHeight + 'px';
+    ctx.scale(dpr, dpr);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
@@ -3155,8 +3218,8 @@ function renderSessionHistogram(sessions, startDate, endDate) {
 
     const maxHours = Math.max(...dayData.map(d => d.totalHours), 1);
     const padding = { top: 10, right: 20, bottom: 30, left: 40 };
-    const width = canvas.width - padding.left - padding.right;
-    const height = canvas.height - padding.top - padding.bottom;
+    const width = logicalWidth - padding.left - padding.right;
+    const height = logicalHeight - padding.top - padding.bottom;
     const barWidth = Math.max(4, Math.min(40, (width / days.length) - 2));
     const barGap = (width - barWidth * days.length) / (days.length + 1);
 
@@ -3213,18 +3276,10 @@ function renderSessionHistogram(sessions, startDate, endDate) {
             ctx.fillStyle = labelColor;
             ctx.textAlign = 'center';
             const dateStr = `${day.date.getMonth() + 1}/${day.date.getDate()}`;
-            ctx.fillText(dateStr, x + barWidth / 2, canvas.height - 4);
+            ctx.fillText(dateStr, x + barWidth / 2, logicalHeight - 4);
         }
     });
 
-    // Render legend
-    const legendEl = document.getElementById('session-legend');
-    if (legendEl) {
-        legendEl.innerHTML = Array.from(allCategories).map(cat => {
-            const display = getCategoryDisplay(cat);
-            return `<span class="legend-item"><span class="legend-swatch" style="background:${getCategoryColor(cat)}"></span>${display}</span>`;
-        }).join('');
-    }
 }
 
 function drawHistoryChart() {
@@ -3235,8 +3290,14 @@ function drawHistoryChart() {
     const container = canvas.parentElement;
     const rect = container.getBoundingClientRect();
 
-    canvas.width = rect.width - 32;
-    canvas.height = rect.height - 64; // Account for chart header
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = rect.width - 32;
+    const logicalHeight = rect.height - 64; // Account for chart header
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = logicalWidth + 'px';
+    canvas.style.height = logicalHeight + 'px';
+    ctx.scale(dpr, dpr);
 
     const data = state.historyData;
     if (data.length === 0) return;
@@ -3244,10 +3305,10 @@ function drawHistoryChart() {
     const hasCostData = data.some(d => d.total_cost != null && d.total_cost > 0);
     const rightPad = hasCostData ? 60 : 20;
     const padding = { top: 20, right: rightPad, bottom: 40, left: 60 };
-    const width = canvas.width - padding.left - padding.right;
-    const height = canvas.height - padding.top - padding.bottom;
+    const width = logicalWidth - padding.left - padding.right;
+    const height = logicalHeight - padding.top - padding.bottom;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     const maxWh = Math.max(...data.map(d => d.total_wh)) * 1.1 || 100;
 
@@ -3757,20 +3818,26 @@ function renderMiniChart(canvasId, historyArray, color = '#6366f1') {
     const metricInfoHeight = metricInfo ? metricInfo.offsetHeight + 8 : 0;
 
     // Fill available space in card body
-    canvas.width = Math.max(bodyRect.width - 16, 100);
-    canvas.height = Math.max(bodyRect.height - headerHeight - metricInfoHeight - 16, 60);
+    const dpr = window.devicePixelRatio || 1;
+    const logicalWidth = Math.max(bodyRect.width - 16, 100);
+    const logicalHeight = Math.max(bodyRect.height - headerHeight - metricInfoHeight - 16, 60);
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = logicalWidth + 'px';
+    canvas.style.height = logicalHeight + 'px';
+    ctx.scale(dpr, dpr);
 
     const data = historyArray;
     const padding = { top: 8, right: 8, bottom: 8, left: 8 };
-    const width = canvas.width - padding.left - padding.right;
-    const height = canvas.height - padding.top - padding.bottom;
+    const width = logicalWidth - padding.left - padding.right;
+    const height = logicalHeight - padding.top - padding.bottom;
 
     // Use 0-100 range for percentage-based metrics
     const maxVal = 100;
     const minVal = 0;
     const range = maxVal - minVal;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     // Parse hex color to rgba
     const hexToRgba = (hex, alpha) => {
