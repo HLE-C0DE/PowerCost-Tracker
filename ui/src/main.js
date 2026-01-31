@@ -336,7 +336,7 @@ const WIDGET_REGISTRY = {
             // Radial mode
             if (displayMode === 'radial') {
                 const ramBars = [];
-                ramBars.push({ value: usedGB, max: totalGB, label: `${formatNumber(usedGB, 1)}G`, color: '#f59e0b', name: 'USED' });
+                ramBars.push({ value: usedGB, max: totalGB, label: `<span style="font-weight:700;color:#f59e0b">${formatNumber(usedGB, 1)}</span><span style="font-weight:400;color:#f59e0b">/${formatNumber(totalGB, 0)}G</span>`, color: '#f59e0b', name: 'USED' });
                 if (mem.swap_total_bytes && mem.swap_total_bytes > 0) {
                     const swapUsedGB = mem.swap_used_bytes / (1024 * 1024 * 1024);
                     const swapTotalGB = mem.swap_total_bytes / (1024 * 1024 * 1024);
@@ -347,7 +347,7 @@ const WIDGET_REGISTRY = {
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
                         ${renderChargeBars(ramBars)}
                     </div>
-                    <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                    ${mem.memory_speed_mhz ? `<div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${mem.memory_type ? mem.memory_type + ' ' : ''}${mem.memory_speed_mhz} MHz</div>` : ''}
                 `;
             }
 
@@ -389,7 +389,7 @@ const WIDGET_REGISTRY = {
                 </div>
                 ${mem.memory_speed_mhz ? `<div class="metric-row ${globalDisplay !== 'normal' ? 'hidden' : ''}">
                     <span class="metric-label">${t('widget.speed')}</span>
-                    <span class="metric-value">${mem.memory_speed_mhz} MHz</span>
+                    <span class="metric-value">${mem.memory_type ? mem.memory_type + ' ' : ''}${mem.memory_speed_mhz} MHz</span>
                 </div>` : ''}
                 ${hasSwap && globalDisplay === 'normal' ? `
                 <div class="metric-row" style="margin-top: 4px">
@@ -2351,6 +2351,20 @@ function renderWidgetsByType(data, type) {
             // Skip re-rendering session_controls when idle (no active session) to avoid hover flicker
             if (widgetConfig.id === 'session_controls' && !data.activeSession && body.querySelector('.session-widget-idle')) continue;
 
+            // For session_controls with active session, only update dynamic text (timer, surplus) without replacing the whole DOM
+            // This prevents input/select fields from being destroyed while the user is typing or selecting
+            if (widgetConfig.id === 'session_controls' && data.activeSession && body.querySelector('.session-widget')) {
+                const session = data.activeSession;
+                const elapsed = Math.floor(Date.now() / 1000) - session.start_time;
+                const durationEl = body.querySelector('.session-widget-duration');
+                if (durationEl) durationEl.textContent = formatDuration(elapsed);
+                const surplusVal = body.querySelector('.session-surplus-wh');
+                if (surplusVal) surplusVal.textContent = formatNumber(session.surplus_wh, 2);
+                const surplusCostVal = body.querySelector('.session-surplus-cost');
+                if (surplusCostVal) surplusCostVal.textContent = `${state.currencySymbol}${formatNumber(session.surplus_cost || 0, 4)}`;
+                continue;
+            }
+
             if (widgetDef.supportsDisplayModes) {
                 const displayMode = widgetConfig.display_mode || 'text';
                 body.innerHTML = widgetDef.render(data, displayMode, widgetConfig);
@@ -3519,8 +3533,9 @@ function renderRadialProgress(percent, label, color = '#6366f1') {
  */
 function renderChargeBar(value, max, label, color, name) {
     const percent = Math.min(100, Math.max(0, (value / max) * 100));
+    const plainLabel = label.replace(/<[^>]*>/g, '');
     return `
-        <div class="charge-bar" title="${name}: ${label}">
+        <div class="charge-bar" title="${name}: ${plainLabel}">
             <span class="charge-bar-name" style="color:${color}">${name}</span>
             <div class="charge-bar-track">
                 <div class="charge-bar-fill" style="height:${percent}%;background:${color}"></div>

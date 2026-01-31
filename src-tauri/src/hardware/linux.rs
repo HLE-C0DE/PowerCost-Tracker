@@ -686,6 +686,7 @@ impl LinuxSystemMonitor {
             swap_total_bytes: swap_total,
             swap_usage_percent: swap_percent,
             memory_speed_mhz: None, // Not easily available on Linux without dmidecode
+            memory_type: None,
         };
 
         Ok(SystemMetrics {

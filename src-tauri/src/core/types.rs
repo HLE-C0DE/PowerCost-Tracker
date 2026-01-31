@@ -183,6 +183,9 @@ pub struct MemoryMetrics {
     /// Physical memory speed in MHz (cached, fetched once via WMI)
     #[serde(default)]
     pub memory_speed_mhz: Option<u64>,
+    /// Memory type (e.g. "DDR4", "DDR5")
+    #[serde(default)]
+    pub memory_type: Option<String>,
 }
 
 /// Process metrics for top processes display

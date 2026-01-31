@@ -177,8 +177,8 @@ pub struct WmiMonitor {
     gpu_process_cache: Mutex<Option<CachedValue<HashMap<u32, f64>>>>,
     /// Cached system fan speeds (WMI is slow, cache for 5s)
     fan_cache: Mutex<Option<CachedValue<Option<FanMetrics>>>>,
-    /// Cached memory speed in MHz (permanent cache - RAM speed never changes at runtime)
-    memory_speed_cache: Mutex<Option<Option<u64>>>,
+    /// Cached memory info: (speed_mhz, type_string) - permanent cache, RAM never changes at runtime
+    memory_info_cache: Mutex<Option<(Option<u64>, Option<String>)>>,
     /// PDH query handle for thermal zone temperature (lazily initialized, reused)
     #[cfg(target_os = "windows")]
     pdh_thermal_query: Mutex<Option<PdhThermalQuery>>,
@@ -236,7 +236,7 @@ impl WmiMonitor {
             cpu_temp_cache: Mutex::new(None),
             gpu_process_cache: Mutex::new(None),
             fan_cache: Mutex::new(None),
-            memory_speed_cache: Mutex::new(None),
+            memory_info_cache: Mutex::new(None),
             #[cfg(target_os = "windows")]
             pdh_thermal_query: Mutex::new(None),
         })
@@ -853,7 +853,7 @@ impl WmiMonitor {
         } else {
             (None, None, None)
         };
-        let mem_speed = self.get_memory_speed();
+        let (mem_speed, mem_type) = self.get_memory_info();
         let memory = MemoryMetrics {
             used_bytes: used_memory,
             total_bytes: total_memory,
@@ -862,6 +862,7 @@ impl WmiMonitor {
             swap_total_bytes: swap_total,
             swap_usage_percent: swap_percent,
             memory_speed_mhz: mem_speed,
+            memory_type: mem_type,
         };
 
         Ok(SystemMetrics {
@@ -1435,45 +1436,61 @@ impl WmiMonitor {
     }
 
     /// Get memory speed in MHz (permanently cached - RAM speed never changes at runtime)
-    fn get_memory_speed(&self) -> Option<u64> {
+    fn get_memory_info(&self) -> (Option<u64>, Option<String>) {
         // Check permanent cache first
         {
-            let cache = self.memory_speed_cache.lock().unwrap();
+            let cache = self.memory_info_cache.lock().unwrap();
             if let Some(ref value) = *cache {
-                return *value;
+                return value.clone();
             }
         }
 
         // Cache miss - fetch via WMI (one-time cost)
-        let result = self.fetch_memory_speed();
+        let result = self.fetch_memory_info();
 
         // Store permanently
         {
-            let mut cache = self.memory_speed_cache.lock().unwrap();
-            *cache = Some(result);
+            let mut cache = self.memory_info_cache.lock().unwrap();
+            *cache = Some(result.clone());
         }
 
         result
     }
 
-    /// Fetch memory speed from WMI Win32_PhysicalMemory (slow - calls PowerShell, one-time only)
-    fn fetch_memory_speed(&self) -> Option<u64> {
+    /// Fetch memory speed and type from WMI Win32_PhysicalMemory (slow - calls PowerShell, one-time only)
+    fn fetch_memory_info(&self) -> (Option<u64>, Option<String>) {
         let output = run_command_with_timeout(
             "powershell",
-            &["-Command", "Get-WmiObject Win32_PhysicalMemory | Select-Object -First 1 -ExpandProperty Speed"],
+            &["-Command", "Get-WmiObject Win32_PhysicalMemory | Select-Object -First 1 Speed, SMBIOSMemoryType | ForEach-Object { \"$($_.Speed)|$($_.SMBIOSMemoryType)\" }"],
             GPU_COMMAND_TIMEOUT_MS,
-        )?;
+        );
 
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Ok(speed) = stdout.trim().parse::<u64>() {
-                if speed > 0 {
-                    return Some(speed);
-                }
+        if let Some(output) = output {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let parts: Vec<&str> = stdout.trim().split('|').collect();
+
+                let speed = parts.first()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .filter(|&s| s > 0);
+
+                let mem_type = parts.get(1)
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .and_then(|code| match code {
+                        20 => Some("DDR"),
+                        21 => Some("DDR2"),
+                        24 => Some("DDR3"),
+                        26 => Some("DDR4"),
+                        34 => Some("DDR5"),
+                        _ => None,
+                    })
+                    .map(String::from);
+
+                return (speed, mem_type);
             }
         }
 
-        None
+        (None, None)
     }
 
     /// Get system fan speeds via WMI (cached for 5 seconds - WMI/PowerShell is slow)
