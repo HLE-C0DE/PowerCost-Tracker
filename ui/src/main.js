@@ -636,8 +636,9 @@ const state = {
     processAdvancedMode: false,
     allProcesses: [],
     sessionCategories: [],
-    sessionHistoryRange: 7,
-    sessionHistoryOffset: 0,
+    historyRange: 7,
+    historyOffset: 0,
+    historyMode: 'power',
 };
 
 // Widget classification for tiered updates
@@ -734,7 +735,7 @@ function setupNavigation() {
             document.getElementById(targetView).classList.add('active');
 
             if (targetView === 'history') {
-                loadHistoryData('week');
+                loadHistoryForRange();
             }
         });
     });
@@ -2687,103 +2688,160 @@ function updateSessionBar(session) {
 }
 
 // ===== History =====
+// ===== Segmented Control Helper =====
+function updateSegmentedControl(container, activeBtn) {
+    if (!container || !activeBtn) return;
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const indicator = container.querySelector('.segmented-indicator');
+    if (!indicator || buttons.length === 0) return;
+
+    buttons.forEach(b => b.classList.remove('active'));
+    activeBtn.classList.add('active');
+
+    const index = buttons.indexOf(activeBtn);
+    const btnWidth = activeBtn.offsetWidth;
+    const offset = activeBtn.offsetLeft - container.offsetLeft - 3; // 3px padding
+    indicator.style.width = `${btnWidth}px`;
+    indicator.style.transform = `translateX(${offset}px)`;
+}
+
+function initSegmentedControl(container) {
+    if (!container) return;
+    const activeBtn = container.querySelector('button.active');
+    if (activeBtn) {
+        // Defer to ensure layout is computed
+        requestAnimationFrame(() => updateSegmentedControl(container, activeBtn));
+    }
+}
+
 function setupHistoryTabs() {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
+    const rangeControl = document.getElementById('history-range-control');
+    const modeControl = document.getElementById('history-mode-control');
 
-            if (btn.dataset.tab === 'session-history') {
-                loadSessionHistory();
-            }
-        });
-    });
+    // Initialize segmented control indicators
+    initSegmentedControl(rangeControl);
+    initSegmentedControl(modeControl);
 
-    // Power history range buttons
-    document.querySelectorAll('#power-history .range-btn').forEach(btn => {
+    // Period range buttons
+    rangeControl.querySelectorAll('button').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('#power-history .range-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            loadHistoryData(btn.getAttribute('data-range'));
-        });
-    });
+            const range = btn.dataset.range;
+            updateSegmentedControl(rangeControl, btn);
 
-    // Session history range buttons
-    document.querySelectorAll('.session-range-tabs .range-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.session-range-tabs .range-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const range = btn.dataset.sessionRange;
-            const customPanel = document.getElementById('session-range-custom');
+            const customPanel = document.getElementById('history-custom-range');
             if (range === 'custom') {
                 customPanel.classList.remove('hidden');
             } else {
                 customPanel.classList.add('hidden');
-                state.sessionHistoryRange = parseInt(range);
-                state.sessionHistoryOffset = 0;
-                loadSessionHistoryView(range);
+                state.historyRange = parseInt(range);
+                state.historyOffset = 0;
+                loadHistoryForRange();
             }
         });
     });
 
-    // Session custom range apply
-    const applyBtn = document.getElementById('session-range-apply');
+    // Custom range apply
+    const applyBtn = document.getElementById('history-range-apply');
     if (applyBtn) {
         applyBtn.addEventListener('click', () => {
-            state.sessionHistoryRange = 'custom';
-            loadSessionHistoryView('custom');
+            state.historyRange = 'custom';
+            state.historyOffset = 0;
+            loadHistoryForRange();
         });
     }
 
-    // Session nav prev/next
-    const prevBtn = document.getElementById('session-nav-prev');
-    const nextBtn = document.getElementById('session-nav-next');
+    // Nav prev/next
+    const prevBtn = document.getElementById('history-nav-prev');
+    const nextBtn = document.getElementById('history-nav-next');
     if (prevBtn) {
         prevBtn.addEventListener('click', () => {
-            state.sessionHistoryOffset++;
-            loadSessionHistoryView(state.sessionHistoryRange);
+            if (state.historyRange === 'custom') return;
+            state.historyOffset++;
+            loadHistoryForRange();
         });
     }
     if (nextBtn) {
         nextBtn.addEventListener('click', () => {
-            if (state.sessionHistoryOffset > 0) {
-                state.sessionHistoryOffset--;
-                loadSessionHistoryView(state.sessionHistoryRange);
+            if (state.historyRange === 'custom') return;
+            if (state.historyOffset > 0) {
+                state.historyOffset--;
+                loadHistoryForRange();
             }
         });
     }
+
+    // Mode toggle: Power / Sessions
+    modeControl.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mode = btn.dataset.mode;
+            updateSegmentedControl(modeControl, btn);
+            state.historyMode = mode;
+
+            const powerContent = document.getElementById('history-power-content');
+            const sessionsContent = document.getElementById('history-sessions-content');
+            if (mode === 'power') {
+                powerContent.classList.remove('hidden');
+                sessionsContent.classList.add('hidden');
+            } else {
+                powerContent.classList.add('hidden');
+                sessionsContent.classList.remove('hidden');
+            }
+            loadHistoryForRange();
+        });
+    });
 }
 
-async function loadHistoryData(range) {
+// Compute start/end dates from shared state
+function getHistoryDateRange() {
+    const now = new Date();
+
+    if (state.historyRange === 'custom') {
+        const startInput = document.getElementById('history-range-start');
+        const endInput = document.getElementById('history-range-end');
+        if (!startInput || !startInput.value || !endInput || !endInput.value) return null;
+        const startDate = new Date(startInput.value);
+        const endDate = new Date(endInput.value);
+        endDate.setHours(23, 59, 59);
+        return { startDate, endDate };
+    }
+
+    const days = state.historyRange;
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() - (state.historyOffset * days));
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+    return { startDate, endDate };
+}
+
+function loadHistoryForRange() {
+    const range = getHistoryDateRange();
+    if (!range) return;
+
+    // Update range label
+    const label = document.getElementById('history-range-label');
+    if (label) {
+        label.textContent = `${range.startDate.toLocaleDateString()} - ${range.endDate.toLocaleDateString()}`;
+    }
+
+    if (state.historyMode === 'power') {
+        loadHistoryData(range.startDate, range.endDate);
+    } else {
+        loadSessionHistoryView(range.startDate, range.endDate);
+    }
+}
+
+async function loadHistoryData(startDate, endDate) {
     try {
-        const now = new Date();
-        let startDate, endDate;
+        const startStr = formatDate(startDate);
+        const endStr = formatDate(endDate);
 
-        switch (range) {
-            case 'today':
-                startDate = formatDate(now);
-                endDate = startDate;
-                break;
-            case 'week':
-                const weekAgo = new Date(now);
-                weekAgo.setDate(weekAgo.getDate() - 7);
-                startDate = formatDate(weekAgo);
-                endDate = formatDate(now);
-                break;
-            case 'month':
-                const monthAgo = new Date(now);
-                monthAgo.setMonth(monthAgo.getMonth() - 1);
-                startDate = formatDate(monthAgo);
-                endDate = formatDate(now);
-                break;
-        }
+        const stats = await invoke('get_history', { startDate: startStr, endDate: endStr });
 
-        const stats = await invoke('get_history', { startDate, endDate });
+        // Fill date gaps so chart shows every day in range
+        const filledStats = fillDateGaps(stats, startDate, endDate);
 
         const breakdownEl = document.getElementById('daily-breakdown');
-        if (stats.length === 0) {
+        if (filledStats.length === 0 || filledStats.every(d => d.total_wh === 0)) {
             document.getElementById('no-history-data').classList.remove('hidden');
             document.querySelector('.history-chart-container').classList.add('hidden');
             if (breakdownEl) breakdownEl.classList.add('hidden');
@@ -2792,12 +2850,13 @@ async function loadHistoryData(range) {
             document.getElementById('no-history-data').classList.add('hidden');
             document.querySelector('.history-chart-container').classList.remove('hidden');
             if (breakdownEl) breakdownEl.classList.remove('hidden');
-            state.historyData = stats;
+            state.historyData = filledStats;
 
-            const totalWh = stats.reduce((sum, s) => sum + s.total_wh, 0);
-            const totalCost = stats.reduce((sum, s) => sum + (s.total_cost || 0), 0);
-            const avgPower = stats.reduce((sum, s) => sum + s.avg_watts, 0) / stats.length;
-            const maxPower = Math.max(...stats.map(s => s.max_watts));
+            const nonEmpty = filledStats.filter(d => d.total_wh > 0);
+            const totalWh = filledStats.reduce((sum, s) => sum + s.total_wh, 0);
+            const totalCost = filledStats.reduce((sum, s) => sum + (s.total_cost || 0), 0);
+            const avgPower = nonEmpty.length > 0 ? nonEmpty.reduce((sum, s) => sum + s.avg_watts, 0) / nonEmpty.length : 0;
+            const maxPower = nonEmpty.length > 0 ? Math.max(...nonEmpty.map(s => s.max_watts)) : 0;
 
             document.getElementById('history-total-wh').textContent = `${formatNumber(totalWh / 1000, 2)} kWh`;
             document.getElementById('history-total-cost').textContent = `${state.currencySymbol}${formatNumber(totalCost, 2)}`;
@@ -2811,10 +2870,10 @@ async function loadHistoryData(range) {
                 rateBadge.textContent = `${state.currencySymbol}${formatNumber(avgRate, 4)}/kWh`;
             }
 
-            // Populate daily breakdown table
+            // Populate daily breakdown table (only rows with data)
             const tbody = document.getElementById('breakdown-table-body');
             if (tbody) {
-                tbody.innerHTML = stats.map(day => `
+                tbody.innerHTML = nonEmpty.map(day => `
                     <tr>
                         <td>${day.date}</td>
                         <td class="energy-cell">${formatNumber(day.total_wh / 1000, 3)} kWh</td>
@@ -2833,38 +2892,47 @@ async function loadHistoryData(range) {
     }
 }
 
-async function loadSessionHistory() {
-    await loadSessionHistoryView(state.sessionHistoryRange);
+// Fill missing dates in stats array with zero-value entries
+function fillDateGaps(stats, startDate, endDate) {
+    const dateMap = {};
+    for (const s of stats) {
+        dateMap[s.date] = s;
+    }
+
+    const filled = [];
+    const d = new Date(startDate);
+    d.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    while (d <= end) {
+        const key = formatDate(d);
+        if (dateMap[key]) {
+            filled.push(dateMap[key]);
+        } else {
+            filled.push({
+                date: key,
+                total_wh: 0,
+                avg_watts: 0,
+                max_watts: 0,
+                total_cost: 0,
+                usage_seconds: 0,
+            });
+        }
+        d.setDate(d.getDate() + 1);
+    }
+    return filled;
 }
 
-async function loadSessionHistoryView(range) {
+async function loadSessionHistory() {
+    const range = getHistoryDateRange();
+    if (range) loadSessionHistoryView(range.startDate, range.endDate);
+}
+
+async function loadSessionHistoryView(startDate, endDate) {
     try {
-        const now = new Date();
-        let startDate, endDate;
-
-        if (range === 'custom') {
-            const startInput = document.getElementById('session-range-start');
-            const endInput = document.getElementById('session-range-end');
-            if (!startInput.value || !endInput.value) return;
-            startDate = new Date(startInput.value);
-            endDate = new Date(endInput.value);
-            endDate.setHours(23, 59, 59);
-        } else {
-            const days = parseInt(range);
-            endDate = new Date(now);
-            endDate.setDate(endDate.getDate() - (state.sessionHistoryOffset * days));
-            startDate = new Date(endDate);
-            startDate.setDate(startDate.getDate() - days);
-        }
-
         const startTs = Math.floor(startDate.getTime() / 1000);
         const endTs = Math.floor(endDate.getTime() / 1000);
-
-        // Update range label
-        const label = document.getElementById('session-range-label');
-        if (label) {
-            label.textContent = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-        }
 
         const sessions = await invoke('get_sessions_in_range', { start: startTs, end: endTs });
         const list = document.getElementById('session-list');

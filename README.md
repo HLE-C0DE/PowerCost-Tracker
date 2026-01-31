@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version 1.1.0">
+  <img src="https://img.shields.io/badge/version-1.2.0-blue.svg" alt="Version 1.2.0">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/RAM-<50MB-success.svg" alt="RAM Usage">
@@ -92,13 +92,14 @@ Track costs for specific activities:
 1. Set your baseline (idle) power consumption
 2. Start a tracking session when gaming or running LLMs
 3. See only the **surplus cost** - the extra electricity your activity is consuming
-4. Perfect for calculating actual costs of compute-intensive tasks
+4. **Categorize sessions** (Gaming, AI/ML, Mining, Work, etc.) with custom labels
+5. View session history with histogram visualization and usage stats
 
 ### Hardware Monitoring Dashboard
 
 - **CPU**: Usage %, frequency, temperature
 - **GPU**: Usage %, power draw, VRAM, temperature (NVIDIA & AMD)
-- **RAM**: Usage percentage and amount
+- **RAM**: Usage percentage, amount, and DDR type detection
 - **Customizable widgets**: Drag-and-drop layout, resize, show/hide
 
 ### Floating Widget
@@ -182,7 +183,7 @@ The application auto-detects the best available power source:
 | Linux | AMD hwmon | High | Native support |
 | Linux | Battery | Medium | For laptops |
 | Windows | WMI + CPU estimation | Medium–High | High with NVML GPU; estimated CPU |
-| Windows | NVIDIA GPU | High | Via nvidia-smi |
+| Windows | NVIDIA GPU | High | Native NVML library |
 | Windows | AMD GPU | High | Via rocm-smi / amd-smi |
 | All | TDP estimation | Low | Fallback when no sensors |
 
@@ -251,7 +252,7 @@ See `config/example.config.toml` for all options including seasonal and tempo pr
 
 ### Why does it show "Estimated" on Windows?
 
-Windows uses a hybrid approach: real GPU power readings via NVML (NVIDIA) or rocm-smi (AMD), combined with CPU load-based estimation. When a supported GPU is detected, the "Estimated" label is removed and readings are marked as real measurements. The label only appears when no dedicated GPU sensor is available and all values are CPU-estimated.
+Windows uses a hybrid approach: real GPU power readings via native NVML (NVIDIA) or rocm-smi (AMD), combined with CPU load-based estimation. When a supported GPU is detected, the "Estimated" label is removed and readings are marked as real measurements. The label only appears when no dedicated GPU sensor is available and all values are CPU-estimated.
 
 ### How accurate is the power reading?
 
@@ -337,7 +338,17 @@ cd src-tauri && cargo run --bin powercost-demo
 
 ## Roadmap
 
-### v1.1.0 (Current Release)
+### v1.2.0 (Current Release)
+
+- **Native NVML GPU monitoring** — direct library integration replaces nvidia-smi CLI for faster, more reliable GPU readings
+- **Unified history view** — Power and Sessions share a single set of period filters with a segmented control toggle
+- **Segmented controls** — iOS-style animated tab controls replace the old tab/range buttons across the history view
+- **Session categories & labels** — tag sessions (Gaming, AI/ML, Mining, etc.) with usage tracking and histogram visualization
+- **DDR type detection** — RAM widget now identifies DDR4/DDR5 memory type
+- **Collapsible status badge** — cleaner UI with a collapsible power source indicator
+- Bug fixes: Windows per-core frequency deadlock, session controls refresh, estimation accuracy
+
+### v1.1.0
 
 - Overhauled dashboard with adaptive grid layout and charge bars
 - Extended hardware metrics: per-core clocks, fan speeds, GPU memory clock

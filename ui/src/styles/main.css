@@ -651,6 +651,14 @@ body {
     height: 100%;
 }
 
+/* Power and process widgets need full-width content */
+.widget-card[data-widget-id="power"] .card-body,
+.widget-card[data-widget-id="processes"] .card-body {
+    align-items: stretch;
+    text-align: left;
+    width: 100%;
+}
+
 /* Ensure widget card uses full grid cell height */
 .widget-card {
     display: flex;
@@ -836,39 +844,85 @@ body {
     height: 16px;
 }
 
-/* ===== Tabs ===== */
-.view-tabs {
-    display: flex;
-    gap: var(--spacing-xs);
-}
-
-.tab-btn {
-    padding: var(--spacing-sm) var(--spacing-md);
+/* ===== Segmented Control ===== */
+.segmented-control {
+    display: inline-flex;
+    position: relative;
     background: var(--bg-tertiary);
-    border: none;
-    border-radius: var(--radius-md);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    transition: all var(--transition-fast);
+    border-radius: var(--radius-lg);
+    padding: 3px;
 }
 
-.tab-btn:hover {
+.segmented-control .segmented-indicator {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
     background: var(--bg-card);
+    border-radius: calc(var(--radius-lg) - 2px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+}
+
+.segmented-control button {
+    position: relative;
+    z-index: 1;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.825rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+    white-space: nowrap;
+}
+
+.segmented-control button:hover {
     color: var(--text-primary);
 }
 
-.tab-btn.active {
-    background: var(--accent-primary);
-    color: white;
+.segmented-control button.active {
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
-.tab-content {
-    display: none;
+/* Mode variant (Power/Sessions) */
+.segmented-control--mode {
+    margin-bottom: var(--spacing-lg);
 }
 
-.tab-content.active {
-    display: block;
+/* ===== History Filters ===== */
+.history-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.history-custom-range {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.history-custom-range input[type="date"] {
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.history-range-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
 
 /* ===== Session History ===== */
@@ -961,33 +1015,6 @@ body {
 }
 
 /* ===== History View ===== */
-.date-range-picker {
-    display: flex;
-    gap: var(--spacing-xs);
-    margin-bottom: var(--spacing-lg);
-}
-
-.range-btn {
-    padding: var(--spacing-sm) var(--spacing-md);
-    background-color: var(--bg-tertiary);
-    border: none;
-    border-radius: var(--radius-md);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 0.875rem;
-    transition: all var(--transition-fast);
-}
-
-.range-btn:hover {
-    background-color: var(--bg-card);
-    color: var(--text-primary);
-}
-
-.range-btn.active {
-    background-color: var(--accent-primary);
-    color: white;
-}
-
 .history-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -2838,41 +2865,6 @@ body {
 }
 
 /* ===== Session History Histogram ===== */
-.session-range-controls {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-}
-
-.session-range-tabs {
-    display: flex;
-    gap: var(--spacing-xs);
-}
-
-.session-range-custom {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.session-range-custom input[type="date"] {
-    padding: 4px 8px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: 0.85rem;
-}
-
-.session-range-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
 .session-histogram-container {
     background: var(--bg-card);
     border-radius: var(--radius-md);
