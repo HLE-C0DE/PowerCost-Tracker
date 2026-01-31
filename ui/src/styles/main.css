@@ -335,6 +335,33 @@ body {
     gap: var(--spacing-sm);
 }
 
+.layout-profiles-section {
+    display: flex;
+    align-items: center;
+}
+
+.profile-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.profile-select {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8rem;
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.profile-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
 .btn-sm {
     padding: var(--spacing-xs) var(--spacing-md);
     font-size: 0.8rem;
@@ -1544,6 +1571,15 @@ body {
     .edit-toolbar {
         flex-direction: column;
         gap: var(--spacing-sm);
+    }
+
+    .layout-profiles-section {
+        width: 100%;
+    }
+
+    .profile-controls {
+        width: 100%;
+        justify-content: center;
     }
 
     .visibility-panel {

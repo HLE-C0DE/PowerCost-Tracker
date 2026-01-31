@@ -415,6 +415,15 @@ impl Default for AdvancedConfig {
     }
 }
 
+/// A named layout profile
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutProfile {
+    pub name: String,
+    pub widgets: Vec<DashboardWidget>,
+    #[serde(default = "default_global_display")]
+    pub global_display: String,
+}
+
 /// Dashboard layout configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardConfig {
@@ -430,6 +439,12 @@ pub struct DashboardConfig {
     /// Widget configurations
     #[serde(default = "default_dashboard_widgets")]
     pub widgets: Vec<DashboardWidget>,
+    /// Active profile name (empty = custom/no profile)
+    #[serde(default)]
+    pub active_profile: String,
+    /// Saved layout profiles
+    #[serde(default)]
+    pub profiles: Vec<LayoutProfile>,
 }
 
 fn default_layout() -> String { "default".to_string() }
@@ -463,6 +478,8 @@ impl Default for DashboardConfig {
             layout: default_layout(),
             global_display: default_global_display(),
             widgets: default_dashboard_widgets(),
+            active_profile: String::new(),
+            profiles: Vec::new(),
         }
     }
 }

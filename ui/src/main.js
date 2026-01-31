@@ -640,11 +640,23 @@ const state = {
     historyOffset: 0,
     historyMode: 'power',
     sessionCategoryFilter: [],
+    // Canonical 6-column layout (preserved across resizes)
+    canonicalWidgets: null,
+    // Layout profiles
+    layoutProfiles: [],
+    activeProfileName: '',
 };
 
 // Widget classification for tiered updates
 const CRITICAL_WIDGETS = ['power', 'cpu', 'gpu', 'session_cost', 'session_energy', 'session_duration', 'hourly_estimate', 'daily_estimate', 'monthly_estimate', 'session_controls'];
 const DETAILED_WIDGETS = ['processes', 'ram', 'surplus'];
+
+// Deep-copy the current widget layout as the canonical 6-column reference
+function snapshotCanonicalLayout() {
+    if (state.dashboardConfig?.widgets) {
+        state.canonicalWidgets = JSON.parse(JSON.stringify(state.dashboardConfig.widgets));
+    }
+}
 
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -652,6 +664,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadTranslations();
         state.config = await invoke('get_config');
         state.dashboardConfig = await invoke('get_dashboard_config');
+        snapshotCanonicalLayout();
+        state.activeProfileName = state.dashboardConfig.active_profile || '';
+        try {
+            state.layoutProfiles = await invoke('get_layout_profiles');
+        } catch (e) {
+            console.warn('Failed to load layout profiles:', e);
+            state.layoutProfiles = [];
+        }
         applyConfig(state.config);
 
         await loadSessionCategories();
@@ -796,6 +816,30 @@ function setupDashboard() {
     document.getElementById('exit-edit-mode-btn').addEventListener('click', exitEditMode);
     document.getElementById('toggle-visibility-btn').addEventListener('click', toggleVisibilityPanel);
     document.getElementById('fix-layout-btn').addEventListener('click', fixLayout);
+
+    // Profile controls
+    document.getElementById('profile-selector').addEventListener('change', (e) => {
+        const name = e.target.value;
+        if (name) {
+            loadLayoutProfile(name);
+        } else {
+            state.activeProfileName = '';
+        }
+    });
+    document.getElementById('save-profile-btn').addEventListener('click', () => {
+        const name = prompt(t('dashboard.profile_name_prompt'), state.activeProfileName || '');
+        if (name && name.trim()) {
+            saveLayoutProfile(name.trim());
+        }
+    });
+    document.getElementById('delete-profile-btn').addEventListener('click', () => {
+        const select = document.getElementById('profile-selector');
+        const name = select.value;
+        if (name) {
+            deleteLayoutProfile(name);
+        }
+    });
+
     document.getElementById('close-visibility-panel').addEventListener('click', () => {
         document.getElementById('visibility-panel').classList.add('hidden');
     });
@@ -1340,9 +1384,14 @@ function toggleEditMode() {
 }
 
 function enterEditMode() {
+    if (getActualGridCols() < 6) {
+        showToast(t('dashboard.expand_to_edit'), 'warning');
+        return;
+    }
     state.isEditMode = true;
     document.getElementById('edit-toolbar').classList.remove('hidden');
     document.getElementById('edit-dashboard-btn').classList.add('active');
+    renderProfileSelector();
     renderDashboard();
     showToast(t('dashboard.edit_activated'), 'info');
 }
@@ -1357,6 +1406,7 @@ function exitEditMode() {
     const preview = document.querySelector('.drop-preview');
     if (preview) preview.remove();
 
+    snapshotCanonicalLayout();
     renderDashboard();
     saveDashboardConfigQuiet();
     showToast(t('dashboard.changes_saved'), 'success');
@@ -1592,6 +1642,7 @@ function handleGlobalMouseUp(e) {
     const preview = document.querySelector('.drop-preview');
     if (preview) preview.remove();
 
+    snapshotCanonicalLayout();
     renderDashboard();
     saveDashboardConfigQuiet();
 }
@@ -1872,18 +1923,24 @@ function reflowDashboardGrid() {
     if (newCols === lastGridCols) return;
     lastGridCols = newCols;
 
-    // Clamp col_span and col to fit new column count
-    const widgets = state.dashboardConfig.widgets.filter(w => w.visible);
-    for (const widget of widgets) {
-        if ((widget.col_span || 1) > newCols) {
-            widget.col_span = newCols;
+    if (newCols >= 6 && state.canonicalWidgets) {
+        // Returning to full width: restore canonical layout verbatim
+        state.dashboardConfig.widgets = JSON.parse(JSON.stringify(state.canonicalWidgets));
+    } else if (state.canonicalWidgets) {
+        // Reducing cols: start from canonical copy, then clamp/compact for display
+        state.dashboardConfig.widgets = JSON.parse(JSON.stringify(state.canonicalWidgets));
+        const widgets = state.dashboardConfig.widgets.filter(w => w.visible);
+        for (const widget of widgets) {
+            if ((widget.col_span || 1) > newCols) {
+                widget.col_span = newCols;
+            }
+            if ((widget.col || 1) + (widget.col_span || 1) - 1 > newCols) {
+                widget.col = Math.max(1, newCols - (widget.col_span || 1) + 1);
+            }
         }
-        if ((widget.col || 1) + (widget.col_span || 1) - 1 > newCols) {
-            widget.col = Math.max(1, newCols - (widget.col_span || 1) + 1);
-        }
+        compactGrid();
     }
 
-    compactGrid();
     renderDashboard();
 }
 
@@ -1971,6 +2028,7 @@ function endResize() {
     state.resizeStartPos = null;
     state.resizeStartSpan = null;
 
+    snapshotCanonicalLayout();
     renderDashboard();
     saveDashboardConfigQuiet();
 }
@@ -2000,7 +2058,11 @@ function handleDragEnd(e) {
 
 async function saveDashboardConfigQuiet() {
     try {
-        await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
+        // If viewport is narrower than 6 cols, save the canonical layout instead of reflowed state
+        const configToSave = (getActualGridCols() < 6 && state.canonicalWidgets)
+            ? { ...state.dashboardConfig, widgets: state.canonicalWidgets }
+            : state.dashboardConfig;
+        await invoke('save_dashboard_config', { dashboard: configToSave });
     } catch (error) {
         console.error('Failed to save dashboard config:', error);
     }
@@ -2105,6 +2167,7 @@ async function saveDashboardConfig() {
     });
 
     try {
+        snapshotCanonicalLayout();
         await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
         renderDashboard();
         closeEditModal();
@@ -2124,12 +2187,70 @@ async function resetDashboard() {
         // Force re-migration to ensure proper grid layout
         forceGridMigration();
 
+        snapshotCanonicalLayout();
+        state.activeProfileName = '';
         await invoke('save_dashboard_config', { dashboard: state.dashboardConfig });
         renderDashboard();
+        renderProfileSelector();
         closeEditModal();
         showToast(t('dashboard.reset_success'), 'success');
     } catch (error) {
         console.error('Failed to reset dashboard:', error);
+    }
+}
+
+// ===== Layout Profile Functions =====
+async function saveLayoutProfile(name) {
+    try {
+        state.layoutProfiles = await invoke('save_layout_profile', { name });
+        state.activeProfileName = name;
+        snapshotCanonicalLayout();
+        renderProfileSelector();
+        showToast(t('dashboard.profile_saved'), 'success');
+    } catch (error) {
+        console.error('Failed to save layout profile:', error);
+        showToast(t('dashboard.save_failed'), 'error');
+    }
+}
+
+async function loadLayoutProfile(name) {
+    try {
+        const updatedConfig = await invoke('load_layout_profile', { name });
+        state.dashboardConfig = updatedConfig;
+        state.activeProfileName = name;
+        snapshotCanonicalLayout();
+        renderDashboard();
+    } catch (error) {
+        console.error('Failed to load layout profile:', error);
+    }
+}
+
+async function deleteLayoutProfile(name) {
+    try {
+        state.layoutProfiles = await invoke('delete_layout_profile', { name });
+        if (state.activeProfileName === name) {
+            state.activeProfileName = '';
+        }
+        renderProfileSelector();
+        showToast(t('dashboard.profile_deleted'), 'success');
+    } catch (error) {
+        console.error('Failed to delete layout profile:', error);
+    }
+}
+
+function renderProfileSelector() {
+    const select = document.getElementById('profile-selector');
+    if (!select) return;
+
+    select.innerHTML = `<option value="">${t('dashboard.custom_layout')}</option>`;
+    for (const profile of state.layoutProfiles) {
+        const option = document.createElement('option');
+        option.value = profile.name;
+        option.textContent = profile.name;
+        if (profile.name === state.activeProfileName) {
+            option.selected = true;
+        }
+        select.appendChild(option);
     }
 }
 

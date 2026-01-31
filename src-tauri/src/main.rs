@@ -11,7 +11,7 @@ mod hardware;
 mod i18n;
 mod pricing;
 
-use crate::core::{AppState, BaselineDetection, Config, CriticalMetrics, DetailedMetrics, ProcessMetrics, Session, SessionCategory, SystemMetrics};
+use crate::core::{AppState, BaselineDetection, Config, CriticalMetrics, DetailedMetrics, LayoutProfile, ProcessMetrics, Session, SessionCategory, SystemMetrics};
 use crate::db::Database;
 use crate::hardware::{BaselineDetector, PowerMonitor};
 use crate::i18n::I18n;
@@ -612,6 +612,70 @@ async fn get_detailed_metrics(state: tauri::State<'_, TauriState>) -> Result<Opt
     Ok(cache.clone())
 }
 
+// ===== Layout Profile Commands =====
+
+/// Get all saved layout profiles
+#[tauri::command]
+async fn get_layout_profiles(state: tauri::State<'_, TauriState>) -> Result<Vec<LayoutProfile>, String> {
+    let config = state.config.lock().await;
+    Ok(config.dashboard.profiles.clone())
+}
+
+/// Save current layout as a named profile (upsert)
+#[tauri::command]
+async fn save_layout_profile(state: tauri::State<'_, TauriState>, name: String) -> Result<Vec<LayoutProfile>, String> {
+    let mut config = state.config.lock().await;
+    let profile = LayoutProfile {
+        name: name.clone(),
+        widgets: config.dashboard.widgets.clone(),
+        global_display: config.dashboard.global_display.clone(),
+    };
+
+    // Upsert: replace existing profile with same name, or add new
+    if let Some(existing) = config.dashboard.profiles.iter_mut().find(|p| p.name == name) {
+        *existing = profile;
+    } else {
+        config.dashboard.profiles.push(profile);
+    }
+
+    config.dashboard.active_profile = name;
+    config.save().map_err(|e| e.to_string())?;
+    Ok(config.dashboard.profiles.clone())
+}
+
+/// Load a named profile, applying its widgets to the active config
+#[tauri::command]
+async fn load_layout_profile(state: tauri::State<'_, TauriState>, name: String) -> Result<crate::core::DashboardConfig, String> {
+    let mut config = state.config.lock().await;
+    let profile = config.dashboard.profiles.iter().find(|p| p.name == name).cloned();
+
+    match profile {
+        Some(p) => {
+            config.dashboard.widgets = p.widgets;
+            config.dashboard.global_display = p.global_display;
+            config.dashboard.active_profile = name;
+            config.save().map_err(|e| e.to_string())?;
+            Ok(config.dashboard.clone())
+        }
+        None => Err(format!("Profile '{}' not found", name)),
+    }
+}
+
+/// Delete a named profile
+#[tauri::command]
+async fn delete_layout_profile(state: tauri::State<'_, TauriState>, name: String) -> Result<Vec<LayoutProfile>, String> {
+    let mut config = state.config.lock().await;
+    config.dashboard.profiles.retain(|p| p.name != name);
+
+    // Clear active profile if it was the deleted one
+    if config.dashboard.active_profile == name {
+        config.dashboard.active_profile = String::new();
+    }
+
+    config.save().map_err(|e| e.to_string())?;
+    Ok(config.dashboard.profiles.clone())
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -707,6 +771,11 @@ fn main() {
             // Dashboard config commands
             get_dashboard_config,
             save_dashboard_config,
+            // Layout profile commands
+            get_layout_profiles,
+            save_layout_profile,
+            load_layout_profile,
+            delete_layout_profile,
             // Autostart command
             set_autostart,
             // Tiered monitoring API (fast/slow refresh)

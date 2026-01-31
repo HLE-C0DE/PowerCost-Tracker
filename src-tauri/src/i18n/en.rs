@@ -160,6 +160,16 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("dashboard.default_applied".into(), "Default layout applied".into());
     t.insert("dashboard.display_mode".into(), "Display mode".into());
 
+    // Layout profiles
+    t.insert("dashboard.profile".into(), "Profile".into());
+    t.insert("dashboard.save_profile".into(), "Save Profile".into());
+    t.insert("dashboard.delete_profile".into(), "Delete Profile".into());
+    t.insert("dashboard.profile_saved".into(), "Profile saved".into());
+    t.insert("dashboard.profile_deleted".into(), "Profile deleted".into());
+    t.insert("dashboard.expand_to_edit".into(), "Expand window to edit layout".into());
+    t.insert("dashboard.profile_name_prompt".into(), "Profile name:".into());
+    t.insert("dashboard.custom_layout".into(), "-- Custom --".into());
+
     // Session tracking
     t.insert("session.no_active".into(), "No active session".into());
     t.insert("session.start".into(), "Start Session".into());
