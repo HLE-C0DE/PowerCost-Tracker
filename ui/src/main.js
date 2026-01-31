@@ -2973,7 +2973,7 @@ function renderCategoryFilterChips(sessions) {
         }
 
         // Re-render with current date range
-        const range = getHistoryRange();
+        const range = getHistoryDateRange();
         if (range) loadSessionHistoryView(range.startDate, range.endDate);
     };
 }
@@ -3114,13 +3114,34 @@ function setupSessionListEvents(list, sessions) {
         }
     });
 
-    // Delete button
+    // Delete button - inline confirm (click once to arm, click again to delete)
+    let deleteConfirmTimer = null;
     list.addEventListener('click', async (e) => {
         const btn = e.target.closest('.session-history-delete-btn');
         if (!btn) return;
+
+        // First click: arm the button for confirmation
+        if (!btn.classList.contains('confirm')) {
+            // Reset any other armed buttons
+            list.querySelectorAll('.session-history-delete-btn.confirm').forEach(b => {
+                b.classList.remove('confirm');
+                b.textContent = '✕';
+            });
+            btn.classList.add('confirm');
+            btn.textContent = '?';
+            // Auto-reset after 3 seconds
+            if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+            deleteConfirmTimer = setTimeout(() => {
+                btn.classList.remove('confirm');
+                btn.textContent = '✕';
+            }, 3000);
+            return;
+        }
+
+        // Second click: confirmed, proceed with delete
+        if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+        btn.classList.remove('confirm');
         const sessionId = parseInt(btn.dataset.sessionId);
-        const tr = state.translations;
-        if (!confirm(tr['session.delete_confirm'] || 'Delete this session?')) return;
         try {
             await invoke('delete_session', { sessionId });
             // Remove from DOM

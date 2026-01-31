@@ -890,7 +890,7 @@ body {
 
 /* Mode variant (Power/Sessions) */
 .segmented-control--mode {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 0;
 }
 
 /* ===== History Filters ===== */
@@ -1024,6 +1024,12 @@ body {
 .session-history-delete-btn:hover {
     color: var(--accent-red, #ef4444);
     background: rgba(239, 68, 68, 0.1);
+}
+
+.session-history-delete-btn.confirm {
+    color: #fff;
+    background: var(--accent-red, #ef4444);
+    font-weight: 700;
 }
 
 .session-date {
@@ -2966,6 +2972,7 @@ body {
     align-items: center;
     gap: var(--spacing-md);
     flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
 }
 
 .session-category-filter {
