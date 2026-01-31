@@ -735,6 +735,9 @@ function setupNavigation() {
             document.getElementById(targetView).classList.add('active');
 
             if (targetView === 'history') {
+                // Re-init segmented controls now that the view is visible
+                initSegmentedControl(document.getElementById('history-range-control'));
+                initSegmentedControl(document.getElementById('history-mode-control'));
                 loadHistoryForRange();
             }
         });
@@ -2944,23 +2947,36 @@ async function loadSessionHistoryView(startDate, endDate) {
         } else {
             empty.classList.add('hidden');
             const tr = state.translations;
+            const categories = state.sessionCategories || [];
             list.innerHTML = sessions.map(s => {
                 const sDate = new Date(s.start_time * 1000);
                 const duration = s.end_time ? s.end_time - s.start_time : 0;
-                const categoryInfo = s.category ? getCategoryDisplay(s.category) : '';
+                const categoryOptions = categories.map(c =>
+                    `<option value="${c.name}" ${s.category === c.name ? 'selected' : ''}>${c.emoji} ${c.name}</option>`
+                ).join('');
                 return `
-                    <div class="session-item">
+                    <div class="session-item" data-session-id="${s.id}">
                         <div class="session-item-header">
-                            <div>
-                                ${categoryInfo ? `<span class="session-category-badge">${categoryInfo}</span>` : ''}
-                                ${s.label ? `<span class="session-name">${s.label}</span>` : ''}
+                            <div class="session-item-header-left">
+                                <input type="text" class="session-history-name-input"
+                                    data-session-id="${s.id}"
+                                    value="${(s.label || '').replace(/"/g, '&quot;')}"
+                                    placeholder="${tr['session.name_placeholder'] || 'Session name...'}"
+                                    title="${tr['session.edit_name'] || 'Edit name'}">
+                                <select class="session-history-category-select" data-session-id="${s.id}">
+                                    <option value="">${tr['session.no_category'] || 'No category'}</option>
+                                    ${categoryOptions}
+                                </select>
                                 <span class="session-date">${sDate.toLocaleDateString()} ${sDate.toLocaleTimeString()}</span>
                                 <span class="session-duration">${formatDuration(duration)}</span>
                             </div>
-                            <span class="session-status completed">
-                                <span class="session-status-dot"></span>
-                                ${s.end_time ? (tr['session.ended'] || 'Completed') : (tr['widget.session_active'] || 'Active')}
-                            </span>
+                            <div class="session-item-header-right">
+                                <span class="session-status completed">
+                                    <span class="session-status-dot"></span>
+                                    ${s.end_time ? (tr['session.ended'] || 'Completed') : (tr['widget.session_active'] || 'Active')}
+                                </span>
+                                <button class="session-history-delete-btn" data-session-id="${s.id}" title="${tr['session.delete'] || 'Delete'}">✕</button>
+                            </div>
                         </div>
                         <div class="session-item-stats">
                             <div class="session-stat">
@@ -2983,6 +2999,9 @@ async function loadSessionHistoryView(startDate, endDate) {
                     </div>
                 `;
             }).join('');
+
+            // Set up event delegation for session editing
+            setupSessionListEvents(list, sessions);
         }
 
         // Update session summary stats
@@ -3006,6 +3025,75 @@ async function loadSessionHistoryView(startDate, endDate) {
     } catch (error) {
         console.error('Failed to load sessions:', error);
     }
+}
+
+function setupSessionListEvents(list, sessions) {
+    // Debounce timer for name input
+    let nameDebounceTimers = {};
+
+    // Name input - debounced save
+    list.addEventListener('input', (e) => {
+        if (!e.target.classList.contains('session-history-name-input')) return;
+        const sessionId = parseInt(e.target.dataset.sessionId);
+        if (nameDebounceTimers[sessionId]) clearTimeout(nameDebounceTimers[sessionId]);
+        nameDebounceTimers[sessionId] = setTimeout(async () => {
+            try {
+                await invoke('update_session_label', { sessionId, label: e.target.value });
+            } catch (err) {
+                console.error('Failed to update session label:', err);
+            }
+        }, 500);
+    });
+
+    // Category select - immediate save
+    list.addEventListener('change', async (e) => {
+        if (!e.target.classList.contains('session-history-category-select')) return;
+        const sessionId = parseInt(e.target.dataset.sessionId);
+        const category = e.target.value || null;
+        try {
+            await invoke('update_session_category', { sessionId, category });
+        } catch (err) {
+            console.error('Failed to update session category:', err);
+        }
+    });
+
+    // Delete button
+    list.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.session-history-delete-btn');
+        if (!btn) return;
+        const sessionId = parseInt(btn.dataset.sessionId);
+        const tr = state.translations;
+        if (!confirm(tr['session.delete_confirm'] || 'Delete this session?')) return;
+        try {
+            await invoke('delete_session', { sessionId });
+            // Remove from DOM
+            const item = btn.closest('.session-item');
+            if (item) item.remove();
+            // Update summary stats
+            const remaining = sessions.filter(s => s.id !== sessionId);
+            sessions.length = 0;
+            sessions.push(...remaining);
+            const totalCount = remaining.length;
+            const totalEnergy = remaining.reduce((sum, s) => sum + (s.total_wh || 0), 0);
+            const totalSurplus = remaining.reduce((sum, s) => sum + (s.surplus_wh || 0), 0);
+            const totalCost = remaining.reduce((sum, s) => sum + (s.surplus_cost || 0), 0);
+            document.getElementById('session-total-count').textContent = totalCount;
+            document.getElementById('session-total-energy').textContent = totalEnergy >= 1000
+                ? `${formatNumber(totalEnergy / 1000, 2)} kWh`
+                : `${formatNumber(totalEnergy, 1)} Wh`;
+            document.getElementById('session-total-surplus').textContent = totalSurplus >= 1000
+                ? `${formatNumber(totalSurplus / 1000, 2)} kWh`
+                : `${formatNumber(totalSurplus, 1)} Wh`;
+            document.getElementById('session-total-cost').textContent = `${state.currencySymbol}${formatNumber(totalCost, 4)}`;
+            // Show empty state if no sessions left
+            if (totalCount === 0) {
+                list.innerHTML = '';
+                document.getElementById('no-sessions')?.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error('Failed to delete session:', err);
+        }
+    });
 }
 
 function getCategoryDisplay(categoryName) {

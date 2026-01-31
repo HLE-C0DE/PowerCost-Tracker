@@ -474,6 +474,12 @@ impl Database {
         Ok(())
     }
 
+    /// Delete a session by ID
+    pub fn delete_session(&self, session_id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])?;
+        Ok(())
+    }
+
     /// Get sessions in a date range (by start_time)
     pub fn get_sessions_in_range(&self, start_timestamp: i64, end_timestamp: i64) -> Result<Vec<Session>> {
         let mut stmt = self.conn.prepare(

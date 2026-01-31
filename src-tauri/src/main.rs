@@ -550,6 +550,13 @@ async fn remove_session_category(state: tauri::State<'_, TauriState>, name: Stri
     Ok(config.advanced.session_categories.clone())
 }
 
+/// Delete a session
+#[tauri::command]
+async fn delete_session(state: tauri::State<'_, TauriState>, session_id: i64) -> Result<(), String> {
+    let db = state.db.lock().await;
+    db.delete_session(session_id).map_err(|e| e.to_string())
+}
+
 /// Get sessions in a date range
 #[tauri::command]
 async fn get_sessions_in_range(state: tauri::State<'_, TauriState>, start: i64, end: i64) -> Result<Vec<Session>, String> {
@@ -682,6 +689,7 @@ fn main() {
             add_session_category,
             remove_session_category,
             get_sessions_in_range,
+            delete_session,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

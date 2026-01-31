@@ -273,6 +273,11 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("widget.swap".into(), "Swap".into());
     t.insert("widget.speed".into(), "Speed".into());
 
+    // Session editing
+    t.insert("session.delete".into(), "Delete".into());
+    t.insert("session.delete_confirm".into(), "Delete this session?".into());
+    t.insert("session.edit_name".into(), "Edit name".into());
+
     // Session naming and categories
     t.insert("session.name_placeholder".into(), "Session name...".into());
     t.insert("session.no_category".into(), "No category".into());
