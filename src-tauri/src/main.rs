@@ -11,7 +11,7 @@ mod hardware;
 mod i18n;
 mod pricing;
 
-use crate::core::{AppState, BaselineDetection, Config, CriticalMetrics, DetailedMetrics, ProcessMetrics, Session, SystemMetrics};
+use crate::core::{AppState, BaselineDetection, Config, CriticalMetrics, DetailedMetrics, ProcessMetrics, Session, SessionCategory, SystemMetrics};
 use crate::db::Database;
 use crate::hardware::{BaselineDetector, PowerMonitor};
 use crate::i18n::I18n;
@@ -409,6 +409,7 @@ async fn get_session_stats(state: tauri::State<'_, TauriState>) -> Result<Option
                 surplus_wh: session.surplus_wh,
                 surplus_cost,
                 label: None, // Would need to fetch from DB for label
+                category: None,
             }))
         }
         None => Ok(None),
@@ -504,6 +505,56 @@ async fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), Strin
     }
 
     Ok(())
+}
+
+// ===== Session Category & Label Commands =====
+
+/// Update a session's label
+#[tauri::command]
+async fn update_session_label(state: tauri::State<'_, TauriState>, session_id: i64, label: String) -> Result<(), String> {
+    let db = state.db.lock().await;
+    db.update_session_label(session_id, &label).map_err(|e| e.to_string())
+}
+
+/// Update a session's category
+#[tauri::command]
+async fn update_session_category(state: tauri::State<'_, TauriState>, session_id: i64, category: Option<String>) -> Result<(), String> {
+    let db = state.db.lock().await;
+    db.update_session_category(session_id, category.as_deref()).map_err(|e| e.to_string())
+}
+
+/// Get session categories from config
+#[tauri::command]
+async fn get_session_categories(state: tauri::State<'_, TauriState>) -> Result<Vec<SessionCategory>, String> {
+    let config = state.config.lock().await;
+    Ok(config.advanced.session_categories.clone())
+}
+
+/// Add a new session category
+#[tauri::command]
+async fn add_session_category(state: tauri::State<'_, TauriState>, category: SessionCategory) -> Result<Vec<SessionCategory>, String> {
+    let mut config = state.config.lock().await;
+    if !config.advanced.session_categories.iter().any(|c| c.name == category.name) {
+        config.advanced.session_categories.push(category);
+        config.save().map_err(|e| e.to_string())?;
+    }
+    Ok(config.advanced.session_categories.clone())
+}
+
+/// Remove a session category by name
+#[tauri::command]
+async fn remove_session_category(state: tauri::State<'_, TauriState>, name: String) -> Result<Vec<SessionCategory>, String> {
+    let mut config = state.config.lock().await;
+    config.advanced.session_categories.retain(|c| c.name != name);
+    config.save().map_err(|e| e.to_string())?;
+    Ok(config.advanced.session_categories.clone())
+}
+
+/// Get sessions in a date range
+#[tauri::command]
+async fn get_sessions_in_range(state: tauri::State<'_, TauriState>, start: i64, end: i64) -> Result<Vec<Session>, String> {
+    let db = state.db.lock().await;
+    db.get_sessions_in_range(start, end).map_err(|e| e.to_string())
 }
 
 // ===== Tiered Monitoring API (Fast/Slow refresh) =====
@@ -624,6 +675,13 @@ fn main() {
             // Tiered monitoring API (fast/slow refresh)
             get_critical_metrics,
             get_detailed_metrics,
+            // Session category & label commands
+            update_session_label,
+            update_session_category,
+            get_session_categories,
+            add_session_category,
+            remove_session_category,
+            get_sessions_in_range,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -822,6 +880,7 @@ async fn critical_monitoring_loop(app: tauri::AppHandle) {
                     surplus_wh: session.surplus_wh,
                     surplus_cost,
                     label: None,
+                    category: None,
                 })
             } else {
                 None
@@ -879,6 +938,10 @@ async fn critical_monitoring_loop(app: tauri::AppHandle) {
                         pricing.get_current_rate()
                     };
                     let _ = db.update_today_stats(Some(&pricing_mode), Some(rate));
+
+                    // Track app usage time (accumulate 60 seconds per minute)
+                    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                    let _ = db.add_usage_seconds(&today, 60);
                 }
             }
         }

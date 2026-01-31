@@ -273,5 +273,25 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("widget.swap".into(), "Swap".into());
     t.insert("widget.speed".into(), "Speed".into());
 
+    // Session naming and categories
+    t.insert("session.name_placeholder".into(), "Session name...".into());
+    t.insert("session.no_category".into(), "No category".into());
+    t.insert("session.category".into(), "Category".into());
+
+    // Settings - Categories
+    t.insert("settings.categories".into(), "Session Categories".into());
+    t.insert("settings.categories.add".into(), "Add".into());
+    t.insert("settings.categories.delete".into(), "Delete".into());
+    t.insert("settings.categories.name_placeholder".into(), "Category name".into());
+
+    // History - Session histogram
+    t.insert("history.usage".into(), "Usage".into());
+    t.insert("history.7_days".into(), "7 Days".into());
+    t.insert("history.30_days".into(), "30 Days".into());
+    t.insert("history.12_months".into(), "12 Months".into());
+    t.insert("history.custom".into(), "Custom".into());
+    t.insert("history.apply".into(), "Apply".into());
+    t.insert("history.hours".into(), "hours".into());
+
     t
 }

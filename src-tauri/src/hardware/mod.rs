@@ -2,7 +2,7 @@
 //!
 //! Provides abstractions for reading power consumption from various sources:
 //! - Linux: RAPL (Intel Running Average Power Limit) via sysfs
-//! - Windows: WMI queries and estimation
+//! - Windows: WMI queries and hardware monitoring
 //! - Fallback: TDP-based estimation
 
 #[cfg(target_os = "linux")]

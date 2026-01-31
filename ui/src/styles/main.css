@@ -2713,3 +2713,206 @@ body {
     width: 14px;
     height: 14px;
 }
+
+/* ===== Text Helpers ===== */
+.text-muted {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-left: var(--spacing-xs);
+    white-space: nowrap;
+}
+
+/* ===== Session Widget Fields ===== */
+.session-widget-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0;
+}
+
+.session-name-input {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.session-name-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.session-category-select {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.session-category-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* ===== Category Settings ===== */
+.category-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 6px var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.category-emoji {
+    font-size: 1.2rem;
+    width: 24px;
+    text-align: center;
+}
+
+.category-name {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.category-delete-btn {
+    opacity: 0.5;
+    transition: opacity var(--transition-fast);
+}
+
+.category-delete-btn:hover {
+    opacity: 1;
+    color: var(--accent-red);
+}
+
+.category-add-row {
+    display: flex;
+    gap: var(--spacing-xs);
+    align-items: center;
+}
+
+.category-emoji-field {
+    width: 48px;
+    padding: 6px;
+    text-align: center;
+    font-size: 1.1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+.category-name-field {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+.category-emoji-field:focus,
+.category-name-field:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* ===== Session History Histogram ===== */
+.session-range-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.session-range-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.session-range-custom {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.session-range-custom input[type="date"] {
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.session-range-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.session-histogram-container {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    border: 1px solid var(--border-color);
+}
+
+.session-histogram-container canvas {
+    width: 100%;
+    height: 200px;
+}
+
+.session-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.session-category-badge {
+    font-size: 0.85rem;
+    margin-right: var(--spacing-xs);
+}
+
+.session-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-right: var(--spacing-sm);
+}

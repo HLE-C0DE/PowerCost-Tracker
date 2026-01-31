@@ -1,6 +1,6 @@
 //! Configuration management
 
-use crate::core::{Error, Result};
+use crate::core::{Error, Result, SessionCategory};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -384,11 +384,22 @@ pub struct AdvancedConfig {
     /// CPU/GPU load threshold (%) to collect extended metrics (per-core freq, fans)
     #[serde(default = "default_extended_threshold")]
     pub extended_metrics_threshold: f64,
+    /// Session categories for organizing tracking sessions
+    #[serde(default = "default_session_categories")]
+    pub session_categories: Vec<SessionCategory>,
 }
 
 fn default_profile() -> String { "default".to_string() }
 fn default_process_limit() -> usize { 10 }
 fn default_extended_threshold() -> f64 { 15.0 }
+fn default_session_categories() -> Vec<SessionCategory> {
+    vec![
+        SessionCategory { emoji: "\u{1F3AE}".to_string(), name: "Gaming".to_string() },
+        SessionCategory { emoji: "\u{1F4BB}".to_string(), name: "Work".to_string() },
+        SessionCategory { emoji: "\u{1F916}".to_string(), name: "AI".to_string() },
+        SessionCategory { emoji: "\u{1F310}".to_string(), name: "Browsing".to_string() },
+    ]
+}
 
 impl Default for AdvancedConfig {
     fn default() -> Self {
@@ -399,6 +410,7 @@ impl Default for AdvancedConfig {
             pinned_processes: Vec::new(),
             process_list_limit: default_process_limit(),
             extended_metrics_threshold: default_extended_threshold(),
+            session_categories: default_session_categories(),
         }
     }
 }

@@ -385,20 +385,20 @@ const WIDGET_REGISTRY = {
                 <div class="metric-row">
                     <div class="progress-bar"><div class="progress-fill ram-fill" style="width: ${mem.usage_percent}%"></div></div>
                     <span class="metric-value">${formatNumber(mem.usage_percent, 0)}%</span>
+                    <span class="text-muted">${formatNumber(usedGB, 1)}/${formatNumber(totalGB, 1)} GB</span>
                 </div>
-                <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
+                ${mem.memory_speed_mhz ? `<div class="metric-row ${globalDisplay !== 'normal' ? 'hidden' : ''}">
+                    <span class="metric-label">${t('widget.speed')}</span>
+                    <span class="metric-value">${mem.memory_speed_mhz} MHz</span>
+                </div>` : ''}
                 ${hasSwap && globalDisplay === 'normal' ? `
-                <div class="metric-row">
+                <div class="metric-row" style="margin-top: 4px">
                     <span class="metric-label">${t('widget.swap')}</span>
                     <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width: ${swapPercent}%; background: #a855f7"></div></div>
                     <span class="metric-value">${formatNumber(swapPercent, 0)}%</span>
                 </div>
                 <div class="metric-info">${formatNumber(swapUsedGB, 1)} / ${formatNumber(swapTotalGB, 1)} GB</div>
                 ` : ''}
-                ${mem.memory_speed_mhz && globalDisplay === 'normal' ? `<div class="metric-row">
-                    <span class="metric-label">${t('widget.speed')}</span>
-                    <span class="metric-value">${mem.memory_speed_mhz} MHz</span>
-                </div>` : ''}
             `;
         },
     },
@@ -456,6 +456,12 @@ const WIDGET_REGISTRY = {
                 `;
             }
 
+            const categories = state.sessionCategories || [];
+            const currentCategory = session.category || '';
+            const categoryOptions = categories.map(c =>
+                `<option value="${c.name}" ${currentCategory === c.name ? 'selected' : ''}>${c.emoji} ${c.name}</option>`
+            ).join('');
+
             return `
                 <div class="session-widget">
                     <div class="session-widget-info">
@@ -465,9 +471,15 @@ const WIDGET_REGISTRY = {
                         </div>
                         <span class="session-widget-duration">${duration}</span>
                     </div>
-                    <div class="session-widget-stats">
-                        <span class="session-widget-stat">${t('session.surplus')}: ${surplusWh} Wh</span>
-                        <span class="session-widget-stat">${t('widget.cost')}: ${surplusCost}</span>
+                    <div class="session-widget-fields">
+                        <input type="text" class="session-name-input" id="session-name-input"
+                            placeholder="${t('session.name_placeholder')}"
+                            value="${session.label || ''}"
+                            data-session-id="${session.id}">
+                        <select class="session-category-select" id="session-category-select" data-session-id="${session.id}">
+                            <option value="">${t('session.no_category')}</option>
+                            ${categoryOptions}
+                        </select>
                     </div>
                     <div class="session-widget-btns">
                         <button class="btn btn-secondary btn-sm session-widget-end-btn">${t('session.end')}</button>
@@ -620,6 +632,9 @@ const state = {
     lastDashboardData: null,
     processAdvancedMode: false,
     allProcesses: [],
+    sessionCategories: [],
+    sessionHistoryRange: 7,
+    sessionHistoryOffset: 0,
 };
 
 // Widget classification for tiered updates
@@ -634,12 +649,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.dashboardConfig = await invoke('get_dashboard_config');
         applyConfig(state.config);
 
+        await loadSessionCategories();
         setupNavigation();
         setupSettings();
         setupDashboard();
         setupSourceBadgeToggle();
         setupSessionControls();
         setupHistoryTabs();
+        setupCategorySettings();
 
         startDashboardUpdates();
 
@@ -790,6 +807,38 @@ function setupDashboard() {
 
     // Event delegation for dynamically rendered buttons (Stream C)
     document.getElementById('dashboard-grid').addEventListener('click', handleDashboardClick);
+
+    // Event delegation for session name input (debounced)
+    let sessionNameTimer = null;
+    document.getElementById('dashboard-grid').addEventListener('input', (e) => {
+        const nameInput = e.target.closest('.session-name-input');
+        if (nameInput) {
+            const sessionId = parseInt(nameInput.dataset.sessionId);
+            const label = nameInput.value;
+            if (sessionNameTimer) clearTimeout(sessionNameTimer);
+            sessionNameTimer = setTimeout(() => {
+                if (sessionId) {
+                    invoke('update_session_label', { sessionId, label }).catch(err =>
+                        console.error('Failed to update label:', err)
+                    );
+                }
+            }, 500);
+        }
+    });
+
+    // Event delegation for session category select (change event)
+    document.getElementById('dashboard-grid').addEventListener('change', (e) => {
+        const categorySelect = e.target.closest('.session-category-select');
+        if (categorySelect) {
+            const sessionId = parseInt(categorySelect.dataset.sessionId);
+            const category = categorySelect.value || null;
+            if (sessionId) {
+                invoke('update_session_category', { sessionId, category }).catch(err =>
+                    console.error('Failed to update category:', err)
+                );
+            }
+        }
+    });
 
     // Stream A: Setup global display toggle buttons
     setupGlobalDisplayToggle();
@@ -1001,6 +1050,20 @@ async function handleDashboardClick(e) {
     if (sessionEndBtn) {
         e.stopPropagation();
         endSession();
+        return;
+    }
+
+    // Handle session category change
+    const categorySelect = e.target.closest('.session-category-select');
+    if (categorySelect) {
+        e.stopPropagation();
+        const sessionId = parseInt(categorySelect.dataset.sessionId);
+        const category = categorySelect.value || null;
+        if (sessionId) {
+            invoke('update_session_category', { sessionId, category }).catch(err =>
+                console.error('Failed to update category:', err)
+            );
+        }
         return;
     }
 
@@ -2621,13 +2684,59 @@ function setupHistoryTabs() {
         });
     });
 
-    document.querySelectorAll('.range-btn').forEach(btn => {
+    // Power history range buttons
+    document.querySelectorAll('#power-history .range-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#power-history .range-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             loadHistoryData(btn.getAttribute('data-range'));
         });
     });
+
+    // Session history range buttons
+    document.querySelectorAll('.session-range-tabs .range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.session-range-tabs .range-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const range = btn.dataset.sessionRange;
+            const customPanel = document.getElementById('session-range-custom');
+            if (range === 'custom') {
+                customPanel.classList.remove('hidden');
+            } else {
+                customPanel.classList.add('hidden');
+                state.sessionHistoryRange = parseInt(range);
+                state.sessionHistoryOffset = 0;
+                loadSessionHistoryView(range);
+            }
+        });
+    });
+
+    // Session custom range apply
+    const applyBtn = document.getElementById('session-range-apply');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            state.sessionHistoryRange = 'custom';
+            loadSessionHistoryView('custom');
+        });
+    }
+
+    // Session nav prev/next
+    const prevBtn = document.getElementById('session-nav-prev');
+    const nextBtn = document.getElementById('session-nav-next');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            state.sessionHistoryOffset++;
+            loadSessionHistoryView(state.sessionHistoryRange);
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (state.sessionHistoryOffset > 0) {
+                state.sessionHistoryOffset--;
+                loadSessionHistoryView(state.sessionHistoryRange);
+            }
+        });
+    }
 }
 
 async function loadHistoryData(range) {
@@ -2695,6 +2804,7 @@ async function loadHistoryData(range) {
                         <td>${formatNumber(day.avg_watts, 0)} W</td>
                         <td class="peak-cell">${formatNumber(day.max_watts, 0)} W</td>
                         <td class="cost-cell">${day.total_cost != null ? state.currencySymbol + formatNumber(day.total_cost, 4) : '--'}</td>
+                        <td>${day.usage_seconds ? formatDuration(day.usage_seconds) : '--'}</td>
                     </tr>
                 `).join('');
             }
@@ -2707,8 +2817,39 @@ async function loadHistoryData(range) {
 }
 
 async function loadSessionHistory() {
+    await loadSessionHistoryView(state.sessionHistoryRange);
+}
+
+async function loadSessionHistoryView(range) {
     try {
-        const sessions = await invoke('get_sessions', { limit: 20 });
+        const now = new Date();
+        let startDate, endDate;
+
+        if (range === 'custom') {
+            const startInput = document.getElementById('session-range-start');
+            const endInput = document.getElementById('session-range-end');
+            if (!startInput.value || !endInput.value) return;
+            startDate = new Date(startInput.value);
+            endDate = new Date(endInput.value);
+            endDate.setHours(23, 59, 59);
+        } else {
+            const days = parseInt(range);
+            endDate = new Date(now);
+            endDate.setDate(endDate.getDate() - (state.sessionHistoryOffset * days));
+            startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - days);
+        }
+
+        const startTs = Math.floor(startDate.getTime() / 1000);
+        const endTs = Math.floor(endDate.getTime() / 1000);
+
+        // Update range label
+        const label = document.getElementById('session-range-label');
+        if (label) {
+            label.textContent = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+        }
+
+        const sessions = await invoke('get_sessions_in_range', { start: startTs, end: endTs });
         const list = document.getElementById('session-list');
         const empty = document.getElementById('no-sessions');
 
@@ -2717,37 +2858,40 @@ async function loadSessionHistory() {
             empty.classList.remove('hidden');
         } else {
             empty.classList.add('hidden');
+            const tr = state.translations;
             list.innerHTML = sessions.map(s => {
-                const startDate = new Date(s.start_time * 1000);
+                const sDate = new Date(s.start_time * 1000);
                 const duration = s.end_time ? s.end_time - s.start_time : 0;
-                const t = state.translations;
+                const categoryInfo = s.category ? getCategoryDisplay(s.category) : '';
                 return `
                     <div class="session-item">
                         <div class="session-item-header">
                             <div>
-                                <span class="session-date">${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()}</span>
+                                ${categoryInfo ? `<span class="session-category-badge">${categoryInfo}</span>` : ''}
+                                ${s.label ? `<span class="session-name">${s.label}</span>` : ''}
+                                <span class="session-date">${sDate.toLocaleDateString()} ${sDate.toLocaleTimeString()}</span>
                                 <span class="session-duration">${formatDuration(duration)}</span>
                             </div>
                             <span class="session-status completed">
                                 <span class="session-status-dot"></span>
-                                ${s.end_time ? (t['session.ended'] || 'Completed') : (t['widget.session_active'] || 'Active')}
+                                ${s.end_time ? (tr['session.ended'] || 'Completed') : (tr['widget.session_active'] || 'Active')}
                             </span>
                         </div>
                         <div class="session-item-stats">
                             <div class="session-stat">
-                                <span class="session-stat-label">${t['widget.baseline'] || 'Baseline'}</span>
+                                <span class="session-stat-label">${tr['widget.baseline'] || 'Baseline'}</span>
                                 <span class="session-stat-value">${formatNumber(s.baseline_watts, 1)} W</span>
                             </div>
                             <div class="session-stat">
-                                <span class="session-stat-label">${t['history.energy'] || 'Energy'}</span>
+                                <span class="session-stat-label">${tr['history.energy'] || 'Energy'}</span>
                                 <span class="session-stat-value">${formatNumber(s.total_wh, 2)} Wh</span>
                             </div>
                             <div class="session-stat">
-                                <span class="session-stat-label">${t['session.surplus'] || 'Surplus'}</span>
+                                <span class="session-stat-label">${tr['session.surplus'] || 'Surplus'}</span>
                                 <span class="session-stat-value surplus">${formatNumber(s.surplus_wh, 2)} Wh</span>
                             </div>
                             <div class="session-stat">
-                                <span class="session-stat-label">${t['history.cost'] || 'Cost'}</span>
+                                <span class="session-stat-label">${tr['history.cost'] || 'Cost'}</span>
                                 <span class="session-stat-value cost">${state.currencySymbol}${formatNumber(s.surplus_cost, 4)}</span>
                             </div>
                         </div>
@@ -2755,8 +2899,143 @@ async function loadSessionHistory() {
                 `;
             }).join('');
         }
+
+        // Draw histogram
+        renderSessionHistogram(sessions, startDate, endDate);
+
     } catch (error) {
         console.error('Failed to load sessions:', error);
+    }
+}
+
+function getCategoryDisplay(categoryName) {
+    const cat = (state.sessionCategories || []).find(c => c.name === categoryName);
+    return cat ? `${cat.emoji} ${cat.name}` : categoryName;
+}
+
+function getCategoryColor(categoryName) {
+    const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4', '#ec4899', '#84cc16'];
+    const categories = state.sessionCategories || [];
+    const idx = categories.findIndex(c => c.name === categoryName);
+    return colors[idx >= 0 ? idx % colors.length : Math.abs(categoryName.charCodeAt(0)) % colors.length];
+}
+
+function renderSessionHistogram(sessions, startDate, endDate) {
+    const canvas = document.getElementById('session-histogram');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+
+    canvas.width = rect.width - 16;
+    canvas.height = 200;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const labelColor = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)';
+
+    // Generate all days in range
+    const days = [];
+    const d = new Date(startDate);
+    d.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59);
+    while (d <= end) {
+        days.push(new Date(d));
+        d.setDate(d.getDate() + 1);
+    }
+
+    if (days.length === 0) return;
+
+    // Group sessions by day and category
+    const dayData = days.map(day => {
+        const dayStart = day.getTime() / 1000;
+        const dayEnd = dayStart + 86400;
+        const daySessions = sessions.filter(s => s.start_time >= dayStart && s.start_time < dayEnd);
+
+        const categoryHours = {};
+        for (const s of daySessions) {
+            const cat = s.category || t('session.no_category');
+            const duration = (s.end_time || Math.floor(Date.now() / 1000)) - s.start_time;
+            categoryHours[cat] = (categoryHours[cat] || 0) + duration / 3600;
+        }
+        return { date: day, categoryHours, totalHours: Object.values(categoryHours).reduce((a, b) => a + b, 0) };
+    });
+
+    const maxHours = Math.max(...dayData.map(d => d.totalHours), 1);
+    const padding = { top: 10, right: 20, bottom: 30, left: 40 };
+    const width = canvas.width - padding.left - padding.right;
+    const height = canvas.height - padding.top - padding.bottom;
+    const barWidth = Math.max(4, Math.min(40, (width / days.length) - 2));
+    const barGap = (width - barWidth * days.length) / (days.length + 1);
+
+    // Y-axis grid
+    ctx.font = '10px system-ui';
+    ctx.fillStyle = labelColor;
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+
+    const ySteps = Math.min(5, Math.ceil(maxHours));
+    for (let i = 0; i <= ySteps; i++) {
+        const val = (maxHours / ySteps) * i;
+        const y = padding.top + height - (val / maxHours) * height;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + width, y);
+        ctx.stroke();
+        ctx.textAlign = 'right';
+        ctx.fillText(`${val.toFixed(1)}h`, padding.left - 4, y + 3);
+    }
+
+    // Collect unique categories for legend
+    const allCategories = new Set();
+
+    // Draw bars
+    dayData.forEach((day, i) => {
+        const x = padding.left + barGap + i * (barWidth + barGap);
+        let yOffset = 0;
+
+        const sortedCats = Object.entries(day.categoryHours).sort((a, b) => b[1] - a[1]);
+        for (const [cat, hours] of sortedCats) {
+            allCategories.add(cat);
+            const barH = (hours / maxHours) * height;
+            const y = padding.top + height - yOffset - barH;
+
+            ctx.fillStyle = getCategoryColor(cat);
+            ctx.beginPath();
+            // Rounded top corners
+            const r = Math.min(3, barWidth / 2);
+            ctx.moveTo(x, y + barH);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.lineTo(x + barWidth - r, y);
+            ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + r);
+            ctx.lineTo(x + barWidth, y + barH);
+            ctx.fill();
+
+            yOffset += barH;
+        }
+
+        // X-axis label (show every Nth label to avoid crowding)
+        const showLabel = days.length <= 14 || i % Math.ceil(days.length / 14) === 0;
+        if (showLabel) {
+            ctx.fillStyle = labelColor;
+            ctx.textAlign = 'center';
+            const dateStr = `${day.date.getMonth() + 1}/${day.date.getDate()}`;
+            ctx.fillText(dateStr, x + barWidth / 2, canvas.height - 4);
+        }
+    });
+
+    // Render legend
+    const legendEl = document.getElementById('session-legend');
+    if (legendEl) {
+        legendEl.innerHTML = Array.from(allCategories).map(cat => {
+            const display = getCategoryDisplay(cat);
+            return `<span class="legend-item"><span class="legend-swatch" style="background:${getCategoryColor(cat)}"></span>${display}</span>`;
+        }).join('');
     }
 }
 
@@ -3047,6 +3326,8 @@ async function saveSettings() {
                 active_profile: state.config?.advanced?.active_profile || 'default',
                 pinned_processes: state.config?.advanced?.pinned_processes || [],
                 process_list_limit: parseInt(document.getElementById('setting-process-limit').value) || 10,
+                extended_metrics_threshold: state.config?.advanced?.extended_metrics_threshold || 15.0,
+                session_categories: state.sessionCategories || state.config?.advanced?.session_categories || [],
             },
             dashboard: state.dashboardConfig || state.config?.dashboard,
         };
@@ -3068,6 +3349,7 @@ async function saveSettings() {
         restartDashboardUpdates();
         document.documentElement.setAttribute('data-theme', config.general.theme);
         await loadTranslations();
+        renderDashboard();
         showToast(t('settings.saved') || 'Settings saved successfully', 'success');
     } catch (error) {
         console.error('Save settings error:', error);
@@ -3077,6 +3359,75 @@ async function saveSettings() {
 
 function getCurrencySymbol(currency) {
     return { 'EUR': '\u20AC', 'USD': '$', 'GBP': '\u00A3', 'CHF': 'CHF' }[currency] || currency;
+}
+
+// ===== Session Categories =====
+async function loadSessionCategories() {
+    try {
+        state.sessionCategories = await invoke('get_session_categories');
+    } catch (error) {
+        console.error('Failed to load categories:', error);
+        state.sessionCategories = [];
+    }
+}
+
+function setupCategorySettings() {
+    renderCategorySettings();
+
+    const addBtn = document.getElementById('add-category-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', addCategory);
+    }
+}
+
+function renderCategorySettings() {
+    const list = document.getElementById('category-list');
+    if (!list) return;
+
+    const categories = state.sessionCategories || [];
+    list.innerHTML = categories.map(c => `
+        <div class="category-item">
+            <span class="category-emoji">${c.emoji}</span>
+            <span class="category-name">${c.name}</span>
+            <button class="btn btn-icon btn-sm category-delete-btn" data-name="${c.name}" title="${t('settings.categories.delete')}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+    `).join('');
+
+    // Wire up delete buttons
+    list.querySelectorAll('.category-delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => removeCategory(btn.dataset.name));
+    });
+}
+
+async function addCategory() {
+    const emojiInput = document.getElementById('category-emoji-input');
+    const nameInput = document.getElementById('category-name-input');
+    const emoji = emojiInput.value.trim();
+    const name = nameInput.value.trim();
+
+    if (!emoji || !name) return;
+
+    try {
+        state.sessionCategories = await invoke('add_session_category', { category: { emoji, name } });
+        emojiInput.value = '';
+        nameInput.value = '';
+        renderCategorySettings();
+    } catch (error) {
+        console.error('Failed to add category:', error);
+    }
+}
+
+async function removeCategory(name) {
+    try {
+        state.sessionCategories = await invoke('remove_session_category', { name });
+        renderCategorySettings();
+    } catch (error) {
+        console.error('Failed to remove category:', error);
+    }
 }
 
 // ===== Toast Notifications =====

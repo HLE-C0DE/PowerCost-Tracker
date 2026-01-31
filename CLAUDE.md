@@ -84,7 +84,7 @@ cd ui && npm install
 | Linux | Intel RAPL | `/sys/class/powercap/intel-rapl` | High |
 | Linux | hwmon | `/sys/class/hwmon/*/power*_input` | High |
 | Linux | Battery | `/sys/class/power_supply/BAT*/power_now` | Medium |
-| Windows | WMI + sysinfo | COM/WMI APIs | Low (estimation) |
+| Windows | WMI + sysinfo | COM/WMI APIs | Medium (hybrid: real GPU + estimated CPU) |
 | Windows | NVIDIA GPU | `nvidia-smi` | High |
 | Windows | AMD GPU | `rocm-smi` / `amd-smi` | High |
 | Fallback | TDP estimation | CPU detection via sysinfo | Low |
@@ -108,7 +108,7 @@ RAPL requires elevated access. Solutions:
 - udev rule for `/sys/class/powercap/`
 
 ### Windows Limitations
-No direct power sensor API; relies on WMI estimation + external GPU tools when available.
+No direct CPU power sensor API; uses WMI-based CPU estimation combined with real GPU readings (NVML/rocm-smi) when available. With a supported GPU, readings are hybrid (real GPU + estimated CPU) rather than pure estimation.
 
 ## Project Phase Status
 

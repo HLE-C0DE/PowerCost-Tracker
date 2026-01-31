@@ -24,6 +24,8 @@ pub struct DailyStats {
     pub avg_watts: f64,
     pub max_watts: f64,
     pub pricing_mode: Option<String>,
+    #[serde(default)]
+    pub usage_seconds: i64,
 }
 
 /// Power reading database record
@@ -44,6 +46,7 @@ impl Database {
 
         let db = Self { conn };
         db.init_schema()?;
+        db.run_migrations();
 
         Ok(db)
     }
@@ -100,6 +103,20 @@ impl Database {
         )?;
 
         Ok(())
+    }
+
+    /// Run incremental migrations (safe to call multiple times)
+    fn run_migrations(&self) {
+        // Add usage_seconds column to daily_stats
+        let _ = self.conn.execute(
+            "ALTER TABLE daily_stats ADD COLUMN usage_seconds INTEGER DEFAULT 0",
+            [],
+        );
+        // Add category column to sessions
+        let _ = self.conn.execute(
+            "ALTER TABLE sessions ADD COLUMN category TEXT",
+            [],
+        );
     }
 
     /// Insert a power reading
@@ -169,7 +186,7 @@ impl Database {
     /// Get daily statistics for a date range
     pub fn get_daily_stats(&self, start: &str, end: &str) -> Result<Vec<DailyStats>> {
         let mut stmt = self.conn.prepare(
-            "SELECT date, total_wh, total_cost, avg_watts, max_watts, pricing_mode
+            "SELECT date, total_wh, total_cost, avg_watts, max_watts, pricing_mode, COALESCE(usage_seconds, 0)
              FROM daily_stats
              WHERE date >= ?1 AND date <= ?2
              ORDER BY date ASC",
@@ -184,6 +201,7 @@ impl Database {
                     avg_watts: row.get(3)?,
                     max_watts: row.get(4)?,
                     pricing_mode: row.get(5)?,
+                    usage_seconds: row.get(6)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -260,6 +278,7 @@ impl Database {
                     avg_watts,
                     max_watts,
                     pricing_mode: pricing_mode.map(String::from),
+                    usage_seconds: 0,
                 };
 
                 self.upsert_daily_stats(&stats)?;
@@ -299,6 +318,18 @@ impl Database {
         Ok(count)
     }
 
+    /// Add usage seconds for a given date (accumulates)
+    pub fn add_usage_seconds(&self, date: &str, seconds: i64) -> Result<()> {
+        // First ensure the row exists
+        self.conn.execute(
+            "INSERT INTO daily_stats (date, total_wh, total_cost, avg_watts, max_watts, pricing_mode, usage_seconds)
+             VALUES (?1, 0.0, NULL, 0.0, 0.0, NULL, ?2)
+             ON CONFLICT(date) DO UPDATE SET usage_seconds = COALESCE(usage_seconds, 0) + ?2",
+            params![date, seconds],
+        )?;
+        Ok(())
+    }
+
     // ===== Session Management =====
 
     /// Start a new tracking session
@@ -330,7 +361,7 @@ impl Database {
     /// Get a specific session by ID
     pub fn get_session(&self, session_id: i64) -> Result<Option<Session>> {
         let result = self.conn.query_row(
-            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label, category
              FROM sessions WHERE id = ?1",
             params![session_id],
             |row| {
@@ -343,6 +374,7 @@ impl Database {
                     surplus_wh: row.get(5)?,
                     surplus_cost: row.get(6)?,
                     label: row.get(7)?,
+                    category: row.get(8)?,
                 })
             },
         );
@@ -358,10 +390,10 @@ impl Database {
     pub fn get_sessions(&self, limit: Option<u32>) -> Result<Vec<Session>> {
         let query = match limit {
             Some(n) => format!(
-                "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+                "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label, category
                  FROM sessions ORDER BY start_time DESC LIMIT {}", n
             ),
-            None => "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+            None => "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label, category
                      FROM sessions ORDER BY start_time DESC".to_string(),
         };
 
@@ -378,6 +410,7 @@ impl Database {
                     surplus_wh: row.get(5)?,
                     surplus_cost: row.get(6)?,
                     label: row.get(7)?,
+                    category: row.get(8)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -398,7 +431,7 @@ impl Database {
     /// Get the most recent active (unended) session
     pub fn get_active_session(&self) -> Result<Option<Session>> {
         let result = self.conn.query_row(
-            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label
+            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label, category
              FROM sessions WHERE end_time IS NULL ORDER BY start_time DESC LIMIT 1",
             [],
             |row| {
@@ -411,6 +444,7 @@ impl Database {
                     surplus_wh: row.get(5)?,
                     surplus_cost: row.get(6)?,
                     label: row.get(7)?,
+                    category: row.get(8)?,
                 })
             },
         );
@@ -420,6 +454,53 @@ impl Database {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(Error::Database(e)),
         }
+    }
+
+    /// Update session label
+    pub fn update_session_label(&self, session_id: i64, label: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE sessions SET label = ?1 WHERE id = ?2",
+            params![label, session_id],
+        )?;
+        Ok(())
+    }
+
+    /// Update session category
+    pub fn update_session_category(&self, session_id: i64, category: Option<&str>) -> Result<()> {
+        self.conn.execute(
+            "UPDATE sessions SET category = ?1 WHERE id = ?2",
+            params![category, session_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get sessions in a date range (by start_time)
+    pub fn get_sessions_in_range(&self, start_timestamp: i64, end_timestamp: i64) -> Result<Vec<Session>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, start_time, end_time, baseline_watts, total_wh, surplus_wh, surplus_cost, label, category
+             FROM sessions
+             WHERE start_time >= ?1 AND start_time <= ?2
+             ORDER BY start_time ASC",
+        )?;
+
+        let sessions = stmt
+            .query_map(params![start_timestamp, end_timestamp], |row| {
+                Ok(Session {
+                    id: Some(row.get(0)?),
+                    start_time: row.get(1)?,
+                    end_time: row.get(2)?,
+                    baseline_watts: row.get(3)?,
+                    total_wh: row.get(4)?,
+                    surplus_wh: row.get(5)?,
+                    surplus_cost: row.get(6)?,
+                    label: row.get(7)?,
+                    category: row.get(8)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(sessions)
     }
 }
 
@@ -458,6 +539,7 @@ mod tests {
             avg_watts: 62.5,
             max_watts: 150.0,
             pricing_mode: Some("simple".into()),
+            usage_seconds: 0,
         };
 
         db.upsert_daily_stats(&stats).unwrap();

@@ -32,9 +32,9 @@
 
 ## Why PowerCost Tracker?
 
-Running a local LLM like LLaMA or Mistral? Playing games for hours? Training AI models? **Know exactly what it costs.**
+Playing games for hours? Running a local LLM like LLaMA or Mistral? Training AI models? **Know exactly what it costs.**
 
-PowerCost Tracker monitors your PC's power consumption in real-time and calculates electricity costs based on your actual energy rates. No more guessing - see the real cost of your computing activities.
+Finally, a **power monitor that doesn't eat your RAM**. Real-time PC power tracking in under 50MB. Native performance via Rust/Tauri. Optional electricity cost calculation with flexible pricing modes. See what your hardware actually draws — and what it costs you.
 
 <img width="1389" height="458" alt="image" src="https://github.com/user-attachments/assets/b3a0065b-c8cc-410c-b253-08ad884c4bac" />
 <p align="center"><i>Fully customizable dashboard - drag&drop, resize, show/hide widgets</i></p>
@@ -181,7 +181,7 @@ The application auto-detects the best available power source:
 | Linux | Intel RAPL | High | Requires permissions (see below) |
 | Linux | AMD hwmon | High | Native support |
 | Linux | Battery | Medium | For laptops |
-| Windows | WMI + CPU estimation | Medium | Combined with GPU power |
+| Windows | WMI + CPU estimation | Medium–High | High with NVML GPU; estimated CPU |
 | Windows | NVIDIA GPU | High | Via nvidia-smi |
 | Windows | AMD GPU | High | Via rocm-smi / amd-smi |
 | All | TDP estimation | Low | Fallback when no sensors |
@@ -251,7 +251,7 @@ See `config/example.config.toml` for all options including seasonal and tempo pr
 
 ### Why does it show "Estimated" on Windows?
 
-Windows doesn't provide direct access to power sensors like Linux RAPL. The app uses CPU load estimation combined with actual GPU power (if NVIDIA/AMD GPU detected). This is normal and still provides useful relative measurements.
+Windows uses a hybrid approach: real GPU power readings via NVML (NVIDIA) or rocm-smi (AMD), combined with CPU load-based estimation. When a supported GPU is detected, the "Estimated" label is removed and readings are marked as real measurements. The label only appears when no dedicated GPU sensor is available and all values are CPU-estimated.
 
 ### How accurate is the power reading?
 

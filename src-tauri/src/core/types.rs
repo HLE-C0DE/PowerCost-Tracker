@@ -199,6 +199,13 @@ pub struct ProcessMetrics {
     pub is_pinned: bool,
 }
 
+/// Session category for organizing tracking sessions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionCategory {
+    pub emoji: String,
+    pub name: String,
+}
+
 /// Tracking session for baseline/surplus calculation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
@@ -210,6 +217,8 @@ pub struct Session {
     pub surplus_wh: f64,
     pub surplus_cost: f64,
     pub label: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
 }
 
 impl Session {
@@ -223,6 +232,7 @@ impl Session {
             surplus_wh: 0.0,
             surplus_cost: 0.0,
             label,
+            category: None,
         }
     }
 }

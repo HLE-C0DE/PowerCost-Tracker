@@ -252,6 +252,7 @@
                                         <th data-i18n="history.avg">Avg</th>
                                         <th data-i18n="history.peak">Peak</th>
                                         <th data-i18n="history.cost">Cost</th>
+                                        <th data-i18n="history.usage">Usage</th>
                                     </tr>
                                 </thead>
                                 <tbody id="breakdown-table-body">
@@ -270,10 +271,43 @@
 
                 <!-- Session History Tab -->
                 <div class="tab-content" id="session-history">
+                    <!-- Histogram Range Controls -->
+                    <div class="session-range-controls">
+                        <div class="session-range-tabs">
+                            <button class="range-btn active" data-session-range="7" data-i18n="history.7_days">7 Days</button>
+                            <button class="range-btn" data-session-range="30" data-i18n="history.30_days">30 Days</button>
+                            <button class="range-btn" data-session-range="365" data-i18n="history.12_months">12 Months</button>
+                            <button class="range-btn" data-session-range="custom" data-i18n="history.custom">Custom</button>
+                        </div>
+                        <div class="session-range-custom hidden" id="session-range-custom">
+                            <input type="date" id="session-range-start">
+                            <input type="date" id="session-range-end">
+                            <button class="btn btn-sm btn-primary" id="session-range-apply" data-i18n="history.apply">Apply</button>
+                        </div>
+                        <div class="session-range-nav">
+                            <button class="btn btn-icon btn-sm" id="session-nav-prev">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                            </button>
+                            <span id="session-range-label"></span>
+                            <button class="btn btn-icon btn-sm" id="session-nav-next">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Histogram Canvas -->
+                    <div class="session-histogram-container">
+                        <canvas id="session-histogram"></canvas>
+                    </div>
+
+                    <!-- Category Legend -->
+                    <div class="session-legend" id="session-legend"></div>
+
+                    <!-- Session List -->
                     <div class="session-list" id="session-list">
                         <!-- Sessions will be dynamically rendered here -->
                     </div>
-                    <div id="no-sessions" class="empty-state">
+                    <div id="no-sessions" class="empty-state hidden">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="12" cy="12" r="10"/>
                             <polyline points="12 6 12 12 16 14"/>
@@ -488,6 +522,19 @@
                                 <label data-i18n="settings.pricing.tempo.offpeak">Off-peak</label>
                                 <input type="number" id="setting-tempo-red-offpeak" step="0.0001" value="0.16">
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Categories Settings -->
+                    <div class="settings-section">
+                        <h2 data-i18n="settings.categories">Session Categories</h2>
+                        <div class="category-list" id="category-list">
+                            <!-- Categories rendered dynamically -->
+                        </div>
+                        <div class="category-add-row">
+                            <input type="text" id="category-emoji-input" placeholder="Emoji" maxlength="2" class="category-emoji-field">
+                            <input type="text" id="category-name-input" data-i18n-placeholder="settings.categories.name_placeholder" placeholder="Category name" class="category-name-field">
+                            <button class="btn btn-sm btn-secondary" id="add-category-btn" data-i18n="settings.categories.add">Add</button>
                         </div>
                     </div>
 

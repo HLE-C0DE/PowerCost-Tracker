@@ -645,7 +645,7 @@ impl WmiMonitor {
             GpuSource::NvmlNvidia => "sysinfo+nvml",
             GpuSource::Nvidia => "sysinfo+nvidia",
             GpuSource::Amd => "sysinfo+amd",
-            GpuSource::None => "sysinfo-estimated",
+            GpuSource::None => "sysinfo",
         };
 
         let is_estimated = !has_real_reading;
@@ -673,10 +673,10 @@ impl PowerSource for WmiMonitor {
 
     fn name(&self) -> &str {
         match self.gpu_source {
-            GpuSource::NvmlNvidia => "Windows Estimation + NVIDIA (NVML)",
-            GpuSource::Nvidia => "Windows Estimation + NVIDIA",
-            GpuSource::Amd => "Windows Estimation + AMD",
-            GpuSource::None => "Windows Estimation",
+            GpuSource::NvmlNvidia => "Windows Monitor + NVIDIA (NVML)",
+            GpuSource::Nvidia => "Windows Monitor + NVIDIA",
+            GpuSource::Amd => "Windows Monitor + AMD",
+            GpuSource::None => "Windows Monitor (estimated)",
         }
     }
 
