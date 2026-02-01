@@ -2451,7 +2451,11 @@ function handleCriticalUpdate(metrics) {
     if (state.isEditMode) return;
 
     state.criticalMetrics = metrics;
-    state.activeSession = metrics.active_session;
+    // Skip backend session state during grace period after local start/end
+    // to avoid stale cache overwriting the local state
+    if (Date.now() > sessionLocalOverrideUntil) {
+        state.activeSession = metrics.active_session;
+    }
 
     // Build data object compatible with widget renderers
     const data = buildDashboardData();
@@ -2589,7 +2593,9 @@ async function updateCriticalWidgets() {
             const dashboardData = await invoke('get_dashboard_data');
             const sessionStats = await invoke('get_session_stats').catch(() => null);
 
-            state.activeSession = sessionStats;
+            if (Date.now() > sessionLocalOverrideUntil) {
+                state.activeSession = sessionStats;
+            }
 
             const data = {
                 ...dashboardData,
@@ -2827,6 +2833,10 @@ function drawPowerGraph() {
 
 // ===== Session Controls =====
 
+// Grace period: ignore backend session state for 3s after local start/end
+// to prevent stale cached metrics from overwriting local state
+let sessionLocalOverrideUntil = 0;
+
 async function startSession() {
     // Guard: don't start a new session if one is already active
     if (state.activeSession) return;
@@ -2835,6 +2845,7 @@ async function startSession() {
         await invoke('start_tracking_session', { label: null });
         // Fetch fresh session data
         state.activeSession = await invoke('get_session_stats').catch(() => null);
+        sessionLocalOverrideUntil = Date.now() + 3000;
         // Re-render session widget
         refreshSessionWidget();
         showToast(t('session.started'), 'success');
@@ -2848,6 +2859,7 @@ async function endSession() {
     try {
         const session = await invoke('end_tracking_session');
         state.activeSession = null;
+        sessionLocalOverrideUntil = Date.now() + 3000;
         // Re-render session widget
         refreshSessionWidget();
 
@@ -2862,10 +2874,12 @@ async function endSession() {
 
 function refreshSessionWidget() {
     const widgetBody = document.getElementById('widget-body-session_controls');
-    if (widgetBody && state.lastDashboardData) {
-        state.lastDashboardData.activeSession = state.activeSession;
-        widgetBody.innerHTML = WIDGET_REGISTRY.session_controls.render(state.lastDashboardData);
-    }
+    if (!widgetBody) return;
+    // Build data from current state if lastDashboardData isn't available yet
+    const data = state.lastDashboardData ? { ...state.lastDashboardData } : buildDashboardData();
+    data.activeSession = state.activeSession;
+    state.lastDashboardData = data;
+    widgetBody.innerHTML = WIDGET_REGISTRY.session_controls.render(data);
 }
 
 // ===== History =====
