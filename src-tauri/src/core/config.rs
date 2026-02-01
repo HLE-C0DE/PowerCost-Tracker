@@ -132,6 +132,9 @@ pub struct GeneralConfig {
     /// Remember window position and size across launches
     #[serde(default = "default_true")]
     pub remember_window_position: bool,
+    /// Run as administrator on startup (Windows only)
+    #[serde(default)]
+    pub run_as_admin: bool,
     /// Saved window X position
     #[serde(default)]
     pub window_x: Option<f64>,
@@ -162,6 +165,7 @@ impl Default for GeneralConfig {
             start_minimized: false,
             start_with_system: false,
             remember_window_position: true,
+            run_as_admin: false,
             window_x: None,
             window_y: None,
             window_width: None,

@@ -50,6 +50,10 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.start_minimized".into(), "Start Minimized".into());
     t.insert("settings.start_with_system".into(), "Start with System".into());
     t.insert("settings.remember_window_position".into(), "Remember window position and size".into());
+    t.insert("settings.run_as_admin".into(), "Run as Administrator".into());
+    t.insert("settings.run_as_admin.tooltip".into(), "Enables killing protected/system processes. Requires UAC confirmation on startup.".into());
+    t.insert("settings.run_as_admin.elevated".into(), "Elevated".into());
+    t.insert("settings.run_as_admin.not_elevated".into(), "Not elevated".into());
 
     // Settings - Pricing
     t.insert("settings.pricing".into(), "Pricing".into());
@@ -193,6 +197,8 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("processes.pin_failed".into(), "Failed to update pin".into());
     t.insert("processes.killed".into(), "Process killed".into());
     t.insert("processes.kill_failed".into(), "Failed to kill process".into());
+    t.insert("processes.kill_access_denied".into(), "Access denied — process requires elevated privileges".into());
+    t.insert("processes.kill_not_found".into(), "Process not found — it may have already exited".into());
     t.insert("processes.kill_confirm".into(), "Kill process".into());
 
     // Settings - Baseline detection
@@ -226,6 +232,7 @@ pub fn get_translations() -> HashMap<String, String> {
 
     // Tray menu
     t.insert("tray.show".into(), "Show".into());
+    t.insert("tray.restart".into(), "Restart".into());
     t.insert("tray.exit".into(), "Exit".into());
 
     // Widget titles and labels

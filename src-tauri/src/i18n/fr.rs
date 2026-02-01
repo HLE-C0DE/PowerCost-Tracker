@@ -50,6 +50,10 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.start_minimized".into(), "D\u{00E9}marrer minimis\u{00E9}".into());
     t.insert("settings.start_with_system".into(), "D\u{00E9}marrer avec le syst\u{00E8}me".into());
     t.insert("settings.remember_window_position".into(), "M\u{00E9}moriser la position et la taille de la fen\u{00EA}tre".into());
+    t.insert("settings.run_as_admin".into(), "Ex\u{00E9}cuter en tant qu'administrateur".into());
+    t.insert("settings.run_as_admin.tooltip".into(), "Permet d'arr\u{00EA}ter les processus prot\u{00E9}g\u{00E9}s/syst\u{00E8}me. N\u{00E9}cessite une confirmation UAC au d\u{00E9}marrage.".into());
+    t.insert("settings.run_as_admin.elevated".into(), "\u{00C9}lev\u{00E9}".into());
+    t.insert("settings.run_as_admin.not_elevated".into(), "Non \u{00E9}lev\u{00E9}".into());
 
     // Settings - Pricing
     t.insert("settings.pricing".into(), "Tarification".into());
@@ -193,6 +197,8 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("processes.pin_failed".into(), "Échec de la mise à jour de l'épingle".into());
     t.insert("processes.killed".into(), "Processus arrêté".into());
     t.insert("processes.kill_failed".into(), "Échec de l'arrêt du processus".into());
+    t.insert("processes.kill_access_denied".into(), "Accès refusé — le processus nécessite des privilèges élevés".into());
+    t.insert("processes.kill_not_found".into(), "Processus introuvable — il a peut-être déjà été fermé".into());
     t.insert("processes.kill_confirm".into(), "Arrêter le processus".into());
 
     // Settings - Baseline detection
@@ -226,6 +232,7 @@ pub fn get_translations() -> HashMap<String, String> {
 
     // Tray menu
     t.insert("tray.show".into(), "Afficher".into());
+    t.insert("tray.restart".into(), "Redémarrer".into());
     t.insert("tray.exit".into(), "Quitter".into());
 
     // Widget titles and labels

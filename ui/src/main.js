@@ -958,7 +958,14 @@ function setupProcessModal() {
                 await refreshProcessModalList();
             } catch (error) {
                 console.error('Failed to kill process:', error);
-                showToast(`${t('processes.kill_failed')}: ${name}`, 'error');
+                const msg = String(error);
+                if (msg.includes('ACCESS_DENIED')) {
+                    showToast(`${t('processes.kill_access_denied')} (${name})`, 'error');
+                } else if (msg.includes('NOT_FOUND')) {
+                    showToast(`${t('processes.kill_not_found')} (${name})`, 'warning');
+                } else {
+                    showToast(`${t('processes.kill_failed')}: ${name}`, 'error');
+                }
             }
         }
     });
@@ -1206,7 +1213,14 @@ async function handleDashboardClick(e) {
             }
         } catch (error) {
             console.error('Failed to kill process:', error);
-            showToast(`${t('processes.kill_failed')}: ${name}`, 'error');
+            const msg = String(error);
+            if (msg.includes('ACCESS_DENIED')) {
+                showToast(`${t('processes.kill_access_denied')} (${name})`, 'error');
+            } else if (msg.includes('NOT_FOUND')) {
+                showToast(`${t('processes.kill_not_found')} (${name})`, 'warning');
+            } else {
+                showToast(`${t('processes.kill_failed')}: ${name}`, 'error');
+            }
         }
     }
 }
@@ -3662,6 +3676,23 @@ function setupSettings() {
     document.getElementById('setting-baseline-auto').addEventListener('change', (e) => {
         document.getElementById('manual-baseline-row').style.display = e.target.checked ? 'none' : 'flex';
     });
+
+    // Show run-as-admin setting on Windows only and display elevation status
+    const platform = navigator.userAgent || '';
+    const isWindows = platform.includes('Windows') || platform.includes('Win');
+    if (isWindows) {
+        document.getElementById('run-as-admin-row').style.display = 'flex';
+        invoke('is_elevated').then(elevated => {
+            const statusEl = document.getElementById('elevation-status');
+            if (elevated) {
+                statusEl.textContent = t('settings.run_as_admin.elevated') || 'Elevated';
+                statusEl.style.color = 'var(--color-success, #4caf50)';
+            } else {
+                statusEl.textContent = t('settings.run_as_admin.not_elevated') || 'Not elevated';
+                statusEl.style.color = 'var(--color-warning, #ff9800)';
+            }
+        }).catch(() => {});
+    }
 }
 
 function applyConfig(config) {
@@ -3673,6 +3704,7 @@ function applyConfig(config) {
     document.getElementById('setting-start-minimized').checked = config.general.start_minimized || false;
     document.getElementById('setting-start-with-system').checked = config.general.start_with_system || false;
     document.getElementById('setting-remember-window-position').checked = config.general.remember_window_position !== false;
+    document.getElementById('setting-run-as-admin').checked = config.general.run_as_admin || false;
 
     document.getElementById('setting-baseline-auto').checked = config.advanced.baseline_auto;
     document.getElementById('setting-baseline-watts').value = config.advanced.baseline_watts;
@@ -3737,6 +3769,7 @@ async function saveSettings() {
                 start_minimized: document.getElementById('setting-start-minimized').checked,
                 start_with_system: newStartWithSystem,
                 remember_window_position: document.getElementById('setting-remember-window-position').checked,
+                run_as_admin: document.getElementById('setting-run-as-admin').checked,
                 window_x: state.config?.general?.window_x ?? null,
                 window_y: state.config?.general?.window_y ?? null,
                 window_width: state.config?.general?.window_width ?? null,
@@ -3800,6 +3833,10 @@ async function saveSettings() {
             }
         }
 
+        // If run_as_admin was toggled on and not currently elevated, relaunch
+        const oldRunAsAdmin = state.config?.general?.run_as_admin || false;
+        const newRunAsAdmin = config.general.run_as_admin;
+
         state.config = config;
         state.currencySymbol = config.pricing.currency_symbol;
         restartDashboardUpdates();
@@ -3807,6 +3844,17 @@ async function saveSettings() {
         await loadTranslations();
         renderDashboard();
         showToast(t('settings.saved') || 'Settings saved successfully', 'success');
+
+        if (newRunAsAdmin && !oldRunAsAdmin) {
+            try {
+                const elevated = await invoke('is_elevated');
+                if (!elevated) {
+                    await invoke('relaunch_elevated');
+                }
+            } catch (e) {
+                console.error('Relaunch elevated failed:', e);
+            }
+        }
     } catch (error) {
         console.error('Save settings error:', error);
         showToast(t('error.save_failed') || 'Failed to save settings', 'error');

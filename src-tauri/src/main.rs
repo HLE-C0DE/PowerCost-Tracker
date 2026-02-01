@@ -7,6 +7,7 @@
 
 mod core;
 mod db;
+mod elevation;
 mod hardware;
 mod i18n;
 mod pricing;
@@ -324,9 +325,11 @@ async fn kill_process(name: String) -> Result<(), String> {
     let mut sys = sysinfo::System::new();
     sys.refresh_processes();
 
+    let mut found = false;
     let mut killed = false;
     for (_pid, process) in sys.processes() {
         if process.name().eq_ignore_ascii_case(&name) {
+            found = true;
             if process.kill() {
                 killed = true;
             }
@@ -335,8 +338,10 @@ async fn kill_process(name: String) -> Result<(), String> {
 
     if killed {
         Ok(())
+    } else if found {
+        Err(format!("ACCESS_DENIED:{}", name))
     } else {
-        Err(format!("Could not kill process: {}", name))
+        Err(format!("NOT_FOUND:{}", name))
     }
 }
 
@@ -634,6 +639,23 @@ async fn get_detailed_metrics(state: tauri::State<'_, TauriState>) -> Result<Opt
     Ok(cache.clone())
 }
 
+// ===== Elevation commands =====
+
+/// Check if the app is running with elevated (admin) privileges
+#[tauri::command]
+fn is_elevated() -> bool {
+    elevation::is_elevated()
+}
+
+/// Relaunch the app with elevated privileges, then exit
+#[tauri::command]
+fn relaunch_elevated() -> bool {
+    if elevation::relaunch_elevated() {
+        std::process::exit(0);
+    }
+    false
+}
+
 // ===== Layout Profile Commands =====
 
 /// Get all saved layout profiles
@@ -709,6 +731,16 @@ fn main() {
         log::warn!("Failed to load config, using defaults: {}", e);
         Config::default()
     });
+
+    // Auto-relaunch elevated if configured (Windows only)
+    if config.general.run_as_admin && !elevation::is_elevated() {
+        log::info!("Run as admin is enabled but not elevated, requesting elevation...");
+        if elevation::relaunch_elevated() {
+            log::info!("Elevated process launched, exiting current instance");
+            std::process::exit(0);
+        }
+        log::warn!("UAC was denied or elevation failed, continuing without elevation");
+    }
 
     // Initialize database
     let db = Database::new().unwrap_or_else(|e| {
@@ -812,6 +844,9 @@ fn main() {
             remove_session_category,
             get_sessions_in_range,
             delete_session,
+            // Elevation commands
+            is_elevated,
+            relaunch_elevated,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -875,10 +910,13 @@ fn main() {
                 log::info!("Started minimized - main window stays hidden");
             }
 
-            // Create tray menu
-            let quit_item = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
-            let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            // Create tray menu with translated labels
+            let i18n = tauri::async_runtime::block_on(state.i18n.lock());
+            let quit_item = MenuItem::with_id(app, "quit", i18n.get("tray.exit"), true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", i18n.get("tray.show"), true, None::<&str>)?;
+            let restart_item = MenuItem::with_id(app, "restart", i18n.get("tray.restart"), true, None::<&str>)?;
+            drop(i18n);
+            let menu = Menu::with_items(app, &[&show_item, &restart_item, &quit_item])?;
 
             // Build tray icon with menu
             let _tray = TrayIconBuilder::new()
@@ -897,6 +935,10 @@ fn main() {
                                 let _ = window.set_focus();
                                 log::info!("Window shown from tray menu");
                             }
+                        }
+                        "restart" => {
+                            log::info!("Restart requested from tray menu");
+                            tauri::process::restart(&app.env());
                         }
                         _ => {}
                     }
