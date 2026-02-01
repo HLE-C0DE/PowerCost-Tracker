@@ -23,6 +23,7 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+*.lnk
 
 # Build outputs
 *.exe
