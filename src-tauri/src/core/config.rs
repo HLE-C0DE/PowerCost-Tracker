@@ -473,22 +473,22 @@ fn default_global_display() -> String { "normal".to_string() }
 fn default_dashboard_widgets() -> Vec<DashboardWidget> {
     vec![
         // Row 1-3: CPU, GPU, RAM radials + Processes list
-        DashboardWidget { id: "cpu".to_string(), visible: true, size: "small".to_string(), position: 7, col: 1, row: 1, col_span: 1, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
-        DashboardWidget { id: "gpu".to_string(), visible: true, size: "small".to_string(), position: 8, col: 2, row: 1, col_span: 1, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
-        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9, col: 3, row: 1, col_span: 1, row_span: 2, display_mode: "radial".to_string(), show_wh: true },
-        DashboardWidget { id: "processes".to_string(), visible: true, size: "large".to_string(), position: 11, col: 4, row: 1, col_span: 2, row_span: 3, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "cpu".to_string(), visible: true, size: "small".to_string(), position: 7, col: 1, row: 1, col_span: 2, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
+        DashboardWidget { id: "gpu".to_string(), visible: true, size: "small".to_string(), position: 8, col: 3, row: 1, col_span: 2, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
+        DashboardWidget { id: "ram".to_string(), visible: true, size: "small".to_string(), position: 9, col: 5, row: 1, col_span: 2, row_span: 2, display_mode: "radial".to_string(), show_wh: true },
+        DashboardWidget { id: "processes".to_string(), visible: true, size: "large".to_string(), position: 11, col: 7, row: 1, col_span: 4, row_span: 3, display_mode: "text".to_string(), show_wh: true },
         // Row 3: Surplus
-        DashboardWidget { id: "surplus".to_string(), visible: true, size: "small".to_string(), position: 10, col: 3, row: 3, col_span: 1, row_span: 2, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "surplus".to_string(), visible: true, size: "small".to_string(), position: 10, col: 5, row: 3, col_span: 2, row_span: 2, display_mode: "text".to_string(), show_wh: true },
         // Row 4-6: Power widget + stats grid
-        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 4, col_span: 2, row_span: 3, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2, col: 4, row: 4, col_span: 1, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6, col: 5, row: 4, col_span: 1, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1, col: 4, row: 5, col_span: 1, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4, col: 5, row: 5, col_span: 1, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5, col: 4, row: 6, col_span: 1, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3, col: 5, row: 6, col_span: 1, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 4, col_span: 4, row_span: 3, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 2, col: 7, row: 4, col_span: 2, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 6, col: 9, row: 4, col_span: 2, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 1, col: 7, row: 5, col_span: 2, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "small".to_string(), position: 4, col: 9, row: 5, col_span: 2, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "small".to_string(), position: 5, col: 7, row: 6, col_span: 2, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 3, col: 9, row: 6, col_span: 2, row_span: 1, display_mode: "text".to_string(), show_wh: true },
         // Row 5-6: Session controls
-        DashboardWidget { id: "session_controls".to_string(), visible: true, size: "small".to_string(), position: 12, col: 3, row: 5, col_span: 1, row_span: 2, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "session_controls".to_string(), visible: true, size: "small".to_string(), position: 12, col: 5, row: 5, col_span: 2, row_span: 2, display_mode: "text".to_string(), show_wh: true },
     ]
 }
 
@@ -540,6 +540,6 @@ pub struct DashboardWidget {
 fn default_widget_size_small() -> String { "small".to_string() }
 fn default_col() -> u32 { 1 }
 fn default_row() -> u32 { 1 }
-fn default_col_span() -> u32 { 1 }
+fn default_col_span() -> u32 { 2 }
 fn default_row_span() -> u32 { 1 }
 fn default_display_mode() -> String { "text".to_string() }

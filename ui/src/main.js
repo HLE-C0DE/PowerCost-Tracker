@@ -18,7 +18,7 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.current_power_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
         defaultSize: 'large',
-        defaultColSpan: 2,
+        defaultColSpan: 4,
         defaultRowSpan: 2,  // Needs height for chart
         render: (data) => `
             <div class="widget-value power-value">${formatNumber(data.power_watts, 1)}<span class="unit">W</span></div>
@@ -97,7 +97,7 @@ const WIDGET_REGISTRY = {
         titleKey: 'widget.cpu',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
         defaultSize: 'medium',
-        defaultColSpan: 2,
+        defaultColSpan: 4,
         defaultRowSpan: 2,  // Needs height for chart/radial modes
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
@@ -219,7 +219,7 @@ const WIDGET_REGISTRY = {
         titleKey: 'widget.gpu',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>`,
         defaultSize: 'medium',
-        defaultColSpan: 2,
+        defaultColSpan: 4,
         defaultRowSpan: 2,  // Needs height for chart/radial modes
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
@@ -326,7 +326,7 @@ const WIDGET_REGISTRY = {
         titleKey: 'widget.ram',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="10" y1="2" x2="10" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="18" y1="2" x2="18" y2="6"/></svg>`,
         defaultSize: 'large',
-        defaultColSpan: 2,
+        defaultColSpan: 4,
         defaultRowSpan: 2,
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
@@ -497,7 +497,7 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'widget.processes_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
         defaultSize: 'large',
-        defaultColSpan: 2,
+        defaultColSpan: 4,
         defaultRowSpan: 3,  // Needs height for process list
         render: (data) => {
             const processes = data.topProcesses;
@@ -559,9 +559,9 @@ function getWidgetTitle(widgetId, widgetConfig) {
 
     // Check if widget is 1×1 and has a short title
     if (widgetConfig && widget.shortTitleKey) {
-        const colSpan = widgetConfig.col_span || 1;
+        const colSpan = widgetConfig.col_span || 2;
         const rowSpan = widgetConfig.row_span || 1;
-        if (colSpan === 1 && rowSpan === 1) {
+        if (colSpan <= 2 && rowSpan === 1) {
             const shortTitle = t(widget.shortTitleKey);
             if (shortTitle) return shortTitle;
         }
@@ -620,7 +620,7 @@ const state = {
     draggedWidget: null,
     draggedWidgetId: null,
     dragOffset: { x: 0, y: 0 },
-    gridCols: 6,
+    gridCols: 12,
     cellHeight: 100,  // Match CSS grid-auto-rows: 100px
     gridGap: 16,     // Match CSS gap: var(--spacing-md) = 1rem = 16px
     resizing: false,
@@ -1218,14 +1218,16 @@ function migrateDashboardConfig() {
     for (const widget of sorted) {
         // Get default spans from widget registry, falling back to size-based logic
         const widgetDef = WIDGET_REGISTRY[widget.id];
-        let colSpan = widgetDef?.defaultColSpan || 1;
+        let colSpan = widgetDef?.defaultColSpan || 2;
         let rowSpan = widgetDef?.defaultRowSpan || 1;
 
         // Override with size if no defaults in registry
         if (!widgetDef?.defaultColSpan && !widgetDef?.defaultRowSpan) {
             if (widget.size === 'large') {
-                colSpan = 2; rowSpan = 2;
+                colSpan = 4; rowSpan = 2;
             } else if (widget.size === 'medium') {
+                colSpan = 4; rowSpan = 1;
+            } else {
                 colSpan = 2; rowSpan = 1;
             }
         }
@@ -1277,7 +1279,7 @@ function renderDashboard() {
         // Apply grid positioning
         const col = widgetConfig.col || 1;
         const row = widgetConfig.row || 1;
-        const colSpan = widgetConfig.col_span || 1;
+        const colSpan = widgetConfig.col_span || 2;
         const rowSpan = widgetConfig.row_span || 1;
 
         card.style.gridColumn = `${col} / span ${colSpan}`;
@@ -1285,9 +1287,9 @@ function renderDashboard() {
 
         // Add size class for adaptive styling based on area
         const area = colSpan * rowSpan;
-        if (area <= 1) card.classList.add('widget-1x1');
-        else if (area <= 2) card.classList.add('widget-2cell');
-        else if (area <= 4) card.classList.add('widget-4cell');
+        if (area <= 2) card.classList.add('widget-1x1');
+        else if (area <= 4) card.classList.add('widget-2cell');
+        else if (area <= 8) card.classList.add('widget-4cell');
 
         // Add edit mode class if active
         if (state.isEditMode) {
@@ -1384,7 +1386,7 @@ function toggleEditMode() {
 }
 
 function enterEditMode() {
-    if (getActualGridCols() < 6) {
+    if (getActualGridCols() < 12) {
         showToast(t('dashboard.expand_to_edit'), 'warning');
         return;
     }
@@ -1512,9 +1514,9 @@ function toggleWidgetVisibility(widgetId, visible) {
 function getActualGridCols() {
     const width = window.innerWidth;
     if (width <= 768) return 1;
-    if (width <= 900) return 2;
-    if (width <= 1200) return 4;
-    return 6;
+    if (width <= 900) return 4;
+    if (width <= 1200) return 8;
+    return 12;
 }
 
 // Calculate cell dimensions accounting for CSS grid gaps and scroll position
@@ -1591,7 +1593,7 @@ function handleGlobalMouseMove(e) {
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.draggedWidgetId);
     if (!widget) return;
 
-    const colSpan = Math.min(widget.col_span || 1, cols);  // Clamp span to available columns
+    const colSpan = Math.min(widget.col_span || 2, cols);  // Clamp span to available columns
     const rowSpan = widget.row_span || 1;
 
     // Clamp to grid bounds
@@ -1625,7 +1627,7 @@ function handleGlobalMouseUp(e) {
     // Get widget config
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.draggedWidgetId);
     if (widget) {
-        const colSpan = Math.min(widget.col_span || 1, cols);  // Clamp span to available columns
+        const colSpan = Math.min(widget.col_span || 2, cols);  // Clamp span to available columns
         widget.col = Math.min(targetCol, cols - colSpan + 1);
         widget.row = Math.max(1, targetRow);
 
@@ -1692,14 +1694,14 @@ function resolveCollisions(movedWidget) {
     }
 
     // Phase 2: Find primary overlap (closest center to moved widget's center)
-    const movedCenterCol = (movedWidget.col || 1) + (movedWidget.col_span || 1) / 2;
+    const movedCenterCol = (movedWidget.col || 1) + (movedWidget.col_span || 2) / 2;
     const movedCenterRow = (movedWidget.row || 1) + (movedWidget.row_span || 1) / 2;
 
     let primaryOverlap = null;
     let minDistance = Infinity;
 
     for (const widget of overlapping) {
-        const widgetCenterCol = (widget.col || 1) + (widget.col_span || 1) / 2;
+        const widgetCenterCol = (widget.col || 1) + (widget.col_span || 2) / 2;
         const widgetCenterRow = (widget.row || 1) + (widget.row_span || 1) / 2;
         const distance = Math.abs(movedCenterCol - widgetCenterCol) + Math.abs(movedCenterRow - widgetCenterRow);
 
@@ -1716,7 +1718,7 @@ function resolveCollisions(movedWidget) {
         // Check if the swapped widget can fit at the original position
         const origCol = dragOriginalPosition.col;
         const origRow = dragOriginalPosition.row;
-        const widgetColSpan = primaryOverlap.col_span || 1;
+        const widgetColSpan = primaryOverlap.col_span || 2;
 
         // Ensure swap position is within grid bounds
         const clampedCol = Math.min(origCol, cols - widgetColSpan + 1);
@@ -1757,7 +1759,7 @@ function resolveCollisions(movedWidget) {
 // Check if a widget can fit at the given position without overlapping others
 function canFitAtPosition(widget, col, row, excludeIds) {
     const cols = getActualGridCols();
-    const colSpan = widget.col_span || 1;
+    const colSpan = widget.col_span || 2;
     const rowSpan = widget.row_span || 1;
 
     // Check grid bounds
@@ -1801,7 +1803,7 @@ function verifyNoCollisions() {
 // Uses column-load balancing to avoid left-side pile-up
 function findEmptySpot(widget, excludeWidget) {
     const cols = getActualGridCols();
-    const colSpan = Math.min(widget.col_span || 1, cols);
+    const colSpan = Math.min(widget.col_span || 2, cols);
     const rowSpan = widget.row_span || 1;
 
     // Normalize excludeWidget to an array
@@ -1853,7 +1855,7 @@ function getColumnLoad(placedWidgets, startCol, colSpan, totalCols) {
     let load = 0;
     for (const w of placedWidgets) {
         const wCol = w.col || 1;
-        const wColSpan = w.col_span || 1;
+        const wColSpan = w.col_span || 2;
         const wRowSpan = w.row_span || 1;
         // Check if the widget's column band overlaps with [startCol, startCol+colSpan)
         if (wCol < startCol + colSpan && wCol + wColSpan > startCol) {
@@ -1873,7 +1875,7 @@ function compactGrid() {
     const placed = [];
 
     for (const widget of widgets) {
-        const colSpan = Math.min(widget.col_span || 1, cols);
+        const colSpan = Math.min(widget.col_span || 2, cols);
         const rowSpan = widget.row_span || 1;
         let bestPos = null;
         let bestScore = Infinity;
@@ -1923,7 +1925,7 @@ function reflowDashboardGrid() {
     if (newCols === lastGridCols) return;
     lastGridCols = newCols;
 
-    if (newCols >= 6 && state.canonicalWidgets) {
+    if (newCols >= 12 && state.canonicalWidgets) {
         // Returning to full width: restore canonical layout verbatim
         state.dashboardConfig.widgets = JSON.parse(JSON.stringify(state.canonicalWidgets));
     } else if (state.canonicalWidgets) {
@@ -1931,11 +1933,11 @@ function reflowDashboardGrid() {
         state.dashboardConfig.widgets = JSON.parse(JSON.stringify(state.canonicalWidgets));
         const widgets = state.dashboardConfig.widgets.filter(w => w.visible);
         for (const widget of widgets) {
-            if ((widget.col_span || 1) > newCols) {
+            if ((widget.col_span || 2) > newCols) {
                 widget.col_span = newCols;
             }
-            if ((widget.col || 1) + (widget.col_span || 1) - 1 > newCols) {
-                widget.col = Math.max(1, newCols - (widget.col_span || 1) + 1);
+            if ((widget.col || 1) + (widget.col_span || 2) - 1 > newCols) {
+                widget.col = Math.max(1, newCols - (widget.col_span || 2) + 1);
             }
         }
         compactGrid();
@@ -1946,9 +1948,9 @@ function reflowDashboardGrid() {
 
 function widgetsOverlap(a, b) {
     const aCol = a.col || 1, aRow = a.row || 1;
-    const aColSpan = a.col_span || 1, aRowSpan = a.row_span || 1;
+    const aColSpan = a.col_span || 2, aRowSpan = a.row_span || 1;
     const bCol = b.col || 1, bRow = b.row || 1;
-    const bColSpan = b.col_span || 1, bRowSpan = b.row_span || 1;
+    const bColSpan = b.col_span || 2, bRowSpan = b.row_span || 1;
 
     // Check if rectangles overlap
     const aLeft = aCol, aRight = aCol + aColSpan;
@@ -1967,7 +1969,7 @@ function startResize(e, widgetId) {
 
     const widget = state.dashboardConfig.widgets.find(w => w.id === widgetId);
     state.resizeStartSpan = {
-        col: widget.col_span || 1,
+        col: widget.col_span || 2,
         row: widget.row_span || 1
     };
 
@@ -1994,7 +1996,7 @@ function handleResize(e) {
     if (!widget) return;
 
     // Calculate new spans (min 1, max 4 for cols, max 5 for rows)
-    const newColSpan = Math.max(1, Math.min(4, state.resizeStartSpan.col + colDelta));
+    const newColSpan = Math.max(1, Math.min(8, state.resizeStartSpan.col + colDelta));
     const newRowSpan = Math.max(1, Math.min(5, state.resizeStartSpan.row + rowDelta));
 
     // Ensure widget doesn't exceed grid bounds
@@ -2003,9 +2005,9 @@ function handleResize(e) {
     widget.row_span = newRowSpan;
 
     // Update legacy size field for backwards compat
-    if (widget.col_span >= 2 && widget.row_span >= 2) {
+    if (widget.col_span >= 4 && widget.row_span >= 2) {
         widget.size = 'large';
-    } else if (widget.col_span >= 2) {
+    } else if (widget.col_span >= 4) {
         widget.size = 'medium';
     } else {
         widget.size = 'small';
@@ -2059,7 +2061,7 @@ function handleDragEnd(e) {
 async function saveDashboardConfigQuiet() {
     try {
         // If viewport is narrower than 6 cols, save the canonical layout instead of reflowed state
-        const configToSave = (getActualGridCols() < 6 && state.canonicalWidgets)
+        const configToSave = (getActualGridCols() < 12 && state.canonicalWidgets)
             ? { ...state.dashboardConfig, widgets: state.canonicalWidgets }
             : state.dashboardConfig;
         await invoke('save_dashboard_config', { dashboard: configToSave });
@@ -2085,10 +2087,10 @@ function openEditModal() {
 
         // Determine current size from spans
         let currentSize = 'small';
-        const colSpan = widgetConfig.col_span || 1;
+        const colSpan = widgetConfig.col_span || 2;
         const rowSpan = widgetConfig.row_span || 1;
-        if (colSpan >= 2 && rowSpan >= 2) currentSize = 'large';
-        else if (colSpan >= 2) currentSize = 'medium';
+        if (colSpan >= 4 && rowSpan >= 2) currentSize = 'large';
+        else if (colSpan >= 4) currentSize = 'medium';
 
         const item = document.createElement('div');
         item.className = 'widget-toggle-item';
@@ -2154,13 +2156,13 @@ async function saveDashboardConfig() {
 
             // Update spans based on size
             if (newSize === 'large') {
-                widget.col_span = 2;
+                widget.col_span = 4;
                 widget.row_span = 2;
             } else if (newSize === 'medium') {
-                widget.col_span = 2;
+                widget.col_span = 4;
                 widget.row_span = 1;
             } else {
-                widget.col_span = 1;
+                widget.col_span = 2;
                 widget.row_span = 1;
             }
         }
@@ -2295,14 +2297,16 @@ function forceGridMigration() {
     for (const widget of sorted) {
         // Get default spans from widget registry, falling back to size-based logic
         const widgetDef = WIDGET_REGISTRY[widget.id];
-        let colSpan = widgetDef?.defaultColSpan || 1;
+        let colSpan = widgetDef?.defaultColSpan || 2;
         let rowSpan = widgetDef?.defaultRowSpan || 1;
 
         // Override with size if no defaults in registry
         if (!widgetDef?.defaultColSpan && !widgetDef?.defaultRowSpan) {
             if (widget.size === 'large') {
-                colSpan = 2; rowSpan = 2;
+                colSpan = 4; rowSpan = 2;
             } else if (widget.size === 'medium') {
+                colSpan = 4; rowSpan = 1;
+            } else {
                 colSpan = 2; rowSpan = 1;
             }
         }
