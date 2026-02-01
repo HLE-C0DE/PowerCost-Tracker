@@ -64,6 +64,9 @@ impl Config {
         // Merge missing widgets from defaults
         config.merge_missing_widgets();
 
+        // Ensure the "Default" profile always exists
+        config.ensure_default_profile();
+
         Ok(config)
     }
 
@@ -92,6 +95,19 @@ impl Config {
 
                 self.dashboard.widgets.push(new_widget);
             }
+        }
+    }
+
+    /// Ensure a "Default" profile exists with the hardcoded default widget layout.
+    /// This profile is created once and never deleted by the user.
+    fn ensure_default_profile(&mut self) {
+        const DEFAULT_PROFILE_NAME: &str = "Default";
+        if !self.dashboard.profiles.iter().any(|p| p.name == DEFAULT_PROFILE_NAME) {
+            self.dashboard.profiles.insert(0, LayoutProfile {
+                name: DEFAULT_PROFILE_NAME.to_string(),
+                widgets: default_dashboard_widgets(),
+                global_display: default_global_display(),
+            });
         }
     }
 
@@ -508,7 +524,11 @@ impl Default for DashboardConfig {
             global_display: default_global_display(),
             widgets: default_dashboard_widgets(),
             active_profile: String::new(),
-            profiles: Vec::new(),
+            profiles: vec![LayoutProfile {
+                name: "Default".to_string(),
+                widgets: default_dashboard_widgets(),
+                global_display: default_global_display(),
+            }],
         }
     }
 }

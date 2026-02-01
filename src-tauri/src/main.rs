@@ -709,6 +709,9 @@ async fn load_layout_profile(state: tauri::State<'_, TauriState>, name: String) 
 /// Delete a named profile
 #[tauri::command]
 async fn delete_layout_profile(state: tauri::State<'_, TauriState>, name: String) -> Result<Vec<LayoutProfile>, String> {
+    if name == "Default" {
+        return Err("Cannot delete the Default profile".to_string());
+    }
     let mut config = state.config.lock().await;
     config.dashboard.profiles.retain(|p| p.name != name);
 

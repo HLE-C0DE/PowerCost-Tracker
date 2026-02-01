@@ -929,6 +929,13 @@ function setupDashboard() {
         } else {
             state.activeProfileName = '';
         }
+        // Update delete button state
+        const deleteBtn = document.getElementById('delete-profile-btn');
+        if (deleteBtn) {
+            const isDefault = name === 'Default';
+            deleteBtn.disabled = isDefault || !name;
+            deleteBtn.style.opacity = (isDefault || !name) ? '0.4' : '1';
+        }
     });
     document.getElementById('save-profile-btn').addEventListener('click', () => {
         const name = prompt(t('dashboard.profile_name_prompt'), state.activeProfileName || '');
@@ -939,7 +946,7 @@ function setupDashboard() {
     document.getElementById('delete-profile-btn').addEventListener('click', () => {
         const select = document.getElementById('profile-selector');
         const name = select.value;
-        if (name) {
+        if (name && name !== 'Default') {
             deleteLayoutProfile(name);
         }
     });
@@ -1593,10 +1600,17 @@ function toggleVisibilityPanel() {
 }
 
 async function fixLayout() {
-    forceGridMigration();
-    await saveDashboardConfigQuiet();
-    renderDashboard();
-    showToast(t('dashboard.default_applied'), 'success');
+    try {
+        const updatedConfig = await invoke('load_layout_profile', { name: 'Default' });
+        state.dashboardConfig = updatedConfig;
+        state.activeProfileName = 'Default';
+        snapshotCanonicalLayout();
+        renderDashboard();
+        renderProfileSelector();
+        showToast(t('dashboard.default_applied'), 'success');
+    } catch (error) {
+        console.error('Failed to load default profile:', error);
+    }
 }
 
 function renderVisibilityPanel() {
@@ -2493,6 +2507,14 @@ function renderProfileSelector() {
             option.selected = true;
         }
         select.appendChild(option);
+    }
+
+    // Disable delete button when "Default" profile is selected
+    const deleteBtn = document.getElementById('delete-profile-btn');
+    if (deleteBtn) {
+        const isDefault = select.value === 'Default';
+        deleteBtn.disabled = isDefault || !select.value;
+        deleteBtn.style.opacity = (isDefault || !select.value) ? '0.4' : '1';
     }
 }
 
