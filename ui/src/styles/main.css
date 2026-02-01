@@ -36,7 +36,7 @@
     --transition-normal: 250ms ease;
 
     /* Sidebar width */
-    --sidebar-width: 200px;
+    --sidebar-width: 230px;
 }
 
 /* Light theme */
@@ -194,6 +194,9 @@ body {
 .nav-link span {
     transition: opacity var(--transition-normal), width var(--transition-normal);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .nav-link svg {
