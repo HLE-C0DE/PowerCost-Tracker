@@ -632,6 +632,33 @@
                         </div>
                     </div>
 
+                    <!-- Updates -->
+                    <div class="settings-section">
+                        <h2 data-i18n="settings.updates">Updates</h2>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.updates.current_version">Current version</label>
+                            <span id="current-version"></span>
+                        </div>
+
+                        <div class="setting-row">
+                            <label data-i18n="settings.updates.check_at_startup">Check for updates at startup</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="setting-check-updates-startup">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <button id="check-updates-btn" class="btn btn-secondary" data-i18n="settings.updates.check_now">Check for Updates</button>
+                        </div>
+
+                        <div id="update-result" class="setting-row hidden" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                            <span id="update-result-text"></span>
+                            <a id="update-download-link" class="btn btn-primary btn-sm hidden" target="_blank" data-i18n="settings.updates.download">Download</a>
+                        </div>
+                    </div>
+
                     <!-- Save Button -->
                     <div class="settings-actions">
                         <button id="save-settings" class="btn btn-primary" data-i18n="action.save">Save</button>

@@ -135,6 +135,9 @@ pub struct GeneralConfig {
     /// Run as administrator on startup (Windows only)
     #[serde(default)]
     pub run_as_admin: bool,
+    /// Check for updates at startup
+    #[serde(default)]
+    pub check_updates_at_startup: bool,
     /// Saved window X position
     #[serde(default)]
     pub window_x: Option<f64>,
@@ -166,6 +169,7 @@ impl Default for GeneralConfig {
             start_with_system: false,
             remember_window_position: true,
             run_as_admin: false,
+            check_updates_at_startup: false,
             window_x: None,
             window_y: None,
             window_width: None,
@@ -477,22 +481,23 @@ fn default_global_display() -> String { "normal".to_string() }
 fn default_dashboard_widgets() -> Vec<DashboardWidget> {
     vec![
         // Row 1-3: CPU, GPU, RAM radials (4x3 each, fills 12 cols)
-        DashboardWidget { id: "cpu".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 1, col_span: 4, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
-        DashboardWidget { id: "gpu".to_string(), visible: true, size: "large".to_string(), position: 1, col: 5, row: 1, col_span: 4, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
-        DashboardWidget { id: "ram".to_string(), visible: true, size: "large".to_string(), position: 2, col: 9, row: 1, col_span: 4, row_span: 3, display_mode: "radial".to_string(), show_wh: true },
+        DashboardWidget { id: "cpu".to_string(), visible: true, size: "large".to_string(), position: 0, col: 1, row: 1, col_span: 4, row_span: 3, display_mode: "radial".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "gpu".to_string(), visible: true, size: "large".to_string(), position: 1, col: 5, row: 1, col_span: 4, row_span: 3, display_mode: "radial".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "ram".to_string(), visible: true, size: "large".to_string(), position: 2, col: 9, row: 1, col_span: 4, row_span: 3, display_mode: "radial".to_string(), show_wh: true, ..Default::default() },
         // Row 4-6: Power, Processes, Surplus + Session Controls
-        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 3, col: 1, row: 4, col_span: 4, row_span: 3, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "processes".to_string(), visible: true, size: "large".to_string(), position: 4, col: 5, row: 4, col_span: 4, row_span: 3, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 5, col: 9, row: 4, col_span: 4, row_span: 2, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "session_controls".to_string(), visible: true, size: "small".to_string(), position: 6, col: 9, row: 6, col_span: 4, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "power".to_string(), visible: true, size: "large".to_string(), position: 3, col: 1, row: 4, col_span: 4, row_span: 3, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "processes".to_string(), visible: true, size: "large".to_string(), position: 4, col: 5, row: 4, col_span: 4, row_span: 3, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "surplus".to_string(), visible: true, size: "medium".to_string(), position: 5, col: 9, row: 4, col_span: 4, row_span: 2, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "session_controls".to_string(), visible: true, size: "small".to_string(), position: 6, col: 9, row: 6, col_span: 4, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
         // Row 7: Session stats + Hourly estimate (3x1 each, fills 12 cols)
-        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 7, col: 1, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 8, col: 4, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 9, col: 7, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 10, col: 10, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "session_energy".to_string(), visible: true, size: "small".to_string(), position: 7, col: 1, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "session_cost".to_string(), visible: true, size: "small".to_string(), position: 8, col: 4, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "session_duration".to_string(), visible: true, size: "small".to_string(), position: 9, col: 7, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "hourly_estimate".to_string(), visible: true, size: "small".to_string(), position: 10, col: 10, row: 7, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
         // Row 8: Daily + Monthly estimates (6x1 each, fills 12 cols)
-        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "medium".to_string(), position: 11, col: 1, row: 8, col_span: 6, row_span: 1, display_mode: "text".to_string(), show_wh: true },
-        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "medium".to_string(), position: 12, col: 7, row: 8, col_span: 6, row_span: 1, display_mode: "text".to_string(), show_wh: true },
+        DashboardWidget { id: "daily_estimate".to_string(), visible: true, size: "medium".to_string(), position: 11, col: 1, row: 8, col_span: 6, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "monthly_estimate".to_string(), visible: true, size: "medium".to_string(), position: 12, col: 7, row: 8, col_span: 6, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
+        DashboardWidget { id: "datetime".to_string(), visible: false, size: "small".to_string(), position: 13, col: 1, row: 9, col_span: 3, row_span: 1, display_mode: "text".to_string(), show_wh: true, ..Default::default() },
     ]
 }
 
@@ -539,8 +544,52 @@ pub struct DashboardWidget {
     /// Whether to show Wh line in estimation widgets (default true)
     #[serde(default = "default_true")]
     pub show_wh: bool,
+    /// Date format for datetime widget: "DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD", "D MMM YYYY"
+    #[serde(default = "default_date_format")]
+    pub date_format: String,
+    /// Time format for datetime widget: "24h" or "12h"
+    #[serde(default = "default_time_format")]
+    pub time_format: String,
+    /// Whether to show date in datetime widget
+    #[serde(default = "default_true")]
+    pub show_date: bool,
+    /// Whether to show time in datetime widget
+    #[serde(default = "default_true")]
+    pub show_time: bool,
+    /// Whether to show seconds in datetime widget
+    #[serde(default)]
+    pub show_seconds: bool,
+    /// Locale for datetime widget: "auto", "en", "fr"
+    #[serde(default = "default_widget_locale")]
+    pub widget_locale: String,
 }
 
+impl Default for DashboardWidget {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            visible: false,
+            size: default_widget_size_small(),
+            position: 0,
+            col: default_col(),
+            row: default_row(),
+            col_span: default_col_span(),
+            row_span: default_row_span(),
+            display_mode: default_display_mode(),
+            show_wh: true,
+            date_format: default_date_format(),
+            time_format: default_time_format(),
+            show_date: true,
+            show_time: true,
+            show_seconds: false,
+            widget_locale: default_widget_locale(),
+        }
+    }
+}
+
+fn default_date_format() -> String { "DD/MM/YYYY".to_string() }
+fn default_time_format() -> String { "24h".to_string() }
+fn default_widget_locale() -> String { "auto".to_string() }
 fn default_widget_size_small() -> String { "small".to_string() }
 fn default_col() -> u32 { 1 }
 fn default_row() -> u32 { 1 }

@@ -580,6 +580,73 @@ const WIDGET_REGISTRY = {
             `;
         },
     },
+    datetime: {
+        id: 'datetime',
+        titleKey: 'widget.datetime',
+        shortTitleKey: 'widget.datetime_short',
+        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+        defaultSize: 'small',
+        defaultColSpan: 3,
+        defaultRowSpan: 1,
+        minColSpan: 2,
+        minRowSpan: 1,
+        hasCustomSettings: true,
+        render: (data, displayMode, widgetConfig) => {
+            const cfg = widgetConfig || {};
+            const showDate = cfg.show_date !== false;
+            const showTime = cfg.show_time !== false;
+            const dateFormat = cfg.date_format || 'DD/MM/YYYY';
+            const timeFormat = cfg.time_format || '24h';
+            const showSeconds = cfg.show_seconds || false;
+            const widgetLocale = cfg.widget_locale || 'auto';
+
+            const locale = widgetLocale === 'auto'
+                ? (state.config?.general?.language === 'fr' ? 'fr' : 'en')
+                : widgetLocale;
+
+            const now = new Date();
+
+            let dateStr = '';
+            if (showDate) {
+                const day = now.getDate();
+                const month = now.getMonth();
+                const year = now.getFullYear();
+                const pad = n => String(n).padStart(2, '0');
+                if (dateFormat === 'MM/DD/YYYY') {
+                    dateStr = `${pad(month + 1)}/${pad(day)}/${year}`;
+                } else if (dateFormat === 'YYYY-MM-DD') {
+                    dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+                } else if (dateFormat === 'D MMM YYYY') {
+                    const monthNames = locale === 'fr'
+                        ? ['jan.', 'f\u00e9v.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'ao\u00fbt', 'sept.', 'oct.', 'nov.', 'd\u00e9c.']
+                        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    dateStr = `${day} ${monthNames[month]} ${year}`;
+                } else {
+                    dateStr = `${pad(day)}/${pad(month + 1)}/${year}`;
+                }
+            }
+
+            let timeStr = '';
+            if (showTime) {
+                const hour12 = timeFormat === '12h';
+                const opts = { hour: '2-digit', minute: '2-digit', hour12 };
+                if (showSeconds) opts.second = '2-digit';
+                const intlLocale = locale === 'fr' ? 'fr-FR' : 'en-US';
+                timeStr = new Intl.DateTimeFormat(intlLocale, opts).format(now);
+            }
+
+            if (!showDate && !showTime) {
+                return `<div class="datetime-widget"><span class="datetime-time">--:--</span></div>`;
+            }
+
+            return `
+                <div class="datetime-widget">
+                    ${showDate ? `<span class="datetime-date">${dateStr}</span>` : ''}
+                    ${showTime ? `<span class="datetime-time">${timeStr}</span>` : ''}
+                </div>
+            `;
+        },
+    },
 };
 
 // Helper function to get widget title from translations
@@ -727,6 +794,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Legacy power-update listener (for backwards compat)
         await listen('power-update', (event) => {
             updatePowerDisplay(event.payload);
+        });
+
+        // Listen for update-available event from startup check
+        await listen('update-available', (event) => {
+            const result = event.payload;
+            showToast(`${t('settings.updates.available')}: v${result.latest_version}`, 'info');
         });
 
     } catch (error) {
@@ -1587,6 +1660,72 @@ function renderVisibilityPanel() {
                     }
                 }
             });
+        }
+
+        // Custom settings panel for datetime widget
+        if (widgetDef.hasCustomSettings && widgetConfig.id === 'datetime') {
+            const settingsDiv = document.createElement('div');
+            settingsDiv.className = 'datetime-settings';
+            settingsDiv.innerHTML = `
+                <div class="datetime-settings-row">
+                    <label>${t('widget.datetime.show_date')}</label>
+                    <label class="toggle"><input type="checkbox" class="dt-show-date" ${widgetConfig.show_date !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                </div>
+                <div class="datetime-settings-row">
+                    <label>${t('widget.datetime.show_time')}</label>
+                    <label class="toggle"><input type="checkbox" class="dt-show-time" ${widgetConfig.show_time !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                </div>
+                <div class="datetime-settings-row">
+                    <label>${t('widget.datetime.date_format')}</label>
+                    <select class="dt-date-format">
+                        <option value="DD/MM/YYYY" ${(widgetConfig.date_format || 'DD/MM/YYYY') === 'DD/MM/YYYY' ? 'selected' : ''}>DD/MM/YYYY</option>
+                        <option value="MM/DD/YYYY" ${widgetConfig.date_format === 'MM/DD/YYYY' ? 'selected' : ''}>MM/DD/YYYY</option>
+                        <option value="YYYY-MM-DD" ${widgetConfig.date_format === 'YYYY-MM-DD' ? 'selected' : ''}>YYYY-MM-DD</option>
+                        <option value="D MMM YYYY" ${widgetConfig.date_format === 'D MMM YYYY' ? 'selected' : ''}>D MMM YYYY</option>
+                    </select>
+                </div>
+                <div class="datetime-settings-row">
+                    <label>${t('widget.datetime.time_format')}</label>
+                    <select class="dt-time-format">
+                        <option value="24h" ${(widgetConfig.time_format || '24h') === '24h' ? 'selected' : ''}>${t('widget.datetime.format_24h')}</option>
+                        <option value="12h" ${widgetConfig.time_format === '12h' ? 'selected' : ''}>${t('widget.datetime.format_12h')}</option>
+                    </select>
+                </div>
+                <div class="datetime-settings-row">
+                    <label>${t('widget.datetime.show_seconds')}</label>
+                    <label class="toggle"><input type="checkbox" class="dt-show-seconds" ${widgetConfig.show_seconds ? 'checked' : ''}><span class="toggle-slider"></span></label>
+                </div>
+                <div class="datetime-settings-row">
+                    <label>${t('widget.datetime.locale')}</label>
+                    <select class="dt-locale">
+                        <option value="auto" ${(widgetConfig.widget_locale || 'auto') === 'auto' ? 'selected' : ''}>${t('widget.datetime.locale_auto')}</option>
+                        <option value="en" ${widgetConfig.widget_locale === 'en' ? 'selected' : ''}>EN</option>
+                        <option value="fr" ${widgetConfig.widget_locale === 'fr' ? 'selected' : ''}>FR</option>
+                    </select>
+                </div>
+            `;
+
+            const updateDatetime = () => {
+                const wc = state.dashboardConfig.widgets.find(w => w.id === 'datetime');
+                if (!wc) return;
+                wc.show_date = settingsDiv.querySelector('.dt-show-date').checked;
+                wc.show_time = settingsDiv.querySelector('.dt-show-time').checked;
+                wc.date_format = settingsDiv.querySelector('.dt-date-format').value;
+                wc.time_format = settingsDiv.querySelector('.dt-time-format').value;
+                wc.show_seconds = settingsDiv.querySelector('.dt-show-seconds').checked;
+                wc.widget_locale = settingsDiv.querySelector('.dt-locale').value;
+                saveDashboardConfigQuiet();
+                const body = document.getElementById('widget-body-datetime');
+                if (body) {
+                    body.innerHTML = WIDGET_REGISTRY.datetime.render(state.lastDashboardData || {}, null, wc);
+                }
+            };
+
+            settingsDiv.querySelectorAll('input, select').forEach(el => {
+                el.addEventListener('change', updateDatetime);
+            });
+
+            item.appendChild(settingsDiv);
         }
 
         list.appendChild(item);
@@ -3723,6 +3862,45 @@ function setupSettings() {
         document.getElementById('manual-baseline-row').style.display = e.target.checked ? 'none' : 'flex';
     });
 
+    // Check for updates button
+    document.getElementById('check-updates-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('check-updates-btn');
+        const resultDiv = document.getElementById('update-result');
+        const resultText = document.getElementById('update-result-text');
+        const downloadLink = document.getElementById('update-download-link');
+
+        btn.disabled = true;
+        btn.textContent = t('settings.updates.checking') || 'Checking...';
+        resultDiv.classList.add('hidden');
+        downloadLink.classList.add('hidden');
+
+        try {
+            const result = await invoke('check_for_updates');
+            resultDiv.classList.remove('hidden');
+
+            if (result.update_available) {
+                resultText.textContent = `${t('settings.updates.available')}: v${result.latest_version}`;
+                resultText.style.color = 'var(--color-warning, #ff9800)';
+                downloadLink.classList.remove('hidden');
+                downloadLink.onclick = (e) => {
+                    e.preventDefault();
+                    invoke('open_url', { url: result.release_url });
+                };
+            } else {
+                resultText.textContent = `${t('settings.updates.up_to_date')} (v${result.current_version})`;
+                resultText.style.color = 'var(--color-success, #4caf50)';
+            }
+        } catch (error) {
+            console.error('Update check error:', error);
+            resultDiv.classList.remove('hidden');
+            resultText.textContent = t('settings.updates.error') || 'Failed to check for updates';
+            resultText.style.color = 'var(--color-error, #f44336)';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = t('settings.updates.check_now') || 'Check for Updates';
+        }
+    });
+
     // Show run-as-admin setting on Windows only and display elevation status
     const platform = navigator.userAgent || '';
     const isWindows = platform.includes('Windows') || platform.includes('Win');
@@ -3751,6 +3929,10 @@ function applyConfig(config) {
     document.getElementById('setting-start-with-system').checked = config.general.start_with_system || false;
     document.getElementById('setting-remember-window-position').checked = config.general.remember_window_position !== false;
     document.getElementById('setting-run-as-admin').checked = config.general.run_as_admin || false;
+    document.getElementById('setting-check-updates-startup').checked = config.general.check_updates_at_startup || false;
+    invoke('get_app_version').then(v => {
+        document.getElementById('current-version').textContent = 'v' + v;
+    }).catch(() => {});
 
     document.getElementById('setting-baseline-auto').checked = config.advanced.baseline_auto;
     document.getElementById('setting-baseline-watts').value = config.advanced.baseline_watts;
@@ -3816,6 +3998,7 @@ async function saveSettings() {
                 start_with_system: newStartWithSystem,
                 remember_window_position: document.getElementById('setting-remember-window-position').checked,
                 run_as_admin: document.getElementById('setting-run-as-admin').checked,
+                check_updates_at_startup: document.getElementById('setting-check-updates-startup').checked,
                 window_x: state.config?.general?.window_x ?? null,
                 window_y: state.config?.general?.window_y ?? null,
                 window_width: state.config?.general?.window_width ?? null,

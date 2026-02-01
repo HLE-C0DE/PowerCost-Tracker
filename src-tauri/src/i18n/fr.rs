@@ -310,6 +310,30 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.categories.delete".into(), "Supprimer".into());
     t.insert("settings.categories.name_placeholder".into(), "Nom de cat\u{00E9}gorie".into());
 
+    // Settings - Updates
+    t.insert("settings.updates".into(), "Mises \u{00E0} jour".into());
+    t.insert("settings.updates.check_at_startup".into(), "V\u{00E9}rifier les mises \u{00E0} jour au d\u{00E9}marrage".into());
+    t.insert("settings.updates.check_now".into(), "V\u{00E9}rifier les mises \u{00E0} jour".into());
+    t.insert("settings.updates.checking".into(), "V\u{00E9}rification...".into());
+    t.insert("settings.updates.up_to_date".into(), "Vous \u{00EA}tes \u{00E0} jour !".into());
+    t.insert("settings.updates.available".into(), "Mise \u{00E0} jour disponible".into());
+    t.insert("settings.updates.download".into(), "T\u{00E9}l\u{00E9}charger".into());
+    t.insert("settings.updates.error".into(), "\u{00C9}chec de la v\u{00E9}rification des mises \u{00E0} jour".into());
+    t.insert("settings.updates.current_version".into(), "Version actuelle".into());
+
+    // DateTime widget
+    t.insert("widget.datetime".into(), "Date & Heure".into());
+    t.insert("widget.datetime_short".into(), "Horloge".into());
+    t.insert("widget.datetime.show_date".into(), "Afficher la date".into());
+    t.insert("widget.datetime.show_time".into(), "Afficher l'heure".into());
+    t.insert("widget.datetime.date_format".into(), "Format de date".into());
+    t.insert("widget.datetime.time_format".into(), "Format d'heure".into());
+    t.insert("widget.datetime.show_seconds".into(), "Afficher les secondes".into());
+    t.insert("widget.datetime.locale".into(), "Langue du widget".into());
+    t.insert("widget.datetime.locale_auto".into(), "Auto".into());
+    t.insert("widget.datetime.format_12h".into(), "12h".into());
+    t.insert("widget.datetime.format_24h".into(), "24h".into());
+
     // History - Session histogram
     t.insert("history.usage".into(), "Utilisation".into());
     t.insert("history.7_days".into(), "7 jours".into());

@@ -310,6 +310,30 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("settings.categories.delete".into(), "Delete".into());
     t.insert("settings.categories.name_placeholder".into(), "Category name".into());
 
+    // Settings - Updates
+    t.insert("settings.updates".into(), "Updates".into());
+    t.insert("settings.updates.check_at_startup".into(), "Check for updates at startup".into());
+    t.insert("settings.updates.check_now".into(), "Check for Updates".into());
+    t.insert("settings.updates.checking".into(), "Checking...".into());
+    t.insert("settings.updates.up_to_date".into(), "You're up to date!".into());
+    t.insert("settings.updates.available".into(), "Update available".into());
+    t.insert("settings.updates.download".into(), "Download".into());
+    t.insert("settings.updates.error".into(), "Failed to check for updates".into());
+    t.insert("settings.updates.current_version".into(), "Current version".into());
+
+    // DateTime widget
+    t.insert("widget.datetime".into(), "Date & Time".into());
+    t.insert("widget.datetime_short".into(), "Clock".into());
+    t.insert("widget.datetime.show_date".into(), "Show Date".into());
+    t.insert("widget.datetime.show_time".into(), "Show Time".into());
+    t.insert("widget.datetime.date_format".into(), "Date Format".into());
+    t.insert("widget.datetime.time_format".into(), "Time Format".into());
+    t.insert("widget.datetime.show_seconds".into(), "Show Seconds".into());
+    t.insert("widget.datetime.locale".into(), "Widget Language".into());
+    t.insert("widget.datetime.locale_auto".into(), "Auto".into());
+    t.insert("widget.datetime.format_12h".into(), "12h".into());
+    t.insert("widget.datetime.format_24h".into(), "24h".into());
+
     // History - Session histogram
     t.insert("history.usage".into(), "Usage".into());
     t.insert("history.7_days".into(), "7 Days".into());

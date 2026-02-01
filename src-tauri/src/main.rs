@@ -19,6 +19,7 @@ use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_opener::OpenerExt;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tokio::sync::Mutex;
@@ -720,6 +721,80 @@ async fn delete_layout_profile(state: tauri::State<'_, TauriState>, name: String
     Ok(config.dashboard.profiles.clone())
 }
 
+// ===== Update Check =====
+
+#[derive(serde::Serialize, Clone)]
+struct UpdateCheckResult {
+    update_available: bool,
+    current_version: String,
+    latest_version: String,
+    release_url: String,
+    release_notes: String,
+}
+
+/// Compare two semver strings, returns true if `latest` is newer than `current`
+fn version_is_newer(current: &str, latest: &str) -> bool {
+    let parse = |v: &str| -> (u64, u64, u64) {
+        let v = v.trim_start_matches('v');
+        let parts: Vec<u64> = v.split('.').filter_map(|p| p.parse().ok()).collect();
+        (
+            parts.first().copied().unwrap_or(0),
+            parts.get(1).copied().unwrap_or(0),
+            parts.get(2).copied().unwrap_or(0),
+        )
+    };
+    parse(latest) > parse(current)
+}
+
+#[tauri::command]
+async fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    app.opener().open_url(&url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
+async fn check_for_updates() -> Result<UpdateCheckResult, String> {
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+
+    let client = reqwest::Client::builder()
+        .user_agent(format!("PowerCost-Tracker/{}", current_version))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let resp = client
+        .get("https://api.github.com/repos/HLE-C0DE/PowerCost-Tracker/releases/latest")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch releases: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("GitHub API returned status {}", resp.status()));
+    }
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let tag = json["tag_name"].as_str().unwrap_or("").to_string();
+    let release_url = json["html_url"].as_str().unwrap_or("").to_string();
+    let release_notes = json["body"].as_str().unwrap_or("").to_string();
+
+    let update_available = version_is_newer(&current_version, &tag);
+
+    Ok(UpdateCheckResult {
+        update_available,
+        current_version,
+        latest_version: tag.trim_start_matches('v').to_string(),
+        release_url,
+        release_notes,
+    })
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -785,6 +860,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -847,6 +923,10 @@ fn main() {
             // Elevation commands
             is_elevated,
             relaunch_elevated,
+            // Update check
+            get_app_version,
+            check_for_updates,
+            open_url,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -953,6 +1033,29 @@ fn main() {
                     }
                 })
                 .build(app)?;
+
+            // Check for updates at startup if enabled
+            {
+                let check_updates = {
+                    let config = tauri::async_runtime::block_on(state.config.lock());
+                    config.general.check_updates_at_startup
+                };
+                if check_updates {
+                    let app_handle_updates = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        // Delay to avoid slowing down startup
+                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                        match check_for_updates().await {
+                            Ok(result) if result.update_available => {
+                                let _ = app_handle_updates.emit("update-available", result);
+                                log::info!("Update available, notified frontend");
+                            }
+                            Ok(_) => log::info!("App is up to date"),
+                            Err(e) => log::warn!("Startup update check failed: {}", e),
+                        }
+                    });
+                }
+            }
 
             // Start critical monitoring loop (fast rate: power, CPU%, GPU%, cost)
             let app_handle_critical = app_handle.clone();
