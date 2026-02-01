@@ -20,6 +20,8 @@ const WIDGET_REGISTRY = {
         defaultSize: 'large',
         defaultColSpan: 4,
         defaultRowSpan: 2,  // Needs height for chart
+        minColSpan: 3,
+        minRowSpan: 2,
         render: (data) => `
             <div class="widget-value power-value">${formatNumber(data.power_watts, 1)}<span class="unit">W</span></div>
             <div class="power-graph"><canvas id="power-chart"></canvas></div>
@@ -31,6 +33,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.session_energy_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data) => {
             const energyWh = data.cumulative_wh;
             const display = energyWh >= 1000 ? `${formatNumber(energyWh / 1000, 2)} kWh` : `${formatNumber(energyWh, 1)} Wh`;
@@ -43,6 +47,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.session_cost_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
         defaultSize: 'small',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data) => `<div class="widget-value small cost-value">${state.currencySymbol}${formatNumber(data.current_cost, 4)}</div>`,
     },
     hourly_estimate: {
@@ -51,6 +57,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.hourly_estimate_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12"/></svg>`,
         defaultSize: 'small',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data, displayMode, widgetConfig) => renderEstimationWidget(data, widgetConfig, {
             costValue: data.hourly_cost_estimate,
             costDecimals: 4,
@@ -64,6 +72,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.daily_estimate_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
         defaultSize: 'small',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data, displayMode, widgetConfig) => renderEstimationWidget(data, widgetConfig, {
             costValue: data.daily_cost_estimate,
             costDecimals: 2,
@@ -77,6 +87,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.monthly_estimate_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>`,
         defaultSize: 'small',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data, displayMode, widgetConfig) => renderEstimationWidget(data, widgetConfig, {
             costValue: data.monthly_cost_estimate,
             costDecimals: 2,
@@ -90,6 +102,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'dashboard.session_duration_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
         defaultSize: 'small',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data) => `<div class="widget-value small">${formatDuration(data.session_duration_secs)}</div>`,
     },
     cpu: {
@@ -99,6 +113,8 @@ const WIDGET_REGISTRY = {
         defaultSize: 'medium',
         defaultColSpan: 3,
         defaultRowSpan: 3,  // Needs height for chart/radial modes
+        minColSpan: 2,
+        minRowSpan: 2,
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const cpu = data.systemMetrics?.cpu;
@@ -221,6 +237,8 @@ const WIDGET_REGISTRY = {
         defaultSize: 'medium',
         defaultColSpan: 3,
         defaultRowSpan: 3,  // Needs height for chart/radial modes
+        minColSpan: 2,
+        minRowSpan: 2,
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const gpu = data.systemMetrics?.gpu;
@@ -328,6 +346,8 @@ const WIDGET_REGISTRY = {
         defaultSize: 'large',
         defaultColSpan: 3,
         defaultRowSpan: 3,
+        minColSpan: 2,
+        minRowSpan: 2,
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const mem = data.systemMetrics?.memory;
@@ -411,6 +431,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'widget.surplus_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
         defaultSize: 'medium',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data) => {
             const session = data.activeSession;
             if (!session) return `
@@ -444,6 +466,8 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'widget.session_controls_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
         defaultSize: 'medium',
+        minColSpan: 2,
+        minRowSpan: 1,
         render: (data) => {
             const session = data.activeSession;
             const elapsed = session ? Math.floor(Date.now() / 1000) - session.start_time : 0;
@@ -499,6 +523,8 @@ const WIDGET_REGISTRY = {
         defaultSize: 'large',
         defaultColSpan: 3,
         defaultRowSpan: 3,  // Needs height for process list
+        minColSpan: 3,
+        minRowSpan: 2,
         render: (data) => {
             const processes = data.topProcesses;
             const advancedMode = state.processAdvancedMode || false;
@@ -2064,9 +2090,14 @@ function handleResize(e) {
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.resizeWidgetId);
     if (!widget) return;
 
-    // Calculate new spans (min 1, max 4 for cols, max 5 for rows)
-    const newColSpan = Math.max(1, Math.min(8, state.resizeStartSpan.col + colDelta));
-    const newRowSpan = Math.max(1, Math.min(5, state.resizeStartSpan.row + rowDelta));
+    // Per-widget minimum sizes from registry
+    const registry = WIDGET_REGISTRY[widget.id];
+    const minCol = (registry && registry.minColSpan) || 2;
+    const minRow = (registry && registry.minRowSpan) || 1;
+
+    // Calculate new spans with per-widget minimums
+    const newColSpan = Math.max(minCol, Math.min(8, state.resizeStartSpan.col + colDelta));
+    const newRowSpan = Math.max(minRow, Math.min(5, state.resizeStartSpan.row + rowDelta));
 
     // Ensure widget doesn't exceed grid bounds
     const maxColSpan = cols - (widget.col || 1) + 1;
@@ -2088,11 +2119,12 @@ function handleResize(e) {
 function endResize() {
     if (!state.resizing) return;
 
-    // Resolve any collisions caused by resize
+    // Resolve any collisions caused by resize, then compact to fill gaps
     const widget = state.dashboardConfig.widgets.find(w => w.id === state.resizeWidgetId);
     if (widget) {
         resolveCollisions(widget);
     }
+    compactGrid();
 
     state.resizing = false;
     state.resizeWidgetId = null;
