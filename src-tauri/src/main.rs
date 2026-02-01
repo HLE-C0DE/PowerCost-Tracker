@@ -18,7 +18,7 @@ use crate::hardware::{BaselineDetector, PowerMonitor};
 use crate::i18n::I18n;
 use crate::pricing::PricingEngine;
 use std::sync::Arc;
-use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -949,24 +949,23 @@ fn main() {
                 )
             };
 
-            // Restore saved window position and size
+            // Restore saved window position and size (all in physical pixels)
             if remember_pos {
                 if let Some(main_window) = app.get_webview_window("main") {
                     if let (Some(w), Some(h)) = (win_w, win_h) {
                         let _ = main_window.set_size(LogicalSize::new(w, h));
                     }
                     if let (Some(x), Some(y)) = (win_x, win_y) {
-                        // Verify position is within available screen area
+                        // Verify position is within available screen area (physical coords)
                         let is_visible = main_window.available_monitors().ok()
                             .map(|monitors| {
                                 monitors.iter().any(|m| {
                                     let pos = m.position();
                                     let size = m.size();
-                                    let scale = m.scale_factor();
-                                    let mx = pos.x as f64 / scale;
-                                    let my = pos.y as f64 / scale;
-                                    let mw = size.width as f64 / scale;
-                                    let mh = size.height as f64 / scale;
+                                    let mx = pos.x as f64;
+                                    let my = pos.y as f64;
+                                    let mw = size.width as f64;
+                                    let mh = size.height as f64;
                                     // Check if at least part of the window is visible on this monitor
                                     x < mx + mw && x + win_w.unwrap_or(900.0) > mx &&
                                     y < my + mh && y + win_h.unwrap_or(600.0) > my
@@ -975,7 +974,7 @@ fn main() {
                             .unwrap_or(false);
 
                         if is_visible {
-                            let _ = main_window.set_position(LogicalPosition::new(x, y));
+                            let _ = main_window.set_position(PhysicalPosition::new(x as i32, y as i32));
                             log::info!("Restored window position: ({}, {})", x, y);
                         } else {
                             log::info!("Saved window position ({}, {}) is off-screen, using default", x, y);
@@ -1119,11 +1118,13 @@ async fn save_window_geometry(app: &tauri::AppHandle, window: &tauri::Window) {
 
     let scale = window.scale_factor().unwrap_or(1.0);
 
+    // Position: save in physical pixels (virtual desktop coordinates)
     if let Ok(pos) = window.outer_position() {
-        config.general.window_x = Some(pos.x as f64 / scale);
-        config.general.window_y = Some(pos.y as f64 / scale);
+        config.general.window_x = Some(pos.x as f64);
+        config.general.window_y = Some(pos.y as f64);
     }
 
+    // Size: save in logical pixels (consistent across DPI)
     if let Ok(size) = window.outer_size() {
         config.general.window_width = Some(size.width as f64 / scale);
         config.general.window_height = Some(size.height as f64 / scale);
