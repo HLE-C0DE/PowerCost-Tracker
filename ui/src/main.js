@@ -3630,16 +3630,20 @@ function renderSessionHistogram(sessions, startDate, endDate) {
         const daySessions = sessions.filter(s => s.start_time >= dayStart && s.start_time < dayEnd);
 
         const categoryHours = {};
+        let totalCost = 0;
         for (const s of daySessions) {
             const cat = s.category || t('session.no_category');
             const duration = (s.end_time || Math.floor(Date.now() / 1000)) - s.start_time;
             categoryHours[cat] = (categoryHours[cat] || 0) + duration / 3600;
+            totalCost += (s.surplus_cost || 0);
         }
-        return { date: day, categoryHours, totalHours: Object.values(categoryHours).reduce((a, b) => a + b, 0) };
+        return { date: day, categoryHours, totalHours: Object.values(categoryHours).reduce((a, b) => a + b, 0), totalCost };
     });
 
     const maxHours = Math.max(...dayData.map(d => d.totalHours), 1);
-    const padding = { top: 10, right: 20, bottom: 30, left: 40 };
+    const hasCostData = dayData.some(d => d.totalCost > 0);
+    const rightPad = hasCostData ? 60 : 20;
+    const padding = { top: 10, right: rightPad, bottom: 30, left: 40 };
     const width = logicalWidth - padding.left - padding.right;
     const height = logicalHeight - padding.top - padding.bottom;
     const barWidth = Math.max(4, Math.min(40, (width / days.length) - 2));
@@ -3701,6 +3705,44 @@ function renderSessionHistogram(sessions, startDate, endDate) {
             ctx.fillText(dateStr, x + barWidth / 2, logicalHeight - 4);
         }
     });
+
+    // Right Y-axis labels (cost) if cost data exists
+    if (hasCostData) {
+        const maxCost = Math.max(...dayData.map(d => d.totalCost)) * 1.1 || 1;
+
+        for (let i = 0; i <= ySteps; i++) {
+            const val = (maxCost / ySteps) * (ySteps - i);
+            const y = padding.top + (height / ySteps) * i;
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.6)';
+            ctx.font = '10px system-ui';
+            ctx.textAlign = 'left';
+            ctx.fillText(state.currencySymbol + formatNumber(val, 2), padding.left + width + 8, y + 3);
+        }
+
+        // Cost line overlay
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+
+        dayData.forEach((day, i) => {
+            const x = padding.left + barGap + i * (barWidth + barGap) + barWidth / 2;
+            const costY = padding.top + height - (day.totalCost / maxCost) * height;
+            if (i === 0) ctx.moveTo(x, costY);
+            else ctx.lineTo(x, costY);
+        });
+        ctx.stroke();
+
+        // Cost dots
+        dayData.forEach((day, i) => {
+            const x = padding.left + barGap + i * (barWidth + barGap) + barWidth / 2;
+            const costY = padding.top + height - (day.totalCost / maxCost) * height;
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.arc(x, costY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
 
 }
 
