@@ -46,7 +46,7 @@ impl Database {
 
         let db = Self { conn };
         db.init_schema()?;
-        db.run_migrations();
+        db.run_migrations()?;
 
         Ok(db)
     }
@@ -82,7 +82,8 @@ impl Database {
                 total_cost REAL,
                 avg_watts REAL,
                 max_watts REAL,
-                pricing_mode TEXT
+                pricing_mode TEXT,
+                usage_seconds INTEGER DEFAULT 0
             );
 
             -- Sessions for surplus tracking
@@ -94,7 +95,13 @@ impl Database {
                 total_wh REAL,
                 surplus_wh REAL,
                 surplus_cost REAL,
-                label TEXT
+                label TEXT,
+                category TEXT
+            );
+
+            -- Schema version tracking
+            CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER NOT NULL
             );
 
             -- Indexes
@@ -105,18 +112,69 @@ impl Database {
         Ok(())
     }
 
-    /// Run incremental migrations (safe to call multiple times)
-    fn run_migrations(&self) {
-        // Add usage_seconds column to daily_stats
-        let _ = self.conn.execute(
-            "ALTER TABLE daily_stats ADD COLUMN usage_seconds INTEGER DEFAULT 0",
+    /// Get current schema version (0 if no version recorded)
+    fn get_schema_version(&self) -> Result<i64> {
+        // Ensure the schema_version table exists (for pre-migration DBs)
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);"
+        )?;
+
+        let version: i64 = self.conn.query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_version",
             [],
-        );
-        // Add category column to sessions
-        let _ = self.conn.execute(
-            "ALTER TABLE sessions ADD COLUMN category TEXT",
-            [],
-        );
+            |row| row.get(0),
+        )?;
+        Ok(version)
+    }
+
+    /// Set schema version
+    fn set_schema_version(&self, version: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM schema_version", [])?;
+        self.conn.execute(
+            "INSERT INTO schema_version (version) VALUES (?1)",
+            params![version],
+        )?;
+        Ok(())
+    }
+
+    /// Run version-based migrations
+    fn run_migrations(&self) -> Result<()> {
+        let mut version = self.get_schema_version()?;
+
+        if version < 1 {
+            // Migration 1: Add usage_seconds to daily_stats, category to sessions
+            // These may already exist from the old migration approach, so ignore "duplicate column" errors
+            match self.conn.execute(
+                "ALTER TABLE daily_stats ADD COLUMN usage_seconds INTEGER DEFAULT 0",
+                [],
+            ) {
+                Ok(_) => log::info!("Migration 1: added usage_seconds to daily_stats"),
+                Err(e) if e.to_string().contains("duplicate column") => {
+                    log::debug!("Migration 1: usage_seconds column already exists");
+                }
+                Err(e) => return Err(Error::Database(e)),
+            }
+
+            match self.conn.execute(
+                "ALTER TABLE sessions ADD COLUMN category TEXT",
+                [],
+            ) {
+                Ok(_) => log::info!("Migration 1: added category to sessions"),
+                Err(e) if e.to_string().contains("duplicate column") => {
+                    log::debug!("Migration 1: category column already exists");
+                }
+                Err(e) => return Err(Error::Database(e)),
+            }
+
+            version = 1;
+            self.set_schema_version(version)?;
+            log::info!("Schema updated to version {}", version);
+        }
+
+        // Future migrations go here:
+        // if version < 2 { ... version = 2; self.set_schema_version(version)?; }
+
+        Ok(())
     }
 
     /// Insert a power reading
@@ -519,6 +577,7 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         let db = Database { conn };
         db.init_schema().unwrap();
+        db.run_migrations().unwrap();
         db
     }
 
