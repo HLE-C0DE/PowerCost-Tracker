@@ -6,7 +6,7 @@ mod types;
 
 // SimplePricing is used by bin/demo.rs
 #[allow(unused_imports)]
-pub use config::{Config, PricingConfig, DashboardConfig, LayoutProfile, SimplePricing};
+pub use config::{Config, PricingConfig, DashboardConfig, LayoutProfile, SimplePricing, PeakOffpeakPricing, SeasonalPricing, TempoPricing};
 pub use error::{Error, Result};
 #[allow(unused_imports)]
 pub use types::{PowerReading, DashboardData, AppState, SystemMetrics, CpuMetrics, GpuMetrics, MemoryMetrics, ProcessMetrics, Session, SessionCategory, BaselineDetection, CriticalMetrics, DetailedMetrics, FanMetrics, FanReading, VoltageReading};

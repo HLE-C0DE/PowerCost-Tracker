@@ -363,14 +363,51 @@ impl EstimationMonitor {
         }
     }
 
+    /// Create an EstimationMonitor with custom idle power and TDP values
+    ///
+    /// `idle_power` is the baseline idle consumption in watts.
+    /// `tdp` is the thermal design power in watts; max power will be `idle_power + tdp`.
+    #[cfg(test)]
+    pub fn with_power_values(idle_power: f64, tdp: f64) -> Self {
+        let mut sys = System::new();
+        sys.refresh_cpu_usage();
+
+        let cpu_specs = CpuSpecs::detect(&sys);
+
+        Self {
+            sys: Mutex::new(sys),
+            cpu_specs,
+            idle_power_override: Some(idle_power),
+            max_power_override: Some(idle_power + tdp),
+        }
+    }
+
+    /// Get the detected TDP value
+    #[cfg(test)]
+    pub fn get_detected_tdp(&self) -> f64 {
+        self.cpu_specs.profile.tdp
+    }
+
+    /// Get the detected CPU name
+    #[cfg(test)]
+    pub fn get_cpu_name(&self) -> &str {
+        &self.cpu_specs.name
+    }
+
+    /// Get the detected core count
+    #[cfg(test)]
+    pub fn get_core_count(&self) -> usize {
+        self.cpu_specs.core_count
+    }
+
     /// Get the effective idle power
-    fn get_idle_power(&self) -> f64 {
+    pub fn get_idle_power(&self) -> f64 {
         self.idle_power_override
             .unwrap_or_else(|| self.cpu_specs.profile.idle_power())
     }
 
     /// Get the effective max power
-    fn get_max_power(&self) -> f64 {
+    pub fn get_max_power(&self) -> f64 {
         self.max_power_override
             .unwrap_or_else(|| self.cpu_specs.profile.max_power())
     }
@@ -510,7 +547,7 @@ mod tests {
     #[test]
     fn test_cpu_categorization() {
         // Intel laptop
-        let (cat, is_laptop) = CpuSpecs::categorize_cpu("Intel Core i7-1165G7 @ 2.80GHz", 4);
+        let (cat, _is_laptop) = CpuSpecs::categorize_cpu("Intel Core i7-1165G7 @ 2.80GHz", 4);
         assert!(matches!(
             cat,
             CpuCategory::IntelDesktopI7 | CpuCategory::IntelLaptopU | CpuCategory::IntelLaptopP
