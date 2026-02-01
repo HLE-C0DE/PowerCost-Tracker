@@ -95,6 +95,17 @@ Files stored at:
 - Linux: `~/.config/powercost-tracker/config.toml`
 - Windows: `%APPDATA%/PowerCost-Tracker/config.toml`
 
+## Large Files — Read with offset/limit
+
+Some files exceed the token limit and **must** be read in chunks using `offset` and `limit` parameters. Never read them in full.
+
+| File | Lines | Sections (line ranges) |
+|------|-------|----------------------|
+| `ui/src/main.js` | ~4250 | Widget Registry & helpers (1–604), State & Init (605–710), Translations & Nav (711–810), Dashboard rendering (811–1420), Edit Mode & Drag/Drop (1448–1990), Resize & Layout (1990–2390), Tiered Updates & Push Events (2393–2740), Power Graph (2741–2830), Session Controls (2830–2870), History (2871–3636), Settings (3637–3840), Categories (3844–3900), Utilities & Display Components (3904–4250) |
+| `src-tauri/src/main.rs` | ~1270 | Read in halves: 1–650, 651–1270 |
+
+When modifying these files, read only the relevant section instead of the entire file.
+
 ## Development Notes
 
 ### Performance Targets
