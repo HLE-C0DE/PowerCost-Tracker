@@ -97,8 +97,8 @@ const WIDGET_REGISTRY = {
         titleKey: 'widget.cpu',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
         defaultSize: 'medium',
-        defaultColSpan: 4,
-        defaultRowSpan: 2,  // Needs height for chart/radial modes
+        defaultColSpan: 3,
+        defaultRowSpan: 3,  // Needs height for chart/radial modes
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const cpu = data.systemMetrics?.cpu;
@@ -219,8 +219,8 @@ const WIDGET_REGISTRY = {
         titleKey: 'widget.gpu',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>`,
         defaultSize: 'medium',
-        defaultColSpan: 4,
-        defaultRowSpan: 2,  // Needs height for chart/radial modes
+        defaultColSpan: 3,
+        defaultRowSpan: 3,  // Needs height for chart/radial modes
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const gpu = data.systemMetrics?.gpu;
@@ -326,8 +326,8 @@ const WIDGET_REGISTRY = {
         titleKey: 'widget.ram',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="2" x2="6" y2="6"/><line x1="10" y1="2" x2="10" y2="6"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="18" y1="2" x2="18" y2="6"/></svg>`,
         defaultSize: 'large',
-        defaultColSpan: 4,
-        defaultRowSpan: 2,
+        defaultColSpan: 3,
+        defaultRowSpan: 3,
         supportsDisplayModes: true,
         render: (data, displayMode = 'bar') => {
             const mem = data.systemMetrics?.memory;
@@ -497,7 +497,7 @@ const WIDGET_REGISTRY = {
         shortTitleKey: 'widget.processes_short',
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
         defaultSize: 'large',
-        defaultColSpan: 4,
+        defaultColSpan: 3,
         defaultRowSpan: 3,  // Needs height for process list
         render: (data) => {
             const processes = data.topProcesses;
@@ -510,16 +510,18 @@ const WIDGET_REGISTRY = {
 
             const pinnedIcon = `<svg class="pin-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" width="12" height="12"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
             const unpinnedIcon = `<svg class="pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+            const killIcon = `<svg class="kill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
 
             return `
                 <div class="process-widget">
                     <div class="process-header">
                         <div class="process-header-row">
+                            <span class="process-col-pin"></span>
                             <span class="process-col-name">${t('processes.header.name')}</span>
                             <span class="process-col-cpu">${t('processes.header.cpu')}</span>
                             <span class="process-col-gpu">${t('processes.header.gpu')}</span>
                             <span class="process-col-ram">${t('processes.header.ram')}</span>
-                            <span class="process-col-pin"></span>
+                            <span class="process-col-kill"></span>
                         </div>
                         <button class="btn-icon process-advanced-toggle ${advancedMode ? 'active' : ''}" title="${advancedMode ? t('widget.show_top') : t('widget.search_processes')}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -534,12 +536,15 @@ const WIDGET_REGISTRY = {
                             const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
                             return `
                                 <div class="process-row ${proc.is_pinned ? 'pinned' : ''}">
-                                    <span class="process-name" title="${proc.name}">${proc.is_pinned ? '<span class="pinned-indicator">📌</span>' : ''}${proc.name.slice(0, 20)}</span>
+                                    <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? t('widget.unpin') : t('widget.pin')}">
+                                        ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                                    </button>
+                                    <span class="process-name" title="${proc.name}">${proc.name.slice(0, 20)}</span>
                                     <span class="process-cpu">${cpuVal}%</span>
                                     <span class="process-gpu">${gpuVal}%</span>
                                     <span class="process-ram">${ramVal}%</span>
-                                    <button class="process-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? t('widget.unpin') : t('widget.pin')}">
-                                        ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                                    <button class="process-kill-btn" data-name="${proc.name}" title="${t('processes.kill_confirm')}: ${proc.name}">
+                                        ${killIcon}
                                     </button>
                                 </div>
                             `;
@@ -939,6 +944,23 @@ function setupProcessModal() {
                 showToast(t('processes.pin_failed'), 'error');
             }
         }
+
+        const killBtn = e.target.closest('.process-modal-kill-btn');
+        if (killBtn) {
+            const name = killBtn.dataset.name;
+            if (!name) return;
+
+            if (!confirm(`${t('processes.kill_confirm')}: ${name}?`)) return;
+
+            try {
+                await invoke('kill_process', { name });
+                showToast(`${t('processes.killed')}: ${name}`, 'success');
+                await refreshProcessModalList();
+            } catch (error) {
+                console.error('Failed to kill process:', error);
+                showToast(`${t('processes.kill_failed')}: ${name}`, 'error');
+            }
+        }
     });
 }
 
@@ -998,6 +1020,7 @@ function renderProcessModalList(processes) {
 
     const pinnedIcon = `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" width="14" height="14"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
     const unpinnedIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+    const killIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
 
     list.innerHTML = processes.map(proc => {
         const cpuVal = (proc.cpu_percent != null && !isNaN(proc.cpu_percent)) ? formatNumber(proc.cpu_percent, 1) : '--';
@@ -1005,12 +1028,15 @@ function renderProcessModalList(processes) {
         const ramVal = (proc.memory_percent != null && !isNaN(proc.memory_percent)) ? formatNumber(proc.memory_percent, 1) : '--';
         return `
             <div class="process-modal-row ${proc.is_pinned ? 'pinned' : ''}">
-                <span class="process-modal-name" title="${proc.name}">${proc.is_pinned ? '<span class="pinned-indicator">📌</span>' : ''}${proc.name}</span>
+                <button class="process-modal-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? t('widget.unpin') : t('widget.pin')}">
+                    ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                </button>
+                <span class="process-modal-name" title="${proc.name}">${proc.name}</span>
                 <span class="process-modal-cpu">${cpuVal}%</span>
                 <span class="process-modal-gpu">${gpuVal}%</span>
                 <span class="process-modal-ram">${ramVal}%</span>
-                <button class="process-modal-pin-btn" data-name="${proc.name}" title="${proc.is_pinned ? t('widget.unpin') : t('widget.pin')}">
-                    ${proc.is_pinned ? pinnedIcon : unpinnedIcon}
+                <button class="process-modal-kill-btn" data-name="${proc.name}" title="${t('processes.kill_confirm')}: ${proc.name}">
+                    ${killIcon}
                 </button>
             </div>
         `;
@@ -1152,6 +1178,35 @@ async function handleDashboardClick(e) {
         } catch (error) {
             console.error('Failed to toggle pin:', error);
             showToast(t('processes.pin_failed'), 'error');
+        }
+    }
+
+    // Handle process kill
+    const killBtn = e.target.closest('.process-kill-btn');
+    if (killBtn) {
+        e.stopPropagation();
+        const name = killBtn.dataset.name;
+        if (!name) return;
+
+        if (!confirm(`${t('processes.kill_confirm')}: ${name}?`)) return;
+
+        try {
+            await invoke('kill_process', { name });
+            showToast(`${t('processes.killed')}: ${name}`, 'success');
+
+            // Refresh processes and update widget
+            if (state.processAdvancedMode) {
+                state.allProcesses = await invoke('get_all_processes');
+            } else {
+                state.topProcesses = await invoke('get_top_processes', {});
+            }
+            const processWidget = document.querySelector('[data-widget-id="processes"] .widget-content');
+            if (processWidget) {
+                processWidget.innerHTML = WIDGETS.processes.render({ topProcesses: state.topProcesses });
+            }
+        } catch (error) {
+            console.error('Failed to kill process:', error);
+            showToast(`${t('processes.kill_failed')}: ${name}`, 'error');
         }
     }
 }

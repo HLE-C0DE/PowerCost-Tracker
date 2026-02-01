@@ -318,6 +318,28 @@ async fn get_pinned_processes(state: tauri::State<'_, TauriState>) -> Result<Vec
     Ok(config.advanced.pinned_processes.clone())
 }
 
+/// Kill a process by name
+#[tauri::command]
+async fn kill_process(name: String) -> Result<(), String> {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes();
+
+    let mut killed = false;
+    for (_pid, process) in sys.processes() {
+        if process.name().eq_ignore_ascii_case(&name) {
+            if process.kill() {
+                killed = true;
+            }
+        }
+    }
+
+    if killed {
+        Ok(())
+    } else {
+        Err(format!("Could not kill process: {}", name))
+    }
+}
+
 /// Set process list limit
 #[tauri::command]
 async fn set_process_limit(state: tauri::State<'_, TauriState>, limit: usize) -> Result<(), String> {
@@ -758,6 +780,7 @@ fn main() {
             pin_process,
             unpin_process,
             get_pinned_processes,
+            kill_process,
             set_process_limit,
             // Session tracking commands
             start_tracking_session,

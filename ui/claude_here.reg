@@ -1,0 +1,23 @@
+Windows Registry Editor Version 5.00
+
+; Disable Windows 11 new context menu
+[HKEY_CURRENT_USER\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32]
+@=""
+
+; Right-click on folder background
+[HKEY_CLASSES_ROOT\Directory\Background\shell\claude]
+@="Claude Code here"
+"Icon"="cmd.exe"
+
+[HKEY_CLASSES_ROOT\Directory\Background\shell\claude\command]
+@="cmd.exe /k claude"
+
+; Right-click on a folder
+[HKEY_CLASSES_ROOT\Directory\shell\claude]
+@="Claude Code here"
+"Icon"="cmd.exe"
+
+[HKEY_CLASSES_ROOT\Directory\shell\claude\command]
+@="cmd.exe /k cd /d \"%1\" && claude"
+
+

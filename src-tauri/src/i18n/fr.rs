@@ -191,6 +191,9 @@ pub fn get_translations() -> HashMap<String, String> {
     t.insert("processes.pinned".into(), "Épinglé".into());
     t.insert("processes.unpinned".into(), "Désépinglé".into());
     t.insert("processes.pin_failed".into(), "Échec de la mise à jour de l'épingle".into());
+    t.insert("processes.killed".into(), "Processus arrêté".into());
+    t.insert("processes.kill_failed".into(), "Échec de l'arrêt du processus".into());
+    t.insert("processes.kill_confirm".into(), "Arrêter le processus".into());
 
     // Settings - Baseline detection
     t.insert("settings.baseline".into(), "Détection de base".into());

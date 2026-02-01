@@ -1868,6 +1868,10 @@ body {
     flex: 0 0 24px;
 }
 
+.process-col-kill {
+    flex: 0 0 24px;
+}
+
 .process-advanced-toggle {
     padding: 4px;
     background: transparent;
@@ -1966,6 +1970,10 @@ body {
     flex: 0 0 30px;
 }
 
+.process-modal-col-kill {
+    flex: 0 0 30px;
+}
+
 .process-modal-list {
     max-height: 400px;
     overflow-y: auto;
@@ -2047,6 +2055,27 @@ body {
 
 .process-modal-row.pinned .process-modal-pin-btn {
     color: var(--accent-primary);
+}
+
+.process-modal-kill-btn {
+    flex: 0 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all var(--transition-fast);
+}
+
+.process-modal-kill-btn:hover {
+    opacity: 1;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-red, #ef4444);
 }
 
 .process-modal-empty {
@@ -2177,6 +2206,36 @@ body {
 }
 
 .pin-icon {
+    width: 12px;
+    height: 12px;
+}
+
+.process-kill-btn {
+    flex: 0 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast);
+}
+
+.process-row:hover .process-kill-btn {
+    opacity: 0.7;
+}
+
+.process-kill-btn:hover {
+    opacity: 1 !important;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-red, #ef4444);
+}
+
+.kill-icon {
     width: 12px;
     height: 12px;
 }
