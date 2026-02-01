@@ -93,14 +93,17 @@ Track costs for specific activities:
 2. Start a tracking session when gaming or running LLMs
 3. See only the **surplus cost** - the extra electricity your activity is consuming
 4. **Categorize sessions** (Gaming, AI/ML, Mining, Work, etc.) with custom labels
-5. View session history with histogram visualization and usage stats
+5. **Inline edit & delete** sessions directly in the history view
+6. View session history with summary stats cards, histogram visualization, and usage breakdowns
 
 ### Hardware Monitoring Dashboard
 
 - **CPU**: Usage %, frequency, temperature
 - **GPU**: Usage %, power draw, VRAM, temperature (NVIDIA & AMD)
 - **RAM**: Usage percentage, amount, and DDR type detection
-- **Customizable widgets**: Drag-and-drop layout, resize, show/hide
+- **Top processes**: View top consumers with pin and kill process actions
+- **Customizable widgets**: Drag-and-drop layout, resize (12-column grid), show/hide
+- **Layout profiles**: Save and switch between multiple dashboard arrangements
 
 ### Floating Widget
 
@@ -111,11 +114,13 @@ A compact overlay that stays visible while you work or game:
 - Adjustable opacity
 - Stays on top of other windows
 
+### Quality of Life
 
-
-### Bilingual Interface
-
-Full support for **English** and **French** (Francais).
+- **Check for updates** — get notified when a new version is available
+- **Run as Administrator** — one-click elevation for full hardware access (Windows)
+- **Remember window position & size** — DPI-aware, multi-monitor support
+- **Bilingual interface** — full English and French support
+- **Dark/Light/System themes**
 
 ---
 
@@ -340,13 +345,24 @@ cd src-tauri && cargo run --bin powercost-demo
 
 ### v1.2.0 (Current Release)
 
+- **Check for updates** — in-app update checker notifies you when a new version is available
+- **Date & time dashboard widget** — configurable datetime widget with multiple format options
+- **Layout profiles** — save, load, and switch between multiple dashboard layouts with a non-deletable Default profile
+- **Run as Administrator** — elevation detection, settings toggle, and tray-based restart as admin (Windows)
+- **Kill process button** — terminate processes directly from the top processes widget
+- **12-column dashboard grid** — finer layout control with per-widget resize minimums
+- **Remember window position & size** — persisted across restarts, with DPI-aware restore on multi-monitor setups
+- **Inline session editing & deletion** — edit session labels and delete entries directly in the history tab
+- **Session summary stats** — summary cards for session history with category breakdowns
+- **Version-based DB migrations** — robust database schema upgrades replacing silent error handling
 - **Native NVML GPU monitoring** — direct library integration replaces nvidia-smi CLI for faster, more reliable GPU readings
 - **Unified history view** — Power and Sessions share a single set of period filters with a segmented control toggle
 - **Segmented controls** — iOS-style animated tab controls replace the old tab/range buttons across the history view
 - **Session categories & labels** — tag sessions (Gaming, AI/ML, Mining, etc.) with usage tracking and histogram visualization
 - **DDR type detection** — RAM widget now identifies DDR4/DDR5 memory type
 - **Collapsible status badge** — cleaner UI with a collapsible power source indicator
-- Bug fixes: Windows per-core frequency deadlock, session controls refresh, estimation accuracy
+- **Wider sidebar** — improved navigation with text ellipsis for long labels (e.g. French translations)
+- Bug fixes: session widget race condition, per-core frequency deadlock, session controls refresh, estimation accuracy
 
 ### v1.1.0
 
