@@ -365,12 +365,14 @@ const WIDGET_REGISTRY = {
                     const swapTotalGB = mem.swap_total_bytes / (1024 * 1024 * 1024);
                     ramBars.push({ value: swapUsedGB, max: swapTotalGB, label: `<span style="font-weight:700;color:#a855f7">${formatNumber(swapUsedGB, 1)}G</span>`, color: '#a855f7', name: 'SWAP' });
                 }
+                const dramPowerHtml = mem.power_watts ? `<div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}"><span style="color:#f59e0b">⚡</span> ${formatNumber(mem.power_watts, 1)} W</div>` : '';
                 return `
                     <div class="radial-container">
                         ${renderRadialProgress(mem.usage_percent, 'RAM', '#f59e0b')}
                         ${renderChargeBars(ramBars)}
                     </div>
                     ${mem.memory_speed_mhz ? `<div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${mem.memory_type ? mem.memory_type + ' ' : ''}${mem.memory_speed_mhz} MHz</div>` : ''}
+                    ${dramPowerHtml}
                 `;
             }
 
@@ -392,10 +394,12 @@ const WIDGET_REGISTRY = {
                 const hasSwap = mem.swap_total_bytes && mem.swap_total_bytes > 0;
                 const swapUsedGB = hasSwap ? mem.swap_used_bytes / (1024 * 1024 * 1024) : 0;
                 const swapTotalGB = hasSwap ? mem.swap_total_bytes / (1024 * 1024 * 1024) : 0;
+                const dramPowerHtml = mem.power_watts && globalDisplay === 'normal' ? `<div class="metric-info"><span style="color:#f59e0b">⚡</span> ${formatNumber(mem.power_watts, 1)} W</div>` : '';
                 return `
                     <div class="widget-value">${formatNumber(mem.usage_percent, 0)}<span class="unit">%</span></div>
                     <div class="metric-info ${globalDisplay !== 'normal' ? 'hidden' : ''}">${formatNumber(usedGB, 1)} / ${formatNumber(totalGB, 1)} GB</div>
                     ${hasSwap && globalDisplay === 'normal' ? `<div class="metric-info">${t('widget.swap')}: ${formatNumber(swapUsedGB, 1)} / ${formatNumber(swapTotalGB, 1)} GB</div>` : ''}
+                    ${dramPowerHtml}
                 `;
             }
 
@@ -404,6 +408,11 @@ const WIDGET_REGISTRY = {
             const swapUsedGB = hasSwap ? mem.swap_used_bytes / (1024 * 1024 * 1024) : 0;
             const swapTotalGB = hasSwap ? mem.swap_total_bytes / (1024 * 1024 * 1024) : 0;
             const swapPercent = hasSwap ? mem.swap_usage_percent : 0;
+            const dramPowerHtml = mem.power_watts && globalDisplay === 'normal' ? `
+                <div class="metric-row">
+                    <span class="metric-label"><span style="color:#f59e0b">⚡</span> DRAM</span>
+                    <span class="metric-value">${formatNumber(mem.power_watts, 1)} W</span>
+                </div>` : '';
             return `
                 <div class="metric-row">
                     <div class="progress-bar"><div class="progress-fill ram-fill" style="width: ${mem.usage_percent}%"></div></div>
@@ -414,6 +423,7 @@ const WIDGET_REGISTRY = {
                     <span class="metric-label">${t('widget.speed')}</span>
                     <span class="metric-value">${mem.memory_type ? mem.memory_type + ' ' : ''}${mem.memory_speed_mhz} MHz</span>
                 </div>` : ''}
+                ${dramPowerHtml}
                 ${hasSwap && globalDisplay === 'normal' ? `
                 <div class="metric-row" style="margin-top: 4px">
                     <span class="metric-label">${t('widget.swap')}</span>

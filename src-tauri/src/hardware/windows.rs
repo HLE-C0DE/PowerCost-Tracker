@@ -863,6 +863,7 @@ impl WmiMonitor {
             swap_usage_percent: swap_percent,
             memory_speed_mhz: mem_speed,
             memory_type: mem_type,
+            power_watts: None, // DRAM power not available on Windows (no RAPL access)
         };
 
         Ok(SystemMetrics {

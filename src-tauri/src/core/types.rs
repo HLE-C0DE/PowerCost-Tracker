@@ -186,6 +186,9 @@ pub struct MemoryMetrics {
     /// Memory type (e.g. "DDR4", "DDR5")
     #[serde(default)]
     pub memory_type: Option<String>,
+    /// DRAM power consumption in watts (from RAPL on Linux, if available)
+    #[serde(default)]
+    pub power_watts: Option<f64>,
 }
 
 /// Process metrics for top processes display

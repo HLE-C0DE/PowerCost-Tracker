@@ -27,6 +27,14 @@ pub struct RaplMonitor {
     last_energy: Mutex<u64>,
     last_time: Mutex<Instant>,
     component_paths: HashMap<String, PathBuf>,
+    /// Track last energy for each component (dram, core, etc.) for overflow handling
+    component_last_energy: Mutex<HashMap<String, u64>>,
+    /// Track last time for each component to compute power in watts
+    component_last_time: Mutex<HashMap<String, Instant>>,
+    /// Max energy range for each component
+    component_max_energy: HashMap<String, u64>,
+    /// Count of overflow events (for diagnostics)
+    overflow_count: Mutex<u64>,
 }
 
 impl RaplMonitor {
@@ -53,9 +61,16 @@ impl RaplMonitor {
         let max_energy: u64 = fs::read_to_string(&max_energy_path)
             .ok()
             .and_then(|s| s.trim().parse().ok())
-            .unwrap_or(u64::MAX);
+            .unwrap_or_else(|| {
+                // Typical RAPL max is ~262 kJ for 32-bit counter, use safe default
+                log::warn!("Could not read max_energy_range_uj, using default 262143328850 µJ");
+                262_143_328_850 // ~262 kJ, typical Intel max
+            });
 
         let mut component_paths = HashMap::new();
+        let mut component_max_energy = HashMap::new();
+        let mut component_last_energy = HashMap::new();
+
         for entry in fs::read_dir(&package_path).into_iter().flatten() {
             if let Ok(entry) = entry {
                 let path = entry.path();
@@ -64,7 +79,27 @@ impl RaplMonitor {
                     let energy_uj_path = path.join("energy_uj");
                     if name_path.exists() && energy_uj_path.exists() {
                         if let Ok(name) = fs::read_to_string(&name_path) {
-                            component_paths.insert(name.trim().to_string(), energy_uj_path);
+                            let name = name.trim().to_string();
+
+                            // Read max energy for this component
+                            let comp_max = path.join("max_energy_range_uj");
+                            let max_val = fs::read_to_string(&comp_max)
+                                .ok()
+                                .and_then(|s| s.trim().parse().ok())
+                                .unwrap_or(max_energy); // fallback to package max
+
+                            // Read initial energy for overflow tracking
+                            if let Ok(initial) = fs::read_to_string(&energy_uj_path)
+                                .ok()
+                                .and_then(|s| s.trim().parse::<u64>().ok())
+                                .ok_or(())
+                            {
+                                component_last_energy.insert(name.clone(), initial);
+                            }
+
+                            component_max_energy.insert(name.clone(), max_val);
+                            component_paths.insert(name.clone(), energy_uj_path);
+                            log::info!("RAPL component '{}' discovered (max: {} µJ)", name, max_val);
                         }
                     }
                 }
@@ -77,12 +112,24 @@ impl RaplMonitor {
             .parse()
             .map_err(|_| Error::PowerMonitor("Failed to parse energy value".to_string()))?;
 
+        log::info!("RAPL initialized: max_energy={} µJ, components={:?}",
+                   max_energy, component_paths.keys().collect::<Vec<_>>());
+
+        // Initialize component timing
+        let component_last_time: HashMap<String, Instant> = component_paths.keys()
+            .map(|k| (k.clone(), Instant::now()))
+            .collect();
+
         Ok(Self {
             energy_path,
             max_energy,
             last_energy: Mutex::new(initial_energy),
             last_time: Mutex::new(Instant::now()),
             component_paths,
+            component_last_energy: Mutex::new(component_last_energy),
+            component_last_time: Mutex::new(component_last_time),
+            component_max_energy,
+            overflow_count: Mutex::new(0),
         })
     }
 
@@ -100,11 +147,22 @@ impl RaplMonitor {
         let mut last_energy = self.last_energy.lock().unwrap();
         let mut last_time = self.last_time.lock().unwrap();
 
-        let energy_diff = if current_energy >= *last_energy {
-            current_energy - *last_energy
+        let (energy_diff, overflowed) = if current_energy >= *last_energy {
+            (current_energy - *last_energy, false)
         } else {
-            (self.max_energy - *last_energy) + current_energy
+            // Overflow detected: counter wrapped around
+            let diff = (self.max_energy - *last_energy) + current_energy;
+            (diff, true)
         };
+
+        if overflowed {
+            let mut count = self.overflow_count.lock().unwrap();
+            *count += 1;
+            log::debug!(
+                "RAPL overflow #{}: counter wrapped (last={}, current={}, max={}, computed_diff={})",
+                *count, *last_energy, current_energy, self.max_energy, energy_diff
+            );
+        }
 
         let time_diff = current_time.duration_since(*last_time);
         *last_energy = current_energy;
@@ -116,7 +174,77 @@ impl RaplMonitor {
             0.0
         };
 
+        // Sanity check: reject obviously wrong values (> 10 kW for a desktop)
+        if power_watts > 10_000.0 {
+            log::warn!(
+                "RAPL reading rejected: {} W is unrealistic (possible overflow miscalculation)",
+                power_watts
+            );
+            return Ok(0.0);
+        }
+
         Ok(power_watts)
+    }
+
+    /// Read power in watts from a specific RAPL component (e.g., "dram", "core", "uncore")
+    /// Returns None if component not available or read fails
+    fn get_component_power_watts(&self, component: &str) -> Option<f64> {
+        let energy_path = self.component_paths.get(component)?;
+        let max_energy = self.component_max_energy.get(component).copied()?;
+
+        let current_energy: u64 = fs::read_to_string(energy_path)
+            .ok()?
+            .trim()
+            .parse()
+            .ok()?;
+
+        let current_time = Instant::now();
+
+        let mut last_energy_map = self.component_last_energy.lock().unwrap();
+        let mut last_time_map = self.component_last_time.lock().unwrap();
+
+        let last_energy = last_energy_map.get(component).copied().unwrap_or(current_energy);
+        let last_time = last_time_map.get(component).copied().unwrap_or(current_time);
+
+        let (energy_diff, overflowed) = if current_energy >= last_energy {
+            (current_energy - last_energy, false)
+        } else {
+            ((max_energy - last_energy) + current_energy, true)
+        };
+
+        if overflowed {
+            log::debug!("RAPL component '{}' overflow detected", component);
+        }
+
+        let time_diff = current_time.duration_since(last_time);
+
+        last_energy_map.insert(component.to_string(), current_energy);
+        last_time_map.insert(component.to_string(), current_time);
+
+        // Convert µJ to watts: W = µJ / µs = µJ / (s * 1_000_000)
+        let power_watts = if time_diff.as_secs_f64() > 0.0 {
+            (energy_diff as f64) / time_diff.as_secs_f64() / 1_000_000.0
+        } else {
+            return None; // No time elapsed, can't compute power
+        };
+
+        // Sanity check: DRAM typically uses 1-20W
+        if power_watts > 100.0 {
+            log::warn!("RAPL {} power {} W seems too high, rejecting", component, power_watts);
+            return None;
+        }
+
+        Some(power_watts)
+    }
+
+    /// Get DRAM power in watts if available (useful for memory-intensive workloads)
+    pub fn get_dram_power_watts(&self) -> Option<f64> {
+        self.get_component_power_watts("dram")
+    }
+
+    /// Get total overflow count (for diagnostics)
+    pub fn get_overflow_count(&self) -> u64 {
+        *self.overflow_count.lock().unwrap()
     }
 }
 
@@ -227,6 +355,14 @@ impl InnerPowerSource {
             InnerPowerSource::Battery(_) => "battery",
         }
     }
+
+    /// Get DRAM power in watts if available (RAPL only)
+    fn get_dram_power_watts(&self) -> Option<f64> {
+        match self {
+            InnerPowerSource::Rapl(m) => m.get_dram_power_watts(),
+            _ => None,
+        }
+    }
 }
 
 // ===== Hwmon Discovery =====
@@ -315,6 +451,13 @@ impl LinuxSystemMonitor {
     pub fn try_battery() -> Result<Self> {
         let battery = BatteryMonitor::new()?;
         Ok(Self::new_with_source(InnerPowerSource::Battery(battery)))
+    }
+
+    // ----- DRAM Power (RAPL only) -----
+
+    /// Get DRAM power consumption in watts if available (RAPL only)
+    fn get_dram_power(&self) -> Option<f64> {
+        self.inner_power.get_dram_power_watts()
     }
 
     // ----- CPU Temperature -----
@@ -678,6 +821,9 @@ impl LinuxSystemMonitor {
             (None, None, None)
         };
 
+        // DRAM power from RAPL if available
+        let dram_power = self.get_dram_power();
+
         let memory = MemoryMetrics {
             used_bytes: used_memory,
             total_bytes: total_memory,
@@ -687,6 +833,7 @@ impl LinuxSystemMonitor {
             swap_usage_percent: swap_percent,
             memory_speed_mhz: None, // Not easily available on Linux without dmidecode
             memory_type: None,
+            power_watts: dram_power,
         };
 
         Ok(SystemMetrics {
